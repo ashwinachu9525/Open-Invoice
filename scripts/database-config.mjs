@@ -30,6 +30,13 @@ export function getDatabaseConfig() {
     }
   }
 
+  if (process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL) {
+    return {
+      provider: "postgresql",
+      postgresqlUrl: process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL,
+    }
+  }
+
   return { provider: "sqlite" }
 }
 

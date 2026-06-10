@@ -18,7 +18,7 @@ function getDatabaseUrl(): string {
       return `file:${path.join(dataDir, "invoice.db")}`
     }
 
-    return config.postgresqlUrl || process.env.DATABASE_URL || ""
+    return config.postgresqlUrl || process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || ""
   }
 
   if (process.env.DATABASE_PROVIDER === "sqlite") {
@@ -27,7 +27,7 @@ function getDatabaseUrl(): string {
     return `file:${path.join(dataDir, "invoice.db")}`
   }
 
-  return process.env.DATABASE_URL || ""
+  return process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || ""
 }
 
 export default defineConfig({
