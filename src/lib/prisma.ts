@@ -21,14 +21,41 @@ function createSqliteClient(log: ("error" | "warn")[]): PrismaClient {
   return new PrismaClient({ adapter, log })
 }
 
-function createPostgresClient(log: ("error" | "warn")[]): PrismaClient {
-  // Use Prisma's native Rust engine — it handles SSL (Aiven, Supabase, Neon, etc.)
-  // automatically without any driver-level SSL hacks. DATABASE_URL is read from env.
-  return new PrismaClient({ log })
+function createPostgresClient(databaseUrl: string, log: ("error" | "warn")[]): PrismaClient {
+  const { PrismaPg } = require("@prisma/adapter-pg") as typeof import("@prisma/adapter-pg")
+  const { Pool } = require("pg") as typeof import("pg")
+
+  // Cloud providers (Aiven, Supabase, Neon, etc.) require SSL but use custom certificates.
+  // We MUST strip sslmode from the URL and configure ssl on the Pool object directly —
+  // otherwise the pg driver's URL parser fights with our ssl config and rejects the cert.
+  const cleanUrl = databaseUrl
+    .replace(/[?&]sslmode=[^&]*/g, "")
+    .replace(/[?&]supa=[^&]*/g, "")
+    .replace(/[?&]pool_mode=[^&]*/g, "")
+    .replace(/[?&]pgbouncer=[^&]*/g, "")
+    .replace(/\?$/, "")
+    .replace(/&$/, "")
+
+  const needsSsl = /^postgres(ql)?s?:\/\//i.test(databaseUrl) ||
+    databaseUrl.includes("sslmode=require") ||
+    databaseUrl.includes("sslmode=prefer") ||
+    databaseUrl.includes("aivencloud.com") ||
+    databaseUrl.includes("supabase.com") ||
+    databaseUrl.includes("neon.tech") ||
+    databaseUrl.includes("aiven.io")
+
+  const pool = new Pool({
+    connectionString: cleanUrl,
+    ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
+  })
+
+  const adapter = new PrismaPg(pool)
+  return new PrismaClient({ adapter, log })
 }
 
 function createPrismaClient(): PrismaClient {
   const provider = getActiveProvider()
+  const databaseUrl = getDatabaseUrl()
   const log: ("error" | "warn")[] =
     process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"]
 
@@ -36,7 +63,11 @@ function createPrismaClient(): PrismaClient {
     return createSqliteClient(log)
   }
 
-  return createPostgresClient(log)
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is not configured. Set DATABASE_URL in your environment variables.")
+  }
+
+  return createPostgresClient(databaseUrl, log)
 }
 
 const currentProvider = getActiveProvider()
