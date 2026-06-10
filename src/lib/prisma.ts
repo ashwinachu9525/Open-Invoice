@@ -21,44 +21,22 @@ function createSqliteClient(log: ("error" | "warn")[]): PrismaClient {
   return new PrismaClient({ adapter, log })
 }
 
-function createPostgresClient(databaseUrl: string, log: ("error" | "warn")[]): PrismaClient {
-  if (databaseUrl.startsWith("prisma+postgres://") || databaseUrl.startsWith("prisma://")) {
-    return new PrismaClient({ accelerateUrl: databaseUrl, log })
-  }
-
-  const { PrismaPg } = require("@prisma/adapter-pg") as typeof import("@prisma/adapter-pg")
-  const { Pool } = require("pg") as typeof import("pg")
-
-  // Strip ?sslmode=... from the URL — we handle SSL directly on the Pool object instead.
-  // This avoids the "self-signed certificate in certificate chain" error that the pg
-  // driver throws when it tries to validate cloud provider certs (Aiven, Supabase, Neon, etc.)
-  const cleanUrl = databaseUrl.replace(/[?&]sslmode=[^&]*/g, "").replace(/\?$/, "")
-  const requiresSsl = databaseUrl.includes("sslmode=require") || databaseUrl.includes("sslmode=no-verify") || databaseUrl.includes("sslmode=prefer")
-
-  const pool = new Pool({
-    connectionString: cleanUrl,
-    ssl: requiresSsl ? { rejectUnauthorized: false } : undefined,
-  })
-
-  const adapter = new PrismaPg(pool)
-  return new PrismaClient({ adapter, log })
+function createPostgresClient(log: ("error" | "warn")[]): PrismaClient {
+  // Use Prisma's native Rust engine — it handles SSL (Aiven, Supabase, Neon, etc.)
+  // automatically without any driver-level SSL hacks. DATABASE_URL is read from env.
+  return new PrismaClient({ log })
 }
 
 function createPrismaClient(): PrismaClient {
   const provider = getActiveProvider()
-  const databaseUrl = getDatabaseUrl()
   const log: ("error" | "warn")[] =
     process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"]
-
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL is not configured")
-  }
 
   if (provider === "sqlite") {
     return createSqliteClient(log)
   }
 
-  return createPostgresClient(databaseUrl, log)
+  return createPostgresClient(log)
 }
 
 const currentProvider = getActiveProvider()
