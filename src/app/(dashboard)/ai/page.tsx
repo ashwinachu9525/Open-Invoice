@@ -378,9 +378,9 @@ Please generate the structured JSON payload for this invoice immediately. Do not
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-6">
+    <div className="flex flex-col md:flex-row h-[calc(100dvh-7rem)] md:h-[calc(100vh-8rem)] gap-4 md:gap-6">
       {/* Sidebar */}
-      <div className="w-64 flex-shrink-0 flex flex-col gap-4 bg-black/20 border border-white/10 rounded-xl p-4 overflow-hidden hidden md:flex">
+      <div className="w-full md:w-64 flex-shrink-0 flex flex-col gap-4 bg-black/20 border border-white/10 rounded-xl p-4 overflow-hidden hidden md:flex">
         <Button onClick={handleNewChat} className="w-full justify-start gap-2" variant="outline">
           <Plus className="h-4 w-4" />
           New Chat
@@ -405,10 +405,15 @@ Please generate the structured JSON payload for this invoice immediately. Do not
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-black/20 border border-white/10 rounded-xl overflow-hidden relative">
-        <div className="p-4 border-b border-white/10 bg-black/40 flex items-center gap-3">
-          <Sparkles className="h-5 w-5 text-blue-500" />
-          <h2 className="font-semibold text-lg">AI Invoice Assistant</h2>
+      <div className="flex-1 flex flex-col bg-black/20 border border-white/10 rounded-xl overflow-hidden relative min-h-[400px]">
+        <div className="p-3 md:p-4 border-b border-white/10 bg-black/40 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Sparkles className="h-5 w-5 text-blue-500" />
+            <h2 className="font-semibold text-base md:text-lg">AI Invoice Assistant</h2>
+          </div>
+          <Button onClick={handleNewChat} variant="ghost" size="sm" className="md:hidden h-8 px-2 text-xs">
+            <Plus className="h-3 w-3 mr-1" /> New
+          </Button>
         </div>
         
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -445,13 +450,13 @@ Please generate the structured JSON payload for this invoice immediately. Do not
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-4 bg-black/40 border-t border-white/10 flex flex-col gap-3">
+        <div className="p-3 md:p-4 bg-black/40 border-t border-white/10 flex flex-col gap-3 shrink-0">
           {messages.length === 0 && (
             <div className="flex flex-wrap gap-2">
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="rounded-full text-xs bg-white/5 border-white/10 hover:bg-white/10"
+                className="rounded-full text-[10px] md:text-xs h-7 md:h-8 bg-white/5 border-white/10 hover:bg-white/10"
                 onClick={() => sendDirectMessage("Hello")}
               >
                 Say Hello
@@ -459,18 +464,10 @@ Please generate the structured JSON payload for this invoice immediately. Do not
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="rounded-full text-xs bg-white/5 border-white/10 hover:bg-white/10"
+                className="rounded-full text-[10px] md:text-xs h-7 md:h-8 bg-white/5 border-white/10 hover:bg-white/10"
                 onClick={() => sendDirectMessage("Create a new invoice")}
               >
                 Draft a new invoice
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-full text-xs bg-white/5 border-white/10 hover:bg-white/10"
-                onClick={() => sendDirectMessage("What is the GST rate for software?")}
-              >
-                Ask a question
               </Button>
             </div>
           )}
@@ -478,12 +475,12 @@ Please generate the structured JSON payload for this invoice immediately. Do not
             <Input 
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="E.g., Create an invoice for ABC Tech for $500..."
-              className="bg-black/50 border-white/20 h-12"
+              placeholder="E.g., Create an invoice..."
+              className="bg-black/50 border-white/20 h-10 md:h-12 text-base md:text-sm"
               disabled={isPending || !activeSessionId}
             />
-            <Button type="submit" disabled={isPending || !activeSessionId || !input.trim()} className="h-12 w-12 shrink-0 p-0 rounded-xl">
-              <Send className="h-5 w-5" />
+            <Button type="submit" disabled={isPending || !activeSessionId || !input.trim()} className="h-10 w-10 md:h-12 md:w-12 shrink-0 p-0 rounded-xl">
+              <Send className="h-4 w-4 md:h-5 md:w-5" />
             </Button>
           </form>
         </div>
