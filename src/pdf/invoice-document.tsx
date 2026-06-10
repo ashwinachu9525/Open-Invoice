@@ -52,14 +52,6 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: "row", width: 200, justifyContent: "space-between", paddingVertical: 2 },
   grandTotal: { fontSize: 14, fontWeight: "bold", color: "#1e40af" },
   footer: { position: "absolute", bottom: 40, left: 40, right: 40 },
-  watermark: {
-    position: "absolute",
-    top: "40%",
-    left: "20%",
-    fontSize: 60,
-    color: "#e5e7eb",
-    transform: "rotate(-45deg)",
-  },
 })
 
 interface InvoicePDFProps {
@@ -113,20 +105,24 @@ interface InvoicePDFProps {
       email?: string | null
       phone?: string | null
       logo?: string | null
+      invoiceTemplate?: string | null
     }
   }
   qrCodeDataUrl?: string
 }
 
 export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
-  const isDraft = invoice.status === "DRAFT"
-  const themeColor = invoice.themeColor || "#1e40af"
-  const themeFont = invoice.themeFont || "Helvetica"
+  const template = invoice.company.invoiceTemplate || "modern"
+  const themeColor = template === "classic" || template === "minimal" ? "#000000" : (invoice.themeColor || "#1e40af")
+  const themeFont = template === "classic" ? "Times-Roman" : (invoice.themeFont || "Helvetica")
+
+  const headerBgColor = template === "modern" ? `${themeColor}1A` : template === "classic" ? "#f3f4f6" : "#ffffff"
+  const headerTextColor = template === "modern" ? themeColor : "#000000"
+  const borderStyle = template === "minimal" ? { borderBottomWidth: 0 } : { borderBottomWidth: 1, borderBottomColor: "#e5e7eb" }
 
   return (
     <Document>
       <Page size="A4" style={[styles.page, { fontFamily: themeFont as any }]}>
-        {isDraft && <Text style={styles.watermark}>DRAFT</Text>}
 
         <View style={styles.header}>
           <View>
@@ -159,18 +155,18 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
           {invoice.customer.phone && <Text>Phone: {invoice.customer.phone}</Text>}
         </View>
 
-        <View style={[styles.tableHeader, { backgroundColor: `${themeColor}1A` }]}>
-          <Text style={[styles.col1, { color: themeColor }]}>Description</Text>
-          <Text style={[styles.col2, { color: themeColor }]}>HSN/SAC</Text>
-          <Text style={[styles.col3, { color: themeColor }]}>Qty</Text>
-          <Text style={[styles.col4, { color: themeColor }]}>Rate</Text>
-          <Text style={[styles.col5, { color: themeColor }]}>Disc</Text>
-          <Text style={[styles.col6, { color: themeColor }]}>Tax%</Text>
-          <Text style={[styles.col7, { color: themeColor }]}>Amount</Text>
+        <View style={[styles.tableHeader, { backgroundColor: headerBgColor }]}>
+          <Text style={[styles.col1, { color: headerTextColor }]}>Description</Text>
+          <Text style={[styles.col2, { color: headerTextColor }]}>HSN/SAC</Text>
+          <Text style={[styles.col3, { color: headerTextColor }]}>Qty</Text>
+          <Text style={[styles.col4, { color: headerTextColor }]}>Rate</Text>
+          <Text style={[styles.col5, { color: headerTextColor }]}>Disc</Text>
+          <Text style={[styles.col6, { color: headerTextColor }]}>Tax%</Text>
+          <Text style={[styles.col7, { color: headerTextColor }]}>Amount</Text>
         </View>
 
         {invoice.items.map((item, i) => (
-          <View key={i} style={styles.tableRow}>
+          <View key={i} style={[styles.tableRow, borderStyle]}>
             <Text style={styles.col1}>{item.description}</Text>
             <Text style={styles.col2}>{item.hsnSac ?? "-"}</Text>
             <Text style={styles.col3}>{item.quantity}</Text>

@@ -4,6 +4,8 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 import CredentialsProvider from "next-auth/providers/credentials"
 import GoogleProvider from "next-auth/providers/google"
+import AppleProvider from "next-auth/providers/apple"
+import Passkey from "next-auth/providers/passkey"
 import * as argon2 from "argon2"
 import { Role } from "@prisma/client"
 import { authConfig } from "@/auth.config"
@@ -11,7 +13,9 @@ import { authConfig } from "@/auth.config"
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
+  experimental: { enableWebAuthn: true },
   providers: [
+    // ── Google OAuth ─────────────────────────────────────────────────────
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
       ? [
           GoogleProvider({
@@ -21,6 +25,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }),
         ]
       : []),
+
+    // ── Apple Sign In ─────────────────────────────────────────────────────
+    ...(process.env.APPLE_ID && process.env.APPLE_SECRET
+      ? [
+          AppleProvider({
+            clientId: process.env.APPLE_ID,
+            clientSecret: process.env.APPLE_SECRET,
+          }),
+        ]
+      : []),
+
+    // ── Passkey (WebAuthn — fingerprint / Face ID / hardware key) ─────────
+    Passkey,
+
+    // ── Email / Password ──────────────────────────────────────────────────
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -72,6 +91,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id!
         token.role = (user as { role: Role }).role ?? Role.BUSINESS_OWNER
         token.companyId = (user as { companyId?: string }).companyId
+        token.passkeyPrompted = (user as any).passkeyPrompted
+        token.passkeyEnabled = (user as any).passkeyEnabled
       }
 
       if (trigger === "update" || !user) {
@@ -81,6 +102,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (dbUser) {
           token.role = dbUser.role
           token.companyId = dbUser.companyId
+          token.passkeyPrompted = dbUser.passkeyPrompted
+          token.passkeyEnabled = dbUser.passkeyEnabled
         }
       }
 
@@ -91,6 +114,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id
         session.user.role = token.role
         session.user.companyId = token.companyId
+        session.user.passkeyPrompted = token.passkeyPrompted
+        session.user.passkeyEnabled = token.passkeyEnabled
       }
       return session
     },

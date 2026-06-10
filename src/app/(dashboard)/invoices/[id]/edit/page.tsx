@@ -2,6 +2,7 @@ import { getCustomers } from "@/actions/customer"
 import { getInvoice } from "@/actions/invoice"
 import { getCompany } from "@/actions/company"
 import { getBankAccounts } from "@/actions/bank-accounts"
+import { getCatalogItems } from "@/actions/catalog"
 import { InvoiceForm } from "@/components/forms/invoice-form"
 import Link from "next/link"
 import { redirect, notFound } from "next/navigation"
@@ -15,12 +16,14 @@ interface EditInvoicePageProps {
 export default async function EditInvoicePage({ params }: EditInvoicePageProps) {
   const { id } = await params
   
-  const [customers, invoice, company, bankAccounts] = await Promise.all([
-    getCustomers(),
+  const [customersData, invoice, company, bankAccounts, catalog] = await Promise.all([
+    getCustomers({ limit: 1000 }),
     getInvoice(id),
     getCompany(),
     getBankAccounts(),
+    getCatalogItems(),
   ])
+  const customers = customersData.customers
 
   if (!invoice) return notFound()
   if (invoice.status === "PAID") return redirect(`/invoices/${id}`)
@@ -43,6 +46,7 @@ export default async function EditInvoicePage({ params }: EditInvoicePageProps) 
     date: invoice.date,
     dueDate: invoice.dueDate,
     currency: invoice.currency,
+    exchangeRate: invoice.exchangeRate,
     tdsPercentage: invoice.tdsPercentage,
     notes: invoice.notes || undefined,
     terms: invoice.terms || undefined,
@@ -76,6 +80,7 @@ export default async function EditInvoicePage({ params }: EditInvoicePageProps) 
         bankAccounts={bankAccounts}
         initialData={initialData}
         invoiceId={invoice.id}
+        catalogItems={catalog.items || []}
       />
     </div>
   )

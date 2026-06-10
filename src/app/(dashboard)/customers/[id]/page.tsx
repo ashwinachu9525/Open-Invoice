@@ -2,8 +2,9 @@ import { getCustomer } from "@/actions/customer"
 import { notFound } from "next/navigation"
 import { CustomerForm } from "@/components/forms/customer-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowLeft, User } from "lucide-react"
+import { ArrowLeft, User, FileDown } from "lucide-react"
 
 export default async function EditCustomerPage({
   params,
@@ -16,22 +17,30 @@ export default async function EditCustomerPage({
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-4">
-        <Link
-          href="/customers"
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 glass hover:bg-white/8 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <User className="h-5 w-5 text-primary" />
-            Edit Customer
-          </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            Update details for <span className="font-medium text-foreground">{customer.name}</span>
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/customers"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 glass hover:bg-white/8 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" />
+              Edit Customer
+            </h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              Update details for <span className="font-medium text-foreground">{customer.name}</span>
+            </p>
+          </div>
         </div>
+        <a href={`/api/customers/${customer.id}/statement`} target="_blank" rel="noreferrer">
+          <Button variant="outline" className="glass border-white/10 hover:bg-white/8 gap-2">
+            <FileDown className="h-4 w-4" />
+            Download Statement
+          </Button>
+        </a>
       </div>
 
       <Card className="glass glass-card border-white/10">

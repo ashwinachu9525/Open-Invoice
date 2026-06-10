@@ -39,8 +39,10 @@ export async function createInvoice(data: unknown) {
           date: parsed.data.date,
           dueDate: parsed.data.dueDate,
           currency: parsed.data.currency,
+          exchangeRate: parsed.data.exchangeRate,
           notes: parsed.data.notes,
           terms: parsed.data.terms,
+          internalNotes: parsed.data.internalNotes,
           bankName: parsed.data.bankName,
           bankAccountName: parsed.data.bankAccountName,
           bankAccountNumber: parsed.data.bankAccountNumber,
@@ -139,8 +141,10 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
           date: parsed.data.date,
           dueDate: parsed.data.dueDate,
           currency: parsed.data.currency,
+          exchangeRate: parsed.data.exchangeRate,
           notes: parsed.data.notes,
           terms: parsed.data.terms,
+          internalNotes: parsed.data.internalNotes,
           bankName: parsed.data.bankName,
           bankAccountName: parsed.data.bankAccountName,
           bankAccountNumber: parsed.data.bankAccountNumber,
@@ -310,6 +314,7 @@ export async function sendInvoiceToClient(invoiceId: string) {
     // 4. Send Email
     await sendInvoiceEmail({
       companyId: company.id,
+      invoiceId: invoiceId,
       to: invoice.customer.email,
       subject: `Invoice ${invoiceNumber}`,
       html: htmlBody,
@@ -471,8 +476,166 @@ export async function getNextInvoiceNumber() {
     const { company } = await requireCompany()
     const count = await prisma.invoice.count({ where: { companyId: company.id } })
     const year = new Date().getFullYear()
-    return `INV-${year}-${String(count + 1).padStart(4, "0")}`
+    const prefix = company.invoicePrefix || "INV"
+    return `${prefix}-${year}-${String(count + 1).padStart(4, "0")}`
   } catch {
     return `INV-${new Date().getFullYear()}-0001`
+  }
+}
+
+export async function cloneInvoice(id: string) {
+  try {
+    const { session, company } = await requireCompany()
+    
+    const invoice = await prisma.invoice.findFirst({
+      where: { id, companyId: company.id, deletedAt: null },
+      include: { items: true }
+    })
+    
+    if (!invoice) return { error: "Invoice not found" }
+    
+    const newInvoiceNumber = await getNextInvoiceNumber()
+    
+    const newInvoice = await prisma.invoice.create({
+      data: {
+        companyId: company.id,
+        customerId: invoice.customerId,
+        invoiceNumber: newInvoiceNumber,
+        date: new Date(),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // +30 days
+        currency: invoice.currency,
+        exchangeRate: invoice.exchangeRate,
+        notes: invoice.notes,
+        terms: invoice.terms,
+        internalNotes: invoice.internalNotes,
+        bankName: invoice.bankName,
+        bankAccountName: invoice.bankAccountName,
+        bankAccountNumber: invoice.bankAccountNumber,
+        bankIfscCode: invoice.bankIfscCode,
+        bankAccountType: invoice.bankAccountType,
+        themeColor: invoice.themeColor,
+        themeFont: invoice.themeFont,
+        status: InvoiceStatus.DRAFT,
+        subTotal: invoice.subTotal,
+        totalDiscount: invoice.totalDiscount,
+        totalTax: invoice.totalTax,
+        cgstAmount: invoice.cgstAmount,
+        sgstAmount: invoice.sgstAmount,
+        igstAmount: invoice.igstAmount,
+        tdsPercentage: invoice.tdsPercentage,
+        tdsAmount: invoice.tdsAmount,
+        finalAmount: invoice.finalAmount,
+        balanceDue: invoice.finalAmount,
+        items: {
+          create: invoice.items.map((item) => ({
+            description: item.description,
+            hsnSac: item.hsnSac,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount,
+            taxPercentage: item.taxPercentage,
+            taxableAmount: item.taxableAmount,
+            taxAmount: item.taxAmount,
+            total: item.total,
+          })),
+        },
+        statusHistory: {
+          create: { status: InvoiceStatus.DRAFT, note: `Cloned from ${invoice.invoiceNumber}` },
+        },
+      }
+    })
+
+    await createAuditLog({
+      companyId: company.id,
+      userId: session.user.id,
+      action: "CREATE",
+      entity: "Invoice",
+      entityId: newInvoice.id,
+      details: { clonedFrom: invoice.id }
+    })
+
+    revalidatePath("/invoices")
+    revalidatePath("/dashboard")
+    return { success: true, id: newInvoice.id }
+  } catch (error) {
+    console.error(error)
+    return { error: "Failed to clone invoice" }
+  }
+}
+
+export async function bulkDeleteInvoices(ids: string[]) {
+  try {
+    const { session, company } = await requireCompany()
+    
+    await prisma.invoice.updateMany({
+      where: { id: { in: ids }, companyId: company.id },
+      data: { deletedAt: new Date(), status: InvoiceStatus.CANCELLED },
+    })
+
+    await createAuditLog({
+      companyId: company.id,
+      userId: session.user.id,
+      action: "DELETE",
+      entity: "Invoice",
+      entityId: "bulk",
+      details: { count: ids.length, ids }
+    })
+
+    revalidatePath("/invoices")
+    revalidatePath("/dashboard")
+    return { success: true }
+  } catch {
+    return { error: "Failed to delete invoices" }
+  }
+}
+
+export async function restoreInvoice(id: string) {
+  try {
+    const { session, company } = await requireCompany()
+    
+    await prisma.invoice.update({
+      where: { id, companyId: company.id },
+      data: { deletedAt: null, status: InvoiceStatus.DRAFT },
+    })
+
+    await createAuditLog({
+      companyId: company.id,
+      userId: session.user.id,
+      action: "UPDATE",
+      entity: "Invoice",
+      entityId: id,
+      details: { action: "restored" }
+    })
+
+    revalidatePath("/invoices")
+    revalidatePath("/trash")
+    revalidatePath("/dashboard")
+    return { success: true }
+  } catch {
+    return { error: "Failed to restore invoice" }
+  }
+}
+
+export async function permanentlyDeleteInvoice(id: string) {
+  try {
+    const { session, company } = await requireCompany()
+    
+    await prisma.invoice.delete({
+      where: { id, companyId: company.id },
+    })
+
+    await createAuditLog({
+      companyId: company.id,
+      userId: session.user.id,
+      action: "DELETE",
+      entity: "Invoice",
+      entityId: id,
+      details: { action: "permanently deleted" }
+    })
+
+    revalidatePath("/trash")
+    return { success: true }
+  } catch {
+    return { error: "Failed to permanently delete invoice" }
   }
 }

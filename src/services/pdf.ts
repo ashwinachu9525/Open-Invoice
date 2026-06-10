@@ -1,6 +1,7 @@
 import { renderToBuffer } from "@react-pdf/renderer"
 import QRCode from "qrcode"
 import { InvoiceDocument } from "@/pdf/invoice-document"
+import { StatementDocument } from "@/pdf/statement-document"
 import { uploadFile } from "@/services/storage"
 import { prisma } from "@/lib/prisma"
 
@@ -33,6 +34,37 @@ export async function generateInvoicePdf(invoiceId: string): Promise<Buffer> {
       data: { pdfUrl: key },
     })
   }
+
+  return buffer
+}
+
+export async function generateStatementPdf(customerId: string): Promise<Buffer> {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: { company: true },
+  })
+
+  if (!customer) throw new Error("Customer not found")
+
+  const invoices = await prisma.invoice.findMany({
+    where: { customerId, deletedAt: null, status: { notIn: ["DRAFT", "CANCELLED"] } },
+    orderBy: { date: "asc" },
+  })
+
+  const totalBilled = invoices.reduce((s, i) => s + i.finalAmount, 0)
+  const totalOutstanding = invoices.reduce((s, i) => s + i.balanceDue, 0)
+  const totalPaid = totalBilled - totalOutstanding
+
+  const buffer = await renderToBuffer(
+    StatementDocument({
+      customer,
+      company: customer.company,
+      invoices,
+      totalBilled,
+      totalPaid,
+      totalOutstanding,
+    })
+  )
 
   return buffer
 }

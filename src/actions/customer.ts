@@ -74,17 +74,44 @@ export async function getCustomer(id: string) {
   }
 }
 
-export async function getCustomers() {
+export async function getCustomers(params?: { search?: string; page?: number; limit?: number }) {
   try {
     const user = await requireUser()
-    if (!user?.companyId) return []
+    if (!user?.companyId) return { customers: [], total: 0, totalPages: 0 }
 
-    return await prisma.customer.findMany({
-      where: { companyId: user.companyId, deletedAt: null },
-      orderBy: { createdAt: "desc" },
-    })
+    const { search, page = 1, limit = 20 } = params || {}
+    const skip = (page - 1) * limit
+
+    const where = {
+      companyId: user.companyId,
+      deletedAt: null,
+      ...(search ? {
+        OR: [
+          { name: { contains: search, mode: "insensitive" as const } },
+          { companyName: { contains: search, mode: "insensitive" as const } },
+          { email: { contains: search, mode: "insensitive" as const } },
+          { gstin: { contains: search, mode: "insensitive" as const } },
+        ]
+      } : {})
+    }
+
+    const [customers, total] = await Promise.all([
+      prisma.customer.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.customer.count({ where })
+    ])
+
+    return {
+      customers,
+      total,
+      totalPages: Math.ceil(total / limit)
+    }
   } catch (error) {
     console.error("Failed to fetch customers:", error)
-    return []
+    return { customers: [], total: 0, totalPages: 0 }
   }
 }

@@ -42,8 +42,8 @@ export default function AIChatPage() {
   }, [messages])
 
   async function loadCustomers() {
-    const custs = await getCustomers()
-    setCustomers(custs)
+    const custs = await getCustomers({ limit: 1000 })
+    setCustomers(custs.customers)
   }
 
   async function loadSessions() {

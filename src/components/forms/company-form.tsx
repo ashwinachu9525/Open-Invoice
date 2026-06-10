@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { updateCompany } from "@/actions/company"
 import { useState } from "react"
+import { COMMON_CURRENCIES } from "@/lib/currencies"
 
 export function CompanyForm({ initialData }: { initialData: any }) {
   const [isPending, setIsPending] = useState(false)
@@ -32,6 +33,8 @@ export function CompanyForm({ initialData }: { initialData: any }) {
       website: initialData?.website || "",
       address: initialData?.address || "",
       state: initialData?.state || "",
+      baseCurrency: initialData?.baseCurrency || "INR",
+      invoiceTemplate: initialData?.invoiceTemplate || "modern",
     },
   })
 
@@ -172,6 +175,52 @@ export function CompanyForm({ initialData }: { initialData: any }) {
           )}
         />
         
+        <div className="grid gap-4 md:grid-cols-2 pt-4 border-t border-white/10">
+          <FormField
+            control={form.control}
+            name="baseCurrency"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Base Currency (Default for new invoices & dashboard)</FormLabel>
+                <FormControl>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+                    {...field}
+                  >
+                    {COMMON_CURRENCIES.map(c => (
+                      <option key={c.code} value={c.code}>
+                        {c.code} - {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="invoiceTemplate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Default Invoice Template</FormLabel>
+                <FormControl>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+                    {...field}
+                  >
+                    <option value="modern">Modern (Sleek & Professional)</option>
+                    <option value="classic">Classic (Traditional Table)</option>
+                    <option value="minimal">Minimal (Clean & Whitespace)</option>
+                  </select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
         <Button type="submit" disabled={isPending}>
           {isPending ? "Saving..." : "Save Settings"}
         </Button>

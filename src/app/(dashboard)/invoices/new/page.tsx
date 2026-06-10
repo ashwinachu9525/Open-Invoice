@@ -2,16 +2,19 @@ import { getCustomers } from "@/actions/customer"
 import { getNextInvoiceNumber } from "@/actions/invoice"
 import { getCompany } from "@/actions/company"
 import { getBankAccounts } from "@/actions/bank-accounts"
+import { getCatalogItems } from "@/actions/catalog"
 import { InvoiceForm } from "@/components/forms/invoice-form"
 import Link from "next/link"
 
 export default async function NewInvoicePage() {
-  const [customers, invoiceNumber, company, bankAccounts] = await Promise.all([
-    getCustomers(),
+  const [customersData, invoiceNumber, company, bankAccounts, catalog] = await Promise.all([
+    getCustomers({ limit: 1000 }),
     getNextInvoiceNumber(),
     getCompany(),
     getBankAccounts(),
+    getCatalogItems(),
   ])
+  const customers = customersData.customers
 
   if (customers.length === 0) {
     return (
@@ -35,6 +38,7 @@ export default async function NewInvoicePage() {
         defaultInvoiceNumber={invoiceNumber}
         sellerState={company?.state}
         bankAccounts={bankAccounts}
+        catalogItems={catalog.items || []}
       />
     </div>
   )

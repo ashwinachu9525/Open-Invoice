@@ -1,5 +1,5 @@
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
 }
 
 generator client {
@@ -19,11 +19,14 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
-  companyId     String?
+  companyId       String?
+  passkeyEnabled  Boolean   @default(false)
+  passkeyPrompted Boolean   @default(false)
 
   company        Company?        @relation(fields: [companyId], references: [id])
   accounts       Account[]
   sessions       Session[]
+  Authenticators Authenticator[]
   auditLogs      AuditLog[]
   aichatSessions AIChatSession[]
 
@@ -76,6 +79,21 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model Authenticator {
+  credentialID         String  @unique
+  userId               String
+  providerAccountId    String
+  credentialPublicKey  String
+  counter              Int
+  credentialDeviceType String
+  credentialBackedUp   Boolean
+  transports           String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, credentialID])
+}
+
 model PasswordResetToken {
   id        String   @id @default(cuid())
   email     String
@@ -101,6 +119,9 @@ model Company {
   phone          String?
   website        String?
   taxPreferences Json?
+  invoicePrefix  String?   @default("INV")
+  baseCurrency   String?   @default("INR")
+  invoiceTemplate String?  @default("modern")
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
@@ -113,6 +134,10 @@ model Company {
   aiSettings     AISettings?
   auditLogs      AuditLog[]
   aichatSessions AIChatSession[]
+  catalog        ProductCatalog[]
+  emailLogs      EmailLog[]
+  reminderConfig ReminderConfig?
+  expenses       Expense[]
 
   @@index([gstNumber])
 }
@@ -151,6 +176,7 @@ model Invoice {
   currency          String        @default("INR")
   notes             String?
   terms             String?
+  internalNotes     String?
   bankName          String?
   bankAccountName   String?
   bankAccountNumber String?
@@ -159,6 +185,7 @@ model Invoice {
   themeColor        String?       @default("#1e40af")
   themeFont         String?       @default("Helvetica")
   status            InvoiceStatus @default(DRAFT)
+  exchangeRate      Float         @default(1)
 
   subTotal      Float
   totalDiscount Float   @default(0)
@@ -181,6 +208,7 @@ model Invoice {
   customer      Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
   items         InvoiceItem[]
   payments      Payment[]
+  emailLogs     EmailLog[]
   schedule      RecurringSchedule?
   statusHistory InvoiceStatusHistory[]
 
@@ -381,4 +409,67 @@ model AIChatMessage {
   session AIChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
+}
+
+model ProductCatalog {
+  id            String   @id @default(cuid())
+  companyId     String
+  name          String
+  description   String?
+  hsnSac        String?
+  unitPrice     Float
+  taxPercentage Float    @default(18)
+  unit          String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+  
+  company       Company  @relation(fields: [companyId], references: [id])
+  
+  @@index([companyId])
+}
+
+model EmailLog {
+  id          String   @id @default(cuid())
+  companyId   String
+  invoiceId   String?
+  to          String
+  subject     String
+  status      String   // "sent" | "failed"
+  sentAt      DateTime @default(now())
+  error       String?
+  
+  company     Company  @relation(fields: [companyId], references: [id])
+  invoice     Invoice? @relation(fields: [invoiceId], references: [id])
+  
+  @@index([companyId])
+  @@index([invoiceId])
+}
+
+model ReminderConfig {
+  id            String  @id @default(cuid())
+  companyId     String  @unique
+  day0Enabled   Boolean @default(true)
+  day7Enabled   Boolean @default(true)
+  day15Enabled  Boolean @default(false)
+  customMessage String?
+  
+  company       Company @relation(fields: [companyId], references: [id])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  companyId   String
+  date        DateTime
+  amount      Float
+  category    String   // free-text
+  description String?
+  receiptUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@index([companyId])
 }

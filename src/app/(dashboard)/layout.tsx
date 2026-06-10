@@ -1,18 +1,22 @@
 import { ReactNode } from "react"
 export const dynamic = "force-dynamic"
 import Link from "next/link"
-import { FileText, Home, Users, Settings, Menu, BarChart3, Sparkles, Zap } from "lucide-react"
+import { FileText, Home, Users, Settings, Menu, BarChart3, Sparkles, Zap, Package, Mail, Receipt } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
 import { SignOutButton } from "@/components/dashboard/sign-out-button"
 import { ThemeToggle } from "@/components/dashboard/theme-toggle"
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
+import { PasskeyPromptModal } from "@/components/auth/passkey-prompt-modal"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/invoices", label: "Invoices", icon: FileText },
   { href: "/customers", label: "Customers", icon: Users },
+  { href: "/catalog", label: "Catalog", icon: Package },
   { href: "/reports", label: "Reports", icon: BarChart3 },
+  { href: "/expenses", label: "Expenses", icon: Receipt },
+  { href: "/email-logs", label: "Email Logs", icon: Mail },
   { href: "/ai", label: "AI Tools", icon: Sparkles },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
@@ -133,6 +137,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           {children}
         </main>
       </div>
+      
+      {session.user.id && session.user.passkeyPrompted === false && (
+        <PasskeyPromptModal userId={session.user.id} />
+      )}
     </div>
   )
 }

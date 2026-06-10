@@ -10,6 +10,8 @@ export const companySchema = z.object({
   website: z.string().url("Invalid URL").optional().or(z.literal("")),
   address: z.string().optional(),
   state: z.string().optional(),
+  baseCurrency: z.string().optional(),
+  invoiceTemplate: z.string().optional(),
 })
 
 export type CompanyFormValues = z.infer<typeof companySchema>

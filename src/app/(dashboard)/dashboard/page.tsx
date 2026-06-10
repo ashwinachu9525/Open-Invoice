@@ -4,10 +4,12 @@ import { getDashboardStats } from "@/services/dashboard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { RevenueChart } from "@/components/dashboard/revenue-chart"
+import { AgingChart } from "@/components/dashboard/aging-chart"
+import { CustomerRevenueChart } from "@/components/dashboard/customer-revenue-chart"
 import { formatINR } from "@/services/tax-engine"
 import {
   IndianRupee, Users, FileText, AlertTriangle,
-  TrendingUp, Clock, ReceiptText, Shield
+  TrendingUp, Clock, ReceiptText, Shield, Percent, PieChart, Activity
 } from "lucide-react"
 import { redirect } from "next/navigation"
 
@@ -92,6 +94,13 @@ export default async function DashboardPage() {
       iconColor: "text-teal-400",
       iconBg: "bg-teal-500/15",
     },
+    {
+      label: "Collection Efficiency",
+      value: `${stats.collectionEfficiency}%`,
+      icon: Percent,
+      iconColor: "text-amber-400",
+      iconBg: "bg-amber-500/15",
+    },
   ]
 
   return (
@@ -128,7 +137,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── GST / TDS Stats ── */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {taxCards.map((card) => (
           <Card key={card.label} className="glass glass-card border-white/10">
             <CardContent className="p-4">
@@ -148,20 +157,53 @@ export default async function DashboardPage() {
 
       <Separator className="bg-white/8" />
 
-      {/* ── Revenue Chart ── */}
-      <Card className="glass glass-card border-white/10">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <TrendingUp className="h-4 w-4 text-primary" />
-            Revenue Overview
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">Monthly revenue for the last 6 months</p>
-        </CardHeader>
-        <Separator className="bg-white/8" />
-        <CardContent className="pt-4">
-          <RevenueChart data={stats.monthlyRevenue} />
-        </CardContent>
-      </Card>
+      {/* ── Charts Grid ── */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* ── Revenue Chart ── */}
+        <Card className="glass glass-card border-white/10 lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Revenue Overview
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Monthly revenue for the last 6 months</p>
+          </CardHeader>
+          <Separator className="bg-white/8" />
+          <CardContent className="pt-4">
+            <RevenueChart data={stats.monthlyRevenue} />
+          </CardContent>
+        </Card>
+
+        {/* ── Top Customers Revenue ── */}
+        <Card className="glass glass-card border-white/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <PieChart className="h-4 w-4 text-emerald-400" />
+              Top Customers
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Revenue contribution by client</p>
+          </CardHeader>
+          <Separator className="bg-white/8" />
+          <CardContent className="pt-4">
+            <CustomerRevenueChart data={stats.customerInsights} />
+          </CardContent>
+        </Card>
+
+        {/* ── Aging Buckets ── */}
+        <Card className="glass glass-card border-white/10 lg:col-span-3">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Activity className="h-4 w-4 text-orange-400" />
+              Accounts Receivable Aging
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Outstanding balances grouped by days overdue</p>
+          </CardHeader>
+          <Separator className="bg-white/8" />
+          <CardContent className="pt-4">
+            <AgingChart data={stats.agingBuckets} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

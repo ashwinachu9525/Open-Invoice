@@ -6,7 +6,7 @@ import { loginSchema, LoginFormValues } from "@/validations/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { signIn } from "next-auth/react"
+import { signIn } from "next-auth/webauthn"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import Link from "next/link"
@@ -20,12 +20,25 @@ export function LoginForm() {
   const searchParams = useSearchParams()
   const [error, setError] = useState("")
   const [isPending, setIsPending] = useState(false)
+  const [hasPasskey, setHasPasskey] = useState(false)
   const isVerified = searchParams.get("verified") === "true"
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   })
+
+  const handleEmailBlur = async () => {
+    const email = form.getValues("email")
+    if (!email || !email.includes("@")) return
+    try {
+      const res = await fetch(`/api/auth/check-passkey?email=${encodeURIComponent(email)}`)
+      const data = await res.json()
+      setHasPasskey(!!data.enabled)
+    } catch (e) {
+      console.error(e)
+    }
+  }
 
   async function onSubmit(data: LoginFormValues) {
     setIsPending(true)
@@ -59,7 +72,7 @@ export function LoginForm() {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="you@company.com" {...field} />
+                <Input type="email" placeholder="you@company.com" {...field} onBlur={(e) => { field.onBlur(); handleEmailBlur(); }} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -81,6 +94,16 @@ export function LoginForm() {
         <Button type="submit" className="w-full" disabled={isPending}>
           {isPending ? "Signing in..." : "Sign In"}
         </Button>
+        {hasPasskey && (
+          <Button 
+            type="button" 
+            variant="outline" 
+            className="w-full border-blue-500/30 hover:bg-blue-500/10" 
+            onClick={() => signIn("passkey", { action: "authenticate", email: form.getValues("email"), callbackUrl: "/dashboard" })}
+          >
+            Sign in with Passkey (Face ID / Touch ID)
+          </Button>
+        )}
         <div className="text-center text-sm text-gray-500 space-y-1">
           <Link href="/forgot-password" className="text-blue-600 hover:underline block">
             Forgot password?

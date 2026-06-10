@@ -123,4 +123,81 @@ export const markOverdueInvoices = inngest.createFunction(
   }
 )
 
-export const inngestFunctions = [processRecurringInvoices, markOverdueInvoices]
+export const sendPaymentReminders = inngest.createFunction(
+  { id: "send-payment-reminders", triggers: [{ cron: "0 9 * * *" }] }, // Runs daily at 9am
+  async () => {
+    // We only process invoices that are not paid or cancelled, and have a non-zero balance
+    const eligibleInvoices = await prisma.invoice.findMany({
+      where: {
+        status: { notIn: [InvoiceStatus.PAID, InvoiceStatus.CANCELLED, InvoiceStatus.DRAFT] },
+        balanceDue: { gt: 0 },
+        deletedAt: null,
+      },
+      include: {
+        customer: true,
+        company: { include: { reminderConfig: true } },
+      },
+    })
+
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    let remindersSent = 0
+
+    for (const invoice of eligibleInvoices) {
+      if (!invoice.customer.email) continue
+      const config = invoice.company.reminderConfig
+      if (!config) continue
+
+      const dueDate = new Date(invoice.dueDate)
+      dueDate.setHours(0, 0, 0, 0)
+      
+      const diffTime = now.getTime() - dueDate.getTime()
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+      let shouldSend = false
+      let messageType = ""
+
+      if (diffDays === 0 && config.day0Enabled) {
+        shouldSend = true
+        messageType = "Due Today"
+      } else if (diffDays === 7 && config.day7Enabled) {
+        shouldSend = true
+        messageType = "7 Days Overdue"
+      } else if (diffDays === 15 && config.day15Enabled) {
+        shouldSend = true
+        messageType = "15 Days Overdue"
+      }
+
+      if (shouldSend) {
+        try {
+          const pdf = await generateInvoicePdf(invoice.id)
+          const customMsg = config.customMessage ? `<p>${config.customMessage}</p>` : ""
+          
+          await sendInvoiceEmail({
+            companyId: invoice.companyId,
+            invoiceId: invoice.id,
+            to: invoice.customer.email,
+            subject: `Payment Reminder: Invoice ${invoice.invoiceNumber} is ${messageType}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+                <h2 style="color:#f59e0b;">Payment Reminder: ${messageType}</h2>
+                <p>Hello ${invoice.customer.name},</p>
+                <p>This is a friendly reminder regarding Invoice <strong>${invoice.invoiceNumber}</strong> for <strong>₹${invoice.balanceDue.toLocaleString("en-IN")}</strong>.</p>
+                ${customMsg}
+                <p>Please find the invoice attached to this email. We appreciate your prompt payment.</p>
+              </div>
+            `,
+            attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: pdf }],
+          })
+          remindersSent++
+        } catch (e) {
+          console.error(`Failed to send reminder for invoice ${invoice.id}`, e)
+        }
+      }
+    }
+
+    return { sent: remindersSent }
+  }
+)
+
+export const inngestFunctions = [processRecurringInvoices, markOverdueInvoices, sendPaymentReminders]

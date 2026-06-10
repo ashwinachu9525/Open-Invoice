@@ -3,6 +3,9 @@
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
 import { companySchema, CompanyFormValues } from "@/validations/company"
+import { requireCompany } from "@/lib/auth-helpers"
+import { createAuditLog } from "@/services/audit"
+import { revalidatePath } from "next/cache"
 
 export async function updateCompany(data: CompanyFormValues) {
   try {
@@ -64,5 +67,30 @@ export async function getCompany() {
   } catch (error) {
     console.error("Failed to fetch company:", error)
     return null
+  }
+}
+
+export async function updateInvoicePrefix(prefix: string) {
+  try {
+    const { session, company } = await requireCompany()
+    
+    await prisma.company.update({
+      where: { id: company.id },
+      data: { invoicePrefix: prefix || "INV" },
+    })
+
+    await createAuditLog({
+      companyId: company.id,
+      userId: session.user.id,
+      action: "UPDATE",
+      entity: "Company",
+      entityId: company.id,
+      details: { field: "invoicePrefix", value: prefix }
+    })
+
+    revalidatePath("/settings")
+    return { success: true }
+  } catch {
+    return { error: "Failed to update prefix" }
   }
 }

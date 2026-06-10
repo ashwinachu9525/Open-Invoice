@@ -215,6 +215,7 @@ export async function sendInvoiceEmail(params: {
   subject: string
   html: string
   attachments?: { filename: string; content: Buffer }[]
+  invoiceId?: string
 }) {
   const transporter = await getEmailTransporter(params.companyId)
   const settings = await prisma.emailSetting.findUnique({
@@ -222,13 +223,34 @@ export async function sendInvoiceEmail(params: {
   })
   if (!transporter || !settings) throw new Error("SMTP not configured")
 
-  await transporter.sendMail({
-    from: settings.fromEmail
-      ? `"${settings.fromName ?? "Invoice"}" <${settings.fromEmail}>`
-      : settings.username,
-    to: params.to,
-    subject: params.subject,
-    html: params.html,
-    attachments: params.attachments,
-  })
+  let status = "sent"
+  let errorMessage: string | undefined = undefined
+
+  try {
+    await transporter.sendMail({
+      from: settings.fromEmail
+        ? `"${settings.fromName ?? "Invoice"}" <${settings.fromEmail}>`
+        : settings.username,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+      attachments: params.attachments,
+    })
+  } catch (error) {
+    status = "failed"
+    errorMessage = error instanceof Error ? error.message : String(error)
+    throw error // Re-throw so caller knows it failed
+  } finally {
+    // Write to EmailLog
+    await prisma.emailLog.create({
+      data: {
+        companyId: params.companyId,
+        invoiceId: params.invoiceId,
+        to: params.to,
+        subject: params.subject,
+        status,
+        error: errorMessage,
+      }
+    })
+  }
 }

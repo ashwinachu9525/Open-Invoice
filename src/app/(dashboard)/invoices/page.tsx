@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatINR } from "@/services/tax-engine"
-import { Plus, Sparkles, FileText, TrendingUp, Clock, CheckCircle2, AlertCircle } from "lucide-react"
+import { Plus, Sparkles, FileText, TrendingUp, Clock, CheckCircle2, AlertCircle, Trash2 } from "lucide-react"
 import { InvoiceFilterBar } from "@/components/invoices/invoice-filter-bar"
+import { InvoiceListClient } from "@/components/invoices/invoice-list-client"
 import { Suspense } from "react"
 
 export const dynamic = "force-dynamic"
@@ -58,6 +59,12 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
           <p className="text-muted-foreground text-sm mt-1">Manage and track all your GST invoices</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/trash">
+            <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8 gap-1.5 text-muted-foreground hover:text-red-400">
+              <Trash2 className="h-4 w-4" />
+              Trash
+            </Button>
+          </Link>
           <Link href="/ai">
             <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8 gap-1.5">
               <Sparkles className="h-4 w-4 text-violet-400" />
@@ -167,68 +174,14 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
               )}
             </div>
           ) : (
-            <>
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/8 hover:bg-transparent">
-                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Invoice #</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Customer</TableHead>
-                  <TableHead className="hidden md:table-cell text-xs uppercase tracking-wider text-muted-foreground">Date</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Amount</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Status</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.map((inv) => (
-                  <TableRow
-                    key={inv.id}
-                    className="border-white/5 hover:bg-white/4 transition-colors group"
-                  >
-                    <TableCell className="font-mono text-sm font-medium">{inv.invoiceNumber}</TableCell>
-                    <TableCell className="font-medium">{inv.customer.name}</TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                      {new Date(inv.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                    </TableCell>
-                    <TableCell className="font-semibold">{formatINR(inv.finalAmount)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig[inv.status]?.class ?? ""}`}>
-                          {statusConfig[inv.status]?.label ?? inv.status.replace("_", " ")}
-                        </span>
-                        {inv.schedule && (
-                          <span title="Recurring Invoice" className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                            <Clock className="h-3 w-3 mr-1" /> Recurring
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/invoices/${inv.id}`}
-                        className="text-xs font-medium text-primary hover:underline opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                      >
-                        View →
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-              <div className="p-4 border-t border-white/5 flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
-                  Showing {(currentPage - 1) * limit + 1} to {Math.min(currentPage * limit, totalInvoices)} of {totalInvoices}
-                </p>
-                <div className="flex gap-2">
-                  <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries({ from, to, fy, search }).filter(([_, v]) => v)), page: String(Math.max(1, currentPage - 1)) }).toString()}`} className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}>
-                    <Button variant="outline" size="sm" className="glass border-white/10" disabled={currentPage <= 1}>Previous</Button>
-                  </Link>
-                  <Link href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries({ from, to, fy, search }).filter(([_, v]) => v)), page: String(Math.min(totalPages, currentPage + 1)) }).toString()}`} className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}>
-                    <Button variant="outline" size="sm" className="glass border-white/10" disabled={currentPage >= totalPages}>Next</Button>
-                  </Link>
-                </div>
-              </div>
-            </>
+            <InvoiceListClient 
+              invoices={invoices} 
+              currentPage={currentPage} 
+              limit={limit} 
+              totalPages={totalPages} 
+              totalInvoices={totalInvoices} 
+              searchParamsProps={Object.fromEntries(Object.entries({ from, to, fy, search }).filter(([_, v]) => v)) as Record<string, string>}
+            />
           )}
         </CardContent>
       </Card>

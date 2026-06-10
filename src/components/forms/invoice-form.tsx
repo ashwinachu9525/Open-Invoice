@@ -10,11 +10,20 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { createInvoice, updateInvoice } from "@/actions/invoice"
 import { calculateInvoiceTax, formatINR, TDS_RATES } from "@/services/tax-engine"
+import { getExchangeRates } from "@/services/currency"
+import { COMMON_CURRENCIES } from "@/lib/currencies"
 import { useState, useMemo, useEffect } from "react"
-import { Plus, Trash2, AlertCircle, TrendingDown, Receipt, Percent } from "lucide-react"
+import { Plus, Trash2, AlertCircle, TrendingDown, Receipt, Percent, Package } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { BankAccount } from "@prisma/client"
+import { BankAccount, ProductCatalog } from "@prisma/client"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 interface InvoiceFormProps {
   customers: { id: string; name: string; state?: string | null }[]
@@ -23,21 +32,23 @@ interface InvoiceFormProps {
   bankAccounts?: BankAccount[]
   initialData?: InvoiceFormValues
   invoiceId?: string
+  catalogItems?: ProductCatalog[]
 }
 
-export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bankAccounts = [], initialData, invoiceId }: InvoiceFormProps) {
+export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bankAccounts = [], initialData, invoiceId, catalogItems = [] }: InvoiceFormProps) {
   const router = useRouter()
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState("")
 
   const form = useForm<InvoiceFormValues>({
-    resolver: zodResolver(invoiceSchema),
+    resolver: zodResolver(invoiceSchema) as any,
     defaultValues: initialData || {
       customerId: "",
       invoiceNumber: defaultInvoiceNumber,
       date: new Date(),
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       currency: "INR",
+      exchangeRate: 1,
       tdsPercentage: 0,
       items: [{ description: "", quantity: 1, unitPrice: 0, discount: 0, taxPercentage: 18 }],
       bankName: "",
@@ -47,6 +58,27 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
       bankAccountType: "",
     },
   })
+
+  const [catalogSearch, setCatalogSearch] = useState("")
+  const [isCatalogOpen, setIsCatalogOpen] = useState(false)
+
+  const filteredCatalog = catalogItems.filter(item => 
+    item.name.toLowerCase().includes(catalogSearch.toLowerCase()) || 
+    (item.hsnSac && item.hsnSac.toLowerCase().includes(catalogSearch.toLowerCase()))
+  )
+
+  const handleAddFromCatalog = (item: ProductCatalog) => {
+    append({
+      description: item.name + (item.description ? ` - ${item.description}` : ""),
+      hsnSac: item.hsnSac || "",
+      quantity: 1,
+      unitPrice: item.unitPrice,
+      discount: 0,
+      taxPercentage: item.taxPercentage
+    })
+    setIsCatalogOpen(false)
+    setCatalogSearch("")
+  }
 
   // Autofill default bank account if available
   useEffect(() => {
@@ -63,6 +95,23 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" })
   const watched = form.watch()
+
+  const [isFetchingRate, setIsFetchingRate] = useState(false)
+  useEffect(() => {
+    if (watched.currency && watched.currency !== "INR") {
+      setIsFetchingRate(true)
+      getExchangeRates("INR").then(rates => {
+        const rateToInr = rates[watched.currency]
+        if (rateToInr) {
+          // If 1 INR = 0.012 USD, then 1 USD = 1/0.012 INR = 83.33 INR
+          const rate = parseFloat((1 / rateToInr).toFixed(2))
+          form.setValue("exchangeRate", rate)
+        }
+      }).finally(() => setIsFetchingRate(false))
+    } else {
+      form.setValue("exchangeRate", 1)
+    }
+  }, [watched.currency, form])
 
   const taxPreview = useMemo(() => {
     const customer = customers.find((c) => c.id === watched.customerId)
@@ -197,15 +246,61 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
               <Receipt className="h-3.5 w-3.5" />
               Line Items <span className="text-red-400 normal-case tracking-normal font-normal text-[10px] ml-1">(at least 1 required)</span>
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => append({ description: "", quantity: 1, unitPrice: 0, discount: 0, taxPercentage: 18 })}
-              className="glass border-white/10 hover:bg-white/8 gap-1.5 text-xs"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add Item
-            </Button>
+            <div className="flex items-center gap-2">
+              {catalogItems.length > 0 && (
+                <Dialog open={isCatalogOpen} onOpenChange={setIsCatalogOpen}>
+                  {/* @ts-ignore */}
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="glass border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 gap-1.5 text-xs">
+                      <Package className="h-3.5 w-3.5" /> From Catalog
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[600px] bg-black/90 border-white/10 text-white backdrop-blur-xl">
+                    <DialogHeader>
+                      <DialogTitle>Add from Catalog</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <Input 
+                        placeholder="Search products/services..." 
+                        value={catalogSearch}
+                        onChange={(e) => setCatalogSearch(e.target.value)}
+                        className="bg-white/5 border-white/10"
+                      />
+                      <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                        {filteredCatalog.length === 0 ? (
+                          <p className="text-center text-sm text-muted-foreground py-4">No items found.</p>
+                        ) : (
+                          filteredCatalog.map(item => (
+                            <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors">
+                              <div>
+                                <p className="font-medium text-sm">{item.name}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {formatINR(item.unitPrice)} {item.unit ? `per ${item.unit}` : ''} 
+                                  {item.hsnSac ? ` • HSN/SAC: ${item.hsnSac}` : ''}
+                                  ` • Tax: ${item.taxPercentage}%`
+                                </p>
+                              </div>
+                              <Button type="button" size="sm" onClick={() => handleAddFromCatalog(item)} className="bg-indigo-600 hover:bg-indigo-700 h-8">
+                                Add
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => append({ description: "", quantity: 1, unitPrice: 0, discount: 0, taxPercentage: 18 })}
+                className="glass border-white/10 hover:bg-white/8 gap-1.5 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Custom Item
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -347,6 +442,72 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
                       <option key={rate} value={rate}>{rate}%</option>
                     ))}
                   </select>
+                </FormControl>
+                <FormMessage className="text-xs text-red-400" />
+              </FormItem>
+            )}
+          />
+        </div>
+        
+        <Separator className="bg-white/8" />
+
+        {/* ── Section: Notes & Terms ── */}
+        <div className="space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Additional Information</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Customer Notes</FormLabel>
+                  <FormControl>
+                    <textarea 
+                      className={`${inputClass} min-h-[80px] py-2 resize-y`} 
+                      placeholder="Thank you for your business!" 
+                      {...field} 
+                      value={field.value ?? ""} 
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="terms"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Terms & Conditions</FormLabel>
+                  <FormControl>
+                    <textarea 
+                      className={`${inputClass} min-h-[80px] py-2 resize-y`} 
+                      placeholder="Payment due within 30 days..." 
+                      {...field} 
+                      value={field.value ?? ""} 
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="internalNotes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-medium flex items-center gap-2">
+                  Internal Memo
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">Not shown on PDF</span>
+                </FormLabel>
+                <FormControl>
+                  <textarea 
+                    className={`${inputClass} min-h-[60px] py-2 resize-y border-blue-500/20 focus:border-blue-500/50 bg-blue-500/5`} 
+                    placeholder="Private notes about this invoice or customer..." 
+                    {...field} 
+                    value={field.value ?? ""} 
+                  />
                 </FormControl>
                 <FormMessage className="text-xs text-red-400" />
               </FormItem>

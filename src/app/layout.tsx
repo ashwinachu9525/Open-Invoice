@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Providers } from "@/components/providers"
 import { Toaster } from "@/components/ui/sonner"
@@ -15,8 +15,21 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "InvoiceAI — Indian GST Invoicing",
+  title: "Invoice AI",
   description: "Production-ready invoice management for Indian businesses with GST, TDS, and AI features",
+  applicationName: "Invoice AI",
+  appleWebApp: {
+    capable: true,
+    title: "Invoice AI",
+    statusBarStyle: "default",
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: "#1e40af",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 }
 
 export default function RootLayout({

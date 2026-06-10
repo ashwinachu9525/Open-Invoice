@@ -18,7 +18,12 @@ export const authConfig = {
         request.nextUrl.pathname.startsWith("/forgot-password") ||
         request.nextUrl.pathname.startsWith("/reset-password")
 
-      if (isAuthPage) return true
+      if (isAuthPage) {
+        if (isLoggedIn) {
+          return Response.redirect(new URL("/dashboard", request.nextUrl))
+        }
+        return true
+      }
       if (
         request.nextUrl.pathname.startsWith("/dashboard") ||
         request.nextUrl.pathname.startsWith("/invoices") ||

@@ -11,12 +11,16 @@ declare module "next-auth" {
       image?: string | null
       role: Role
       companyId?: string | null
+      passkeyEnabled?: boolean
+      passkeyPrompted?: boolean
     }
   }
 
   interface User {
     role: Role
     companyId?: string | null
+    passkeyEnabled?: boolean
+    passkeyPrompted?: boolean
   }
 }
 
@@ -25,5 +29,7 @@ declare module "next-auth/jwt" {
     id: string
     role: Role
     companyId?: string | null
+    passkeyEnabled?: boolean
+    passkeyPrompted?: boolean
   }
 }

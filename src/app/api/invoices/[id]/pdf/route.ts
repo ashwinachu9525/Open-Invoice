@@ -4,17 +4,24 @@ import { prisma } from "@/lib/prisma"
 import { generateInvoicePdf } from "@/services/pdf"
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const isPublic = request.nextUrl.searchParams.get("public") === "true"
   const session = await auth()
-  if (!session?.user?.id) {
+  
+  if (!isPublic && !session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   const { id } = await params
+  
+  const whereClause = isPublic 
+    ? { id } 
+    : { id, company: { users: { some: { id: session?.user?.id } } } }
+
   const invoice = await prisma.invoice.findFirst({
-    where: { id, company: { users: { some: { id: session.user.id } } } },
+    where: whereClause,
   })
 
   if (!invoice) {
