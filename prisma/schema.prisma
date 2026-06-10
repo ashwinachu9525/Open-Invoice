@@ -1,0 +1,383 @@
+datasource db {
+  provider = "sqlite"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// NextAuth Models
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          Role      @default(BUSINESS_OWNER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  companyId     String?
+
+  company        Company?        @relation(fields: [companyId], references: [id])
+  accounts       Account[]
+  sessions       Session[]
+  auditLogs      AuditLog[]
+  aichatSessions AIChatSession[]
+
+  @@index([companyId])
+  @@index([email])
+}
+
+enum Role {
+  ADMIN
+  BUSINESS_OWNER
+  STAFF
+  USER
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+// Domain Models
+
+model Company {
+  id             String    @id @default(cuid())
+  name           String
+  gstNumber      String?
+  panNumber      String?
+  cinNumber      String?
+  logo           String?
+  address        String?
+  state          String?
+  email          String?
+  phone          String?
+  website        String?
+  taxPreferences Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  users          User[]
+  customers      Customer[]
+  invoices       Invoice[]
+  bankAccounts   BankAccount[]
+  emailSetting   EmailSetting?
+  aiSettings     AISettings?
+  auditLogs      AuditLog[]
+  aichatSessions AIChatSession[]
+
+  @@index([gstNumber])
+}
+
+model Customer {
+  id          String    @id @default(cuid())
+  companyId   String
+  name        String
+  companyName String?
+  gstin       String?
+  pan         String?
+  address     String?
+  state       String?
+  country     String?   @default("India")
+  email       String?
+  phone       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@index([companyId])
+  @@index([name])
+  @@index([gstin])
+}
+
+model Invoice {
+  id                String        @id @default(cuid())
+  companyId         String
+  customerId        String
+  invoiceNumber     String
+  date              DateTime
+  dueDate           DateTime
+  currency          String        @default("INR")
+  notes             String?
+  terms             String?
+  bankName          String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankIfscCode      String?
+  bankAccountType   String?
+  themeColor        String?       @default("#1e40af")
+  themeFont         String?       @default("Helvetica")
+  status            InvoiceStatus @default(DRAFT)
+
+  subTotal      Float
+  totalDiscount Float   @default(0)
+  totalTax      Float
+  cgstAmount    Float   @default(0)
+  sgstAmount    Float   @default(0)
+  igstAmount    Float   @default(0)
+  tdsPercentage Float   @default(0)
+  tdsAmount     Float   @default(0)
+  finalAmount   Float
+  amountPaid    Float   @default(0)
+  balanceDue    Float   @default(0)
+  pdfUrl        String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  company       Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer      Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items         InvoiceItem[]
+  payments      Payment[]
+  schedule      RecurringSchedule?
+  statusHistory InvoiceStatusHistory[]
+
+  @@unique([companyId, invoiceNumber])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([status])
+  @@index([date])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+}
+
+model InvoiceStatusHistory {
+  id        String        @id @default(cuid())
+  invoiceId String
+  status    InvoiceStatus
+  note      String?
+  createdAt DateTime      @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model InvoiceItem {
+  id            String  @id @default(cuid())
+  invoiceId     String
+  description   String
+  hsnSac        String?
+  quantity      Float
+  unitPrice     Float
+  discount      Float   @default(0)
+  taxPercentage Float   @default(18)
+  taxableAmount Float   @default(0)
+  taxAmount     Float   @default(0)
+  total         Float
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  invoiceId     String
+  amount        Float
+  paymentMethod PaymentMethod
+  transactionId String?
+  status        PaymentStatus @default(COMPLETED)
+  date          DateTime      @default(now())
+  notes         String?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+enum PaymentMethod {
+  UPI
+  BANK_TRANSFER
+  RAZORPAY
+  STRIPE
+  CASH
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model RecurringSchedule {
+  id        String             @id @default(cuid())
+  invoiceId String             @unique
+  frequency RecurringFrequency
+  nextRunAt DateTime
+  autoSend  Boolean            @default(false)
+  status    ScheduleStatus     @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+enum RecurringFrequency {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+}
+
+enum ScheduleStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+model EmailSetting {
+  id                String   @id @default(cuid())
+  companyId         String   @unique
+  host              String
+  port              Int
+  username          String
+  passwordEncrypted String
+  secure            Boolean  @default(true)
+  fromEmail         String?
+  fromName          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String
+  action    String
+  entity    String
+  entityId  String
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([entity, entityId])
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  companyId     String
+  bankName      String
+  accountName   String
+  accountNumber String
+  ifscCode      String
+  accountType   String?
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model AISettings {
+  id            String   @id @default(cuid())
+  companyId     String   @unique
+  provider      String   @default("gemini")
+  geminiKey     String?
+  openaiKey     String?
+  nvidiaKey     String?
+  openrouterKey String?
+  fallbackOrder String   @default("gemini,openai,nvidia,openrouter")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model AIChatSession {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String
+  title     String   @default("New Invoice Chat")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AIChatMessage[]
+
+  @@index([companyId])
+  @@index([userId])
+}
+
+model AIChatMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      String // "user" | "assistant" | "system"
+  content   String
+  createdAt DateTime @default(now())
+
+  session AIChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
