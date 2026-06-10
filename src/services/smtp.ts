@@ -19,6 +19,9 @@ export async function sendVerificationEmail(to: string, otp: string) {
     port,
     secure: port === 465,
     auth: { user, pass },
+    connectionTimeout: 5000, // 5 seconds
+    greetingTimeout: 5000,
+    socketTimeout: 5000,
   })
 
   await transporter.sendMail({
@@ -91,6 +94,9 @@ export async function sendPasswordResetSuccessEmail(to: string) {
     port,
     secure: port === 465,
     auth: { user, pass },
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 5000,
   })
 
   await transporter.sendMail({

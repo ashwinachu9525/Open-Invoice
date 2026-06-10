@@ -25,13 +25,18 @@ export function RegisterForm() {
   async function onSubmit(data: RegisterFormValues) {
     setIsPending(true)
     setError("")
-    const result = await registerUser(data)
-    if (result.error) {
-      setError(result.error)
+    try {
+      const result = await registerUser(data)
+      if (result.error) {
+        setError(result.error)
+        setIsPending(false)
+        return
+      }
+      window.location.assign(`/verify-email?email=${encodeURIComponent(data.email)}`)
+    } catch (e) {
+      setError("An unexpected error occurred. Please try again.")
       setIsPending(false)
-      return
     }
-    router.push(`/verify-email?email=${encodeURIComponent(data.email)}`)
   }
 
   return (

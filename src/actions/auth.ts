@@ -16,82 +16,99 @@ export async function registerUser(data: {
   password: string
   confirmPassword: string
 }) {
-  const parsed = registerSchema.safeParse(data)
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
+  try {
+    const parsed = registerSchema.safeParse(data)
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
+    }
+
+    const limit = rateLimit(`register:${parsed.data.email}`, {
+      windowMs: 3600_000,
+      maxRequests: 5,
+    })
+    if (!limit.success) return { error: "Too many attempts. Try again later." }
+
+    const existing = await prisma.user.findUnique({
+      where: { email: parsed.data.email },
+    })
+    if (existing) return { error: "Email already registered" }
+
+    const hashedPassword = await argon2.hash(parsed.data.password)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString()
+
+    const company = await prisma.company.create({
+      data: { name: `${parsed.data.name}'s Business` },
+    })
+
+    await prisma.user.create({
+      data: {
+        name: parsed.data.name,
+        email: parsed.data.email,
+        password: hashedPassword,
+        role: Role.BUSINESS_OWNER,
+        companyId: company.id,
+      },
+    })
+
+    await prisma.verificationToken.deleteMany({
+      where: { identifier: parsed.data.email }
+    })
+
+    await prisma.verificationToken.create({
+      data: {
+        identifier: parsed.data.email,
+        token: hashToken(otp),
+        expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    })
+
+    try {
+      await sendVerificationEmail(parsed.data.email, otp)
+    } catch (emailError) {
+      console.error("Failed to send verification email:", emailError)
+      // Even if email fails, the user is created. We can still succeed, or we can fail.
+      // If we fail here, the user is already created, so next time they'll get "Email already registered".
+      // It's better to log the error and allow them to proceed to /verify-email where they can request a new OTP.
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Registration error:", error)
+    return { error: "An unexpected error occurred. Please try again." }
   }
-
-  const limit = rateLimit(`register:${parsed.data.email}`, {
-    windowMs: 3600_000,
-    maxRequests: 5,
-  })
-  if (!limit.success) return { error: "Too many attempts. Try again later." }
-
-  const existing = await prisma.user.findUnique({
-    where: { email: parsed.data.email },
-  })
-  if (existing) return { error: "Email already registered" }
-
-  const hashedPassword = await argon2.hash(parsed.data.password)
-  const otp = Math.floor(100000 + Math.random() * 900000).toString()
-
-  const company = await prisma.company.create({
-    data: { name: `${parsed.data.name}'s Business` },
-  })
-
-  await prisma.user.create({
-    data: {
-      name: parsed.data.name,
-      email: parsed.data.email,
-      password: hashedPassword,
-      role: Role.BUSINESS_OWNER,
-      companyId: company.id,
-    },
-  })
-
-  await prisma.verificationToken.deleteMany({
-    where: { identifier: parsed.data.email }
-  })
-
-  await prisma.verificationToken.create({
-    data: {
-      identifier: parsed.data.email,
-      token: hashToken(otp),
-      expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    },
-  })
-
-  await sendVerificationEmail(parsed.data.email, otp)
-
-  return { success: true }
 }
 
 export async function verifyEmail(email: string, otp: string) {
-  const limit = rateLimit(`verify:${email}`, { windowMs: 15 * 60 * 1000, maxRequests: 5 })
-  if (!limit.success) return { error: "Too many attempts" }
+  try {
+    const limit = rateLimit(`verify:${email}`, { windowMs: 15 * 60 * 1000, maxRequests: 5 })
+    if (!limit.success) return { error: "Too many attempts" }
 
-  const tokenRecord = await prisma.verificationToken.findFirst({
-    where: {
-      identifier: email,
-      token: hashToken(otp),
-      expires: { gt: new Date() }
+    const tokenRecord = await prisma.verificationToken.findFirst({
+      where: {
+        identifier: email,
+        token: hashToken(otp),
+        expires: { gt: new Date() }
+      }
+    })
+
+    if (!tokenRecord) {
+      return { error: "Invalid or expired OTP" }
     }
-  })
 
-  if (!tokenRecord) {
-    return { error: "Invalid or expired OTP" }
+    await prisma.user.update({
+      where: { email },
+      data: { emailVerified: new Date() }
+    })
+
+    await prisma.verificationToken.delete({
+      where: { identifier_token: { identifier: email, token: hashToken(otp) } }
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error("verifyEmail error:", error)
+    return { error: "An unexpected error occurred while verifying the OTP." }
   }
-
-  await prisma.user.update({
-    where: { email },
-    data: { emailVerified: new Date() }
-  })
-
-  await prisma.verificationToken.delete({
-    where: { identifier_token: { identifier: email, token: hashToken(otp) } }
-  })
-
-  return { success: true }
 }
 
 export async function loginUser(email: string, password: string) {

@@ -30,17 +30,20 @@ export function LoginForm() {
   async function onSubmit(data: LoginFormValues) {
     setIsPending(true)
     setError("")
-    const result = await loginUser(data.email, data.password)
-    setIsPending(false)
-    if (result?.error) {
-      setError(result.error)
-      if (result.requiresVerification) {
-        // Optionally provide a button to resend email or redirect to verification page
-        router.push(`/verify-email?email=${encodeURIComponent(data.email)}`)
+    try {
+      const result = await loginUser(data.email, data.password)
+      setIsPending(false)
+      if (result?.error) {
+        setError(result.error)
+        if (result.requiresVerification) {
+          window.location.assign(`/verify-email?email=${encodeURIComponent(data.email)}`)
+        }
+      } else {
+        window.location.assign("/dashboard")
       }
-    } else {
-      router.push("/dashboard")
-      router.refresh()
+    } catch (e) {
+      setError("An unexpected error occurred. Please try again.")
+      setIsPending(false)
     }
   }
 

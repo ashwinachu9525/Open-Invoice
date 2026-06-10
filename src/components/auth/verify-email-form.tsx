@@ -37,16 +37,20 @@ export function VerifyEmailForm() {
     setIsPending(true)
     setError("")
     
-    const result = await verifyEmail(email!, otp)
-    
-    if (result.error) {
-      setError(result.error)
-      setIsPending(false)
-      return
-    }
+    try {
+      const result = await verifyEmail(email!, otp)
+      
+      if (result.error) {
+        setError(result.error)
+        setIsPending(false)
+        return
+      }
 
-    // Redirect to login page upon success
-    router.push("/login?verified=true")
+      window.location.assign("/login?verified=true")
+    } catch (e) {
+      setError("An unexpected error occurred. Please try again.")
+      setIsPending(false)
+    }
   }
 
   return (
