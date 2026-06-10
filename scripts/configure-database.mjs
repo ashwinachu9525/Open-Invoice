@@ -27,8 +27,8 @@ const schemaPath = path.join(ROOT, "prisma", "schema.prisma")
 let schema = readFileSync(schemaPath, "utf-8")
 const datasource =
   config.provider === "sqlite"
-    ? 'datasource db {\n  provider = "sqlite"\n}'
-    : 'datasource db {\n  provider = "postgresql"\n}'
+    ? 'datasource db {\n  provider = "sqlite"\n  url      = env("DATABASE_URL")\n}'
+    : 'datasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}'
 
 schema = schema.replace(/datasource db \{[^}]+\}/s, datasource)
 writeFileSync(schemaPath, schema)
