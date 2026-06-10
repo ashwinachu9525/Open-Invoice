@@ -10,7 +10,6 @@ import { InvoiceFilterBar } from "@/components/invoices/invoice-filter-bar"
 import { InvoiceListClient } from "@/components/invoices/invoice-list-client"
 import { Suspense } from "react"
 
-export const dynamic = "force-dynamic"
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   DRAFT:          { label: "Draft",          class: "bg-gray-500/20 text-gray-400 border-gray-500/30 border" },

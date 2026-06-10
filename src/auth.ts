@@ -95,7 +95,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.passkeyEnabled = (user as any).passkeyEnabled
       }
 
-      if (trigger === "update" || !user) {
+      if (trigger === "update") {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
         })

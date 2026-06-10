@@ -2,7 +2,6 @@ import { getDeletedItems } from "@/actions/trash"
 import { TrashClient } from "@/components/trash/trash-client"
 import { Trash2 } from "lucide-react"
 
-export const dynamic = "force-dynamic"
 
 export default async function TrashPage() {
   const { invoices, customers } = await getDeletedItems()

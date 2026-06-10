@@ -1,14 +1,15 @@
 import { prisma } from "@/lib/prisma"
 
 export async function getDashboardStats(companyId: string) {
-  const invoices = await prisma.invoice.findMany({
-    where: { companyId, deletedAt: null },
-    include: { payments: true, customer: { select: { name: true } } },
-  })
-
-  const customers = await prisma.customer.count({
-    where: { companyId, deletedAt: null },
-  })
+  const [invoices, customers] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { companyId, deletedAt: null },
+      include: { payments: true, customer: { select: { name: true } } },
+    }),
+    prisma.customer.count({
+      where: { companyId, deletedAt: null },
+    })
+  ])
 
   const activeInvoices = invoices.filter(i => i.status !== "CANCELLED")
 

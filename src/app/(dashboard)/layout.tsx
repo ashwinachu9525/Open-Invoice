@@ -1,5 +1,4 @@
 import { ReactNode } from "react"
-export const dynamic = "force-dynamic"
 import Link from "next/link"
 import { FileText, Home, Users, Settings, Menu, BarChart3, Sparkles, Zap, Package, Mail, Receipt } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"

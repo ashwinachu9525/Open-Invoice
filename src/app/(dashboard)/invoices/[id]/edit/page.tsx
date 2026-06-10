@@ -7,7 +7,6 @@ import { InvoiceForm } from "@/components/forms/invoice-form"
 import Link from "next/link"
 import { redirect, notFound } from "next/navigation"
 
-export const dynamic = "force-dynamic"
 
 interface EditInvoicePageProps {
   params: Promise<{ id: string }>
