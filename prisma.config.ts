@@ -4,6 +4,16 @@ import { existsSync, mkdirSync, readFileSync } from "fs"
 import path from "path"
 
 function getDatabaseUrl(): string {
+  if (process.env.DATABASE_PROVIDER === "sqlite") {
+    const dataDir = path.join(process.cwd(), "data")
+    if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
+    return `file:${path.join(dataDir, "invoice.db")}`
+  }
+
+  if (process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL) {
+    return process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL || ""
+  }
+
   const configPath = path.join(process.cwd(), "data", "database.config.json")
 
   if (existsSync(configPath)) {
@@ -18,16 +28,10 @@ function getDatabaseUrl(): string {
       return `file:${path.join(dataDir, "invoice.db")}`
     }
 
-    return config.postgresqlUrl || process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || ""
+    return config.postgresqlUrl || ""
   }
 
-  if (process.env.DATABASE_PROVIDER === "sqlite") {
-    const dataDir = path.join(process.cwd(), "data")
-    if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
-    return `file:${path.join(dataDir, "invoice.db")}`
-  }
-
-  return process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || ""
+  return ""
 }
 
 export default defineConfig({

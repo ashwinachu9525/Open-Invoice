@@ -10,19 +10,26 @@ export const CONFIG_PATH = path.join(DATA_DIR, "database.config.json")
 export const SQLITE_DB_PATH = path.join(DATA_DIR, "invoice.db")
 
 export function getDatabaseConfig(): DatabaseConfig {
-  if (existsSync(CONFIG_PATH)) {
-    const config = JSON.parse(readFileSync(CONFIG_PATH, "utf-8")) as DatabaseConfig
-    return {
-      provider: config.provider === "postgresql" ? "postgresql" : "sqlite",
-      postgresqlUrl: config.postgresqlUrl,
-    }
-  }
-
   const envProvider = process.env.DATABASE_PROVIDER
   if (envProvider === "postgresql" || envProvider === "sqlite") {
     return {
       provider: envProvider,
       postgresqlUrl: process.env.DATABASE_URL,
+    }
+  }
+
+  if (process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL) {
+    return {
+      provider: "postgresql",
+      postgresqlUrl: process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL,
+    }
+  }
+
+  if (existsSync(CONFIG_PATH)) {
+    const config = JSON.parse(readFileSync(CONFIG_PATH, "utf-8")) as DatabaseConfig
+    return {
+      provider: config.provider === "postgresql" ? "postgresql" : "sqlite",
+      postgresqlUrl: config.postgresqlUrl,
     }
   }
 
@@ -60,6 +67,8 @@ export function getDatabaseUrl(config: DatabaseConfig = getDatabaseConfig()): st
   return (
     config.postgresqlUrl ||
     process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL ||
     "postgresql://postgres:postgres@localhost:5432/invoice_saas"
   )
 }

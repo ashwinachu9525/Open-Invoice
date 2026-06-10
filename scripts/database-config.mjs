@@ -1,3 +1,4 @@
+import "dotenv/config"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
@@ -14,14 +15,6 @@ export const SQLITE_DB_PATH = path.join(DATA_DIR, "invoice.db")
  * @returns {{ provider: DatabaseProvider, postgresqlUrl?: string }}
  */
 export function getDatabaseConfig() {
-  if (existsSync(CONFIG_PATH)) {
-    const config = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"))
-    return {
-      provider: config.provider === "postgresql" ? "postgresql" : "sqlite",
-      postgresqlUrl: config.postgresqlUrl,
-    }
-  }
-
   const envProvider = process.env.DATABASE_PROVIDER
   if (envProvider === "postgresql" || envProvider === "sqlite") {
     return {
@@ -34,6 +27,14 @@ export function getDatabaseConfig() {
     return {
       provider: "postgresql",
       postgresqlUrl: process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL,
+    }
+  }
+
+  if (existsSync(CONFIG_PATH)) {
+    const config = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"))
+    return {
+      provider: config.provider === "postgresql" ? "postgresql" : "sqlite",
+      postgresqlUrl: config.postgresqlUrl,
     }
   }
 

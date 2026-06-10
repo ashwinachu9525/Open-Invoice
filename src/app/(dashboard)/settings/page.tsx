@@ -8,11 +8,13 @@ import { DatabaseSettingsForm } from "@/components/forms/database-settings-form"
 import { BankAccountsForm } from "@/components/forms/bank-accounts-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
+const isDevMode = process.env.NEXT_PUBLIC_ENV === "dev"
+
 export default async function SettingsPage() {
   const [company, emailSettings, databaseSettings, bankAccounts] = await Promise.all([
     getCompany(),
     getEmailSettings(),
-    getDatabaseSettings(),
+    isDevMode ? getDatabaseSettings() : Promise.resolve(null),
     getBankAccounts(),
   ])
 
@@ -23,21 +25,23 @@ export default async function SettingsPage() {
         <p className="text-gray-500">Manage your company profile and email configuration.</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Database</CardTitle>
-          <CardDescription>
-            Choose SQLite for local package storage or PostgreSQL for production deployments.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DatabaseSettingsForm
-            currentProvider={databaseSettings.provider}
-            currentUrl={databaseSettings.url}
-            isSqlite={databaseSettings.isSqlite}
-          />
-        </CardContent>
-      </Card>
+      {isDevMode && databaseSettings && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Database</CardTitle>
+            <CardDescription>
+              Choose SQLite for local package storage or PostgreSQL for production deployments.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DatabaseSettingsForm
+              currentProvider={databaseSettings.provider}
+              currentUrl={databaseSettings.url}
+              isSqlite={databaseSettings.isSqlite}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

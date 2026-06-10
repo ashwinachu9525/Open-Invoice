@@ -28,7 +28,18 @@ function createPostgresClient(databaseUrl: string, log: ("error" | "warn")[]): P
 
   const { PrismaPg } = require("@prisma/adapter-pg") as typeof import("@prisma/adapter-pg")
   const { Pool } = require("pg") as typeof import("pg")
-  const pool = new Pool({ connectionString: databaseUrl })
+
+  // Strip ?sslmode=... from the URL — we handle SSL directly on the Pool object instead.
+  // This avoids the "self-signed certificate in certificate chain" error that the pg
+  // driver throws when it tries to validate cloud provider certs (Aiven, Supabase, Neon, etc.)
+  const cleanUrl = databaseUrl.replace(/[?&]sslmode=[^&]*/g, "").replace(/\?$/, "")
+  const requiresSsl = databaseUrl.includes("sslmode=require") || databaseUrl.includes("sslmode=no-verify") || databaseUrl.includes("sslmode=prefer")
+
+  const pool = new Pool({
+    connectionString: cleanUrl,
+    ssl: requiresSsl ? { rejectUnauthorized: false } : undefined,
+  })
+
   const adapter = new PrismaPg(pool)
   return new PrismaClient({ adapter, log })
 }
