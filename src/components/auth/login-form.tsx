@@ -59,7 +59,11 @@ export function LoginForm() {
           }
         }
       } else {
-        window.location.assign("/dashboard")
+        if (result?.role === "SUPER_ADMIN") {
+          window.location.assign("/admin")
+        } else {
+          window.location.assign("/dashboard")
+        }
       }
     } catch (e) {
       setError("An unexpected error occurred. Please try again.")

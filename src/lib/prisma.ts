@@ -50,6 +50,10 @@ function createPostgresClient(databaseUrl: string, log: ("error" | "warn")[]): P
   const pool = new Pool({
     connectionString: cleanUrl,
     ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
+    // Serverless-friendly tuning: reduce max connections per instance and close idle connections aggressively
+    max: process.env.NODE_ENV === "production" ? 2 : 10,
+    idleTimeoutMillis: 5000, 
+    connectionTimeoutMillis: 5000,
   })
 
   const adapter = new PrismaPg(pool)

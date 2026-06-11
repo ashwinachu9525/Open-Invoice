@@ -20,6 +20,10 @@ export const authConfig = {
 
       if (isAuthPage) {
         if (isLoggedIn) {
+          const role = (auth?.user as any)?.role
+          if (role === "SUPER_ADMIN") {
+            return Response.redirect(new URL("/admin", request.nextUrl))
+          }
           return Response.redirect(new URL("/dashboard", request.nextUrl))
         }
         return true

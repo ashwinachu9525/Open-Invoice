@@ -123,7 +123,7 @@ export async function loginUser(email: string, password: string, totpToken?: str
       payload.totpToken = totpToken
     }
     await signIn("credentials", payload)
-    return { success: true }
+    return { success: true, role: user.role }
   } catch (error: any) {
     if (error?.message === "MFA_REQUIRED" || error?.cause?.err?.message === "MFA_REQUIRED") {
       return { error: "MFA_REQUIRED", requiresMfa: true }
