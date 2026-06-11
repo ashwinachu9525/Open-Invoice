@@ -11,7 +11,7 @@ export async function createRecurringSchedule(
   autoSend = false
 ) {
   try {
-    const { company } = await requireCompany()
+    const { company, session } = await requireCompany()
     const invoice = await prisma.invoice.findFirst({
       where: { id: invoiceId, companyId: company.id },
     })
@@ -27,6 +27,15 @@ export async function createRecurringSchedule(
     })
 
     revalidatePath(`/invoices/${invoiceId}`)
+
+    import("@/lib/push").then(({ sendPushNotification }) => {
+      sendPushNotification(session.user.id, {
+        title: "Recurring Schedule Created",
+        body: `Schedule activated for Invoice ${invoice.invoiceNumber}.`,
+        url: `/invoices/${invoice.id}`,
+      })
+    })
+
     return { success: true }
   } catch {
     return { error: "Failed to create schedule" }

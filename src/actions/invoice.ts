@@ -18,6 +18,15 @@ export async function createInvoice(data: unknown) {
       return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
     }
 
+    if (company.subscriptionTier === "FREE") {
+      const invoiceCount = await prisma.invoice.count({
+        where: { companyId: company.id, deletedAt: null }
+      })
+      if (invoiceCount >= 5) {
+        return { error: "FREE_LIMIT_REACHED" }
+      }
+    }
+
     const customer = await prisma.customer.findFirst({
       where: { id: parsed.data.customerId, companyId: company.id, deletedAt: null },
     })

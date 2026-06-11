@@ -16,6 +16,7 @@ export const invoiceSchema = z.object({
   dueDate: z.date(),
   currency: z.string(),
   exchangeRate: z.number().min(0).default(1),
+  taxJurisdiction: z.enum(["INDIA_GST", "EU_VAT", "US_SALES_TAX", "NONE"]).default("INDIA_GST"),
   notes: z.string().optional(),
   terms: z.string().optional(),
   internalNotes: z.string().optional(),

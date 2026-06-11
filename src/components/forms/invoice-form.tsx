@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { createInvoice, updateInvoice } from "@/actions/invoice"
-import { calculateInvoiceTax, formatINR, TDS_RATES } from "@/services/tax-engine"
+import { calculateInvoiceTax, formatINR, formatCurrency, TDS_RATES } from "@/services/tax-engine"
 import { getExchangeRates } from "@/services/currency"
 import { COMMON_CURRENCIES } from "@/lib/currencies"
 import { useState, useMemo, useEffect } from "react"
@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+import { PastInvoiceModal } from "./past-invoice-modal"
 
 interface InvoiceFormProps {
   customers: { id: string; name: string; state?: string | null }[]
@@ -33,11 +33,13 @@ interface InvoiceFormProps {
   initialData?: InvoiceFormValues
   invoiceId?: string
   catalogItems?: ProductCatalog[]
+  pastInvoices?: any[]
 }
 
-export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bankAccounts = [], initialData, invoiceId, catalogItems = [] }: InvoiceFormProps) {
+export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bankAccounts = [], initialData, invoiceId, catalogItems = [], pastInvoices = [] }: InvoiceFormProps) {
   const router = useRouter()
   const [isPending, setIsPending] = useState(false)
+  const [isAiLoading, setIsAiLoading] = useState(false)
   const [error, setError] = useState("")
 
   const form = useForm<InvoiceFormValues>({
@@ -49,6 +51,7 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       currency: "INR",
       exchangeRate: 1,
+      taxJurisdiction: "INDIA_GST",
       tdsPercentage: 0,
       items: [{ description: "", quantity: 1, unitPrice: 0, discount: 0, taxPercentage: 18 }],
       bankName: "",
@@ -121,11 +124,74 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
         sellerState,
         buyerState: customer?.state,
         tdsPercentage: watched.tdsPercentage,
+        taxJurisdiction: watched.taxJurisdiction,
       })
     } catch {
       return null
     }
   }, [watched, customers, sellerState])
+
+  const handlePastInvoiceSelect = async (pastInvoice: any, aiInstructions?: string) => {
+    form.setValue("customerId", pastInvoice.customerId)
+    form.setValue("currency", pastInvoice.currency)
+    form.setValue("exchangeRate", pastInvoice.exchangeRate)
+    form.setValue("taxJurisdiction", pastInvoice.taxJurisdiction || "INDIA_GST")
+    form.setValue("tdsPercentage", pastInvoice.tdsPercentage)
+    form.setValue("notes", pastInvoice.notes || "")
+    form.setValue("terms", pastInvoice.terms || "")
+    form.setValue("bankName", pastInvoice.bankName || "")
+    form.setValue("bankAccountName", pastInvoice.bankAccountName || "")
+    form.setValue("bankAccountNumber", pastInvoice.bankAccountNumber || "")
+    form.setValue("bankIfscCode", pastInvoice.bankIfscCode || "")
+    form.setValue("bankAccountType", pastInvoice.bankAccountType || "")
+    form.setValue("themeColor", pastInvoice.themeColor || "#1e40af")
+    form.setValue("themeFont", pastInvoice.themeFont || "Helvetica")
+
+    if (!aiInstructions) {
+      // Just clone items
+      form.setValue("items", pastInvoice.items.map((i: any) => ({
+        description: i.description,
+        hsnSac: i.hsnSac || "",
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        discount: i.discount,
+        taxPercentage: i.taxPercentage
+      })))
+      return
+    }
+
+    // Call AI
+    setIsAiLoading(true)
+    setError("")
+    try {
+      const res = await fetch("/api/ai/invoice-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoiceData: pastInvoice, instructions: aiInstructions })
+      })
+
+      if (!res.ok) {
+        throw new Error("Failed to get AI suggestions")
+      }
+
+      const data = await res.json()
+      if (data.items && Array.isArray(data.items)) {
+        form.setValue("items", data.items.map((i: any) => ({
+          description: i.description || "",
+          hsnSac: i.hsnSac || "",
+          quantity: i.quantity || 1,
+          unitPrice: i.unitPrice || 0,
+          discount: i.discount || 0,
+          taxPercentage: i.taxPercentage || 18
+        })))
+      }
+      if (data.notes) form.setValue("notes", data.notes)
+    } catch (err: any) {
+      setError(err.message || "Failed to get AI suggestions")
+    } finally {
+      setIsAiLoading(false)
+    }
+  }
 
   async function onSubmit(data: InvoiceFormValues) {
     setIsPending(true)
@@ -136,9 +202,19 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
       : await createInvoice(data)
       
     setIsPending(false)
+    if (result.error === "FREE_LIMIT_REACHED") {
+      setError("You have reached the maximum limit of 5 invoices on the Free plan. Please upgrade to Pro.")
+      setIsPending(false)
+      return
+    }
+
     if (result.error) {
       setError(result.error)
-    } else if ("invoiceId" in result && result.invoiceId) {
+      setIsPending(false)
+      return
+    }
+
+    if ("invoiceId" in result && result.invoiceId) {
       router.push(`/invoices/${result.invoiceId}`)
     } else if (invoiceId && result.success) {
       router.push(`/invoices/${invoiceId}`)
@@ -149,9 +225,26 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
   const selectClass = "flex h-9 w-full rounded-md border border-white/10 bg-transparent px-3 py-1 text-sm backdrop-blur-sm focus:outline-none focus:border-primary/50 transition-all"
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* Error Alert */}
+    <>
+      {!invoiceId && pastInvoices.length > 0 && (
+        <PastInvoiceModal pastInvoices={pastInvoices} onSelect={handlePastInvoiceSelect} />
+      )}
+      
+      {isAiLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 p-6 glass rounded-2xl border-white/10 max-w-sm text-center">
+            <div className="h-10 w-10 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin" />
+            <div>
+              <p className="font-semibold">AI is analyzing & cloning...</p>
+              <p className="text-sm text-muted-foreground">This may take a few seconds.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* Error Alert */}
         {error && (
           <Alert className="border-red-500/30 bg-red-500/10 animate-in fade-in duration-300">
             <AlertCircle className="h-4 w-4 text-red-400" />
@@ -162,7 +255,7 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
         {/* ── Section: Invoice Details ── */}
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Invoice Details</p>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
             <FormField
               control={form.control}
               name="customerId"
@@ -234,6 +327,49 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="currency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Currency</FormLabel>
+                  <FormControl>
+                    <div className="flex items-center gap-2">
+                      <select className={selectClass} {...field}>
+                        {COMMON_CURRENCIES.map((c) => (
+                          <option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>
+                        ))}
+                      </select>
+                      {isFetchingRate && <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />}
+                    </div>
+                  </FormControl>
+                  {watched.currency !== "INR" && watched.exchangeRate !== 1 && (
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      1 {watched.currency} ≈ {watched.exchangeRate} INR
+                    </p>
+                  )}
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="taxJurisdiction"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Tax Region</FormLabel>
+                  <FormControl>
+                    <select className={selectClass} {...field}>
+                      <option value="INDIA_GST">India (GST)</option>
+                      <option value="EU_VAT">EU/Global (VAT/Tax)</option>
+                      <option value="US_SALES_TAX">US (Sales Tax)</option>
+                      <option value="NONE">No Tax</option>
+                    </select>
+                  </FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
           </div>
         </div>
 
@@ -275,7 +411,7 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
                               <div>
                                 <p className="font-medium text-sm">{item.name}</p>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {formatINR(item.unitPrice)} {item.unit ? `per ${item.unit}` : ''} 
+                                  {formatCurrency(item.unitPrice, watched.currency)} {item.unit ? `per ${item.unit}` : ''} 
                                   {item.hsnSac ? ` • HSN/SAC: ${item.hsnSac}` : ''}
                                   ` • Tax: ${item.taxPercentage}%`
                                 </p>
@@ -669,24 +805,30 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Tax Preview</p>
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span>
-              <span>{formatINR(taxPreview.subTotal)}</span>
+              <span>{formatCurrency(taxPreview.subTotal, watched.currency)}</span>
             </div>
             {taxPreview.cgstAmount > 0 && (
               <div className="flex justify-between text-muted-foreground">
                 <span>CGST</span>
-                <span>{formatINR(taxPreview.cgstAmount)}</span>
+                <span>{formatCurrency(taxPreview.cgstAmount, watched.currency)}</span>
               </div>
             )}
             {taxPreview.sgstAmount > 0 && (
               <div className="flex justify-between text-muted-foreground">
                 <span>SGST</span>
-                <span>{formatINR(taxPreview.sgstAmount)}</span>
+                <span>{formatCurrency(taxPreview.sgstAmount, watched.currency)}</span>
               </div>
             )}
             {taxPreview.igstAmount > 0 && (
               <div className="flex justify-between text-muted-foreground">
                 <span>IGST {taxPreview.isInterState ? "(Inter-state)" : ""}</span>
-                <span>{formatINR(taxPreview.igstAmount)}</span>
+                <span>{formatCurrency(taxPreview.igstAmount, watched.currency)}</span>
+              </div>
+            )}
+            {taxPreview.vatAmount > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>VAT/Tax</span>
+                <span>{formatCurrency(taxPreview.vatAmount, watched.currency)}</span>
               </div>
             )}
             {taxPreview.tdsAmount > 0 && (
@@ -695,13 +837,13 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
                   <TrendingDown className="h-3.5 w-3.5" />
                   TDS ({taxPreview.tdsPercentage}%)
                 </span>
-                <span>-{formatINR(taxPreview.tdsAmount)}</span>
+                <span>-{formatCurrency(taxPreview.tdsAmount, watched.currency)}</span>
               </div>
             )}
             <Separator className="bg-white/10 my-1" />
             <div className="flex justify-between font-bold text-base">
               <span>Total</span>
-              <span className="text-primary">{formatINR(taxPreview.finalAmount)}</span>
+              <span className="text-primary">{formatCurrency(taxPreview.finalAmount, watched.currency)}</span>
             </div>
           </div>
         )}
@@ -717,5 +859,6 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
         </Button>
       </form>
     </Form>
+    </>
   )
 }

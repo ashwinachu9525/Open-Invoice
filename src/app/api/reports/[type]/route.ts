@@ -44,6 +44,17 @@ export async function GET(
       return NextResponse.json({ error: "Invalid report type" }, { status: 400 })
   }
 
+  if (format === "pdf") {
+    const { generateReportPdf } = await import("@/services/pdf-report")
+    const pdfStream = await generateReportPdf(`${type.toUpperCase()} Report`, data)
+    return new NextResponse(pdfStream as any, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${type}-report.pdf"`,
+      },
+    })
+  }
+
   if (format === "csv") {
     return new NextResponse(toCSV(data), {
       headers: {

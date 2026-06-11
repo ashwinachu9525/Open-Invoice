@@ -21,6 +21,7 @@ export interface TaxBreakdown {
   cgstAmount: number
   sgstAmount: number
   igstAmount: number
+  vatAmount: number
   tdsPercentage: number
   tdsAmount: number
   finalAmount: number
@@ -74,24 +75,36 @@ export function calculateInvoiceTax(params: {
   sellerState?: string | null
   buyerState?: string | null
   tdsPercentage?: number
+  taxJurisdiction?: string
 }): TaxBreakdown {
   const items = params.items.map(calculateLineItem)
   const subTotal = round2(items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0))
   const totalDiscount = round2(items.reduce((sum, i) => sum + i.discount, 0))
   const taxableAmount = round2(items.reduce((sum, i) => sum + i.taxableAmount, 0))
-  const totalTax = round2(items.reduce((sum, i) => sum + i.taxAmount, 0))
+  let totalTax = round2(items.reduce((sum, i) => sum + i.taxAmount, 0))
+
+  const jurisdiction = params.taxJurisdiction || "INDIA_GST"
+  if (jurisdiction === "NONE") {
+    totalTax = 0
+    items.forEach(i => i.taxAmount = 0)
+  }
 
   const interState = isInterState(params.sellerState, params.buyerState)
 
   let cgstAmount = 0
   let sgstAmount = 0
   let igstAmount = 0
+  let vatAmount = 0
 
-  if (interState) {
-    igstAmount = totalTax
-  } else {
-    cgstAmount = round2(totalTax / 2)
-    sgstAmount = round2(totalTax - cgstAmount)
+  if (jurisdiction === "INDIA_GST") {
+    if (interState) {
+      igstAmount = totalTax
+    } else {
+      cgstAmount = round2(totalTax / 2)
+      sgstAmount = round2(totalTax - cgstAmount)
+    }
+  } else if (jurisdiction === "EU_VAT" || jurisdiction === "US_SALES_TAX") {
+    vatAmount = totalTax
   }
 
   const tdsPercentage = params.tdsPercentage ?? 0
@@ -106,6 +119,7 @@ export function calculateInvoiceTax(params: {
     cgstAmount,
     sgstAmount,
     igstAmount,
+    vatAmount,
     tdsPercentage,
     tdsAmount,
     finalAmount,
@@ -119,9 +133,13 @@ export function round2(value: number): number {
 }
 
 export function formatINR(amount: number): string {
+  return formatCurrency(amount, "INR")
+}
+
+export function formatCurrency(amount: number, currencyCode: string = "INR"): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: "INR",
+    currency: currencyCode,
     maximumFractionDigits: 2,
   }).format(amount)
 }

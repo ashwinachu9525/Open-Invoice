@@ -14,6 +14,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma),
   experimental: { enableWebAuthn: true },
+  logger: {
+    warn: (code) => {
+      // Suppress the experimental WebAuthn warning that constantly floods the terminal
+      if (code === "experimental-webauthn" || String(code).includes("experimental-webauthn")) return
+      console.warn(code)
+    },
+  },
   providers: [
     // ── Google OAuth ─────────────────────────────────────────────────────
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET

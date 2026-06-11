@@ -77,6 +77,7 @@ export function InvoiceFilterBar({
 
   // Sync range state when URL changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRange({
       from: parseDate(currentFrom),
       to: parseDate(currentTo),

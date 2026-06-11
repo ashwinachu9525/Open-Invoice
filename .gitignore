@@ -48,3 +48,5 @@ next-env.d.ts
 /data/*.db-wal
 /data/*.db-shm
 /data/database.config.json
+
+certificates

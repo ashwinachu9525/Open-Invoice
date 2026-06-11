@@ -16,13 +16,16 @@ function createSqliteClient(log: ("error" | "warn")[]): PrismaClient {
   }
 
   // Lazy require avoids Turbopack bundling native better-sqlite3
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PrismaLibSql } = require("@prisma/adapter-libsql") as typeof import("@prisma/adapter-libsql")
   const adapter = new PrismaLibSql({ url: `file:${SQLITE_DB_PATH}` })
   return new PrismaClient({ adapter, log })
 }
 
 function createPostgresClient(databaseUrl: string, log: ("error" | "warn")[]): PrismaClient {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PrismaPg } = require("@prisma/adapter-pg") as typeof import("@prisma/adapter-pg")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { Pool } = require("pg") as typeof import("pg")
 
   // Cloud providers (Aiven, Supabase, Neon, etc.) require SSL but use custom certificates.

@@ -4,7 +4,7 @@ import { Trash2 } from "lucide-react"
 
 
 export default async function TrashPage() {
-  const { invoices, customers } = await getDeletedItems()
+  const { invoices, quotations, customers } = await getDeletedItems()
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto w-full">
@@ -14,12 +14,12 @@ export default async function TrashPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Trash</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage deleted invoices and customers.</p>
+          <p className="text-muted-foreground text-sm mt-1">Manage deleted invoices, quotations, and customers.</p>
         </div>
       </div>
 
       <div className="glass glass-card border border-white/10 p-6 rounded-xl">
-        <TrashClient invoices={invoices} customers={customers} />
+        <TrashClient invoices={invoices} quotations={quotations} customers={customers} />
       </div>
     </div>
   )

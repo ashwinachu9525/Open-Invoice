@@ -29,12 +29,15 @@ model User {
   Authenticators Authenticator[]
   auditLogs      AuditLog[]
   aichatSessions AIChatSession[]
+  pushSubscriptions PushSubscription[]
+  feedbacks      UserFeedback[]
 
   @@index([companyId])
   @@index([email])
 }
 
 enum Role {
+  SUPER_ADMIN
   ADMIN
   BUSINESS_OWNER
   STAFF
@@ -105,6 +108,11 @@ model PasswordResetToken {
 }
 
 // Domain Models
+enum SubscriptionTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
 
 model Company {
   id             String    @id @default(cuid())
@@ -122,6 +130,7 @@ model Company {
   invoicePrefix  String?   @default("INV")
   baseCurrency   String?   @default("INR")
   invoiceTemplate String?  @default("modern")
+  subscriptionTier SubscriptionTier @default(FREE)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
@@ -129,6 +138,7 @@ model Company {
   users          User[]
   customers      Customer[]
   invoices       Invoice[]
+  quotations     Quotation[]
   bankAccounts   BankAccount[]
   emailSetting   EmailSetting?
   aiSettings     AISettings?
@@ -138,6 +148,8 @@ model Company {
   emailLogs      EmailLog[]
   reminderConfig ReminderConfig?
   expenses       Expense[]
+  feedbacks      UserFeedback[]
+  teamInvitations TeamInvitation[]
 
   @@index([gstNumber])
 }
@@ -160,6 +172,7 @@ model Customer {
 
   company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoices Invoice[]
+  quotations Quotation[]
 
   @@index([companyId])
   @@index([name])
@@ -190,9 +203,11 @@ model Invoice {
   subTotal      Float
   totalDiscount Float   @default(0)
   totalTax      Float
+  taxJurisdiction String @default("INDIA_GST")
   cgstAmount    Float   @default(0)
   sgstAmount    Float   @default(0)
   igstAmount    Float   @default(0)
+  vatAmount     Float   @default(0)
   tdsPercentage Float   @default(0)
   tdsAmount     Float   @default(0)
   finalAmount   Float
@@ -472,4 +487,118 @@ model Expense {
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   
   @@index([companyId])
+}
+
+model Quotation {
+  id                String          @id @default(cuid())
+  companyId         String
+  customerId        String
+  quotationNumber   String
+  date              DateTime
+  expiryDate        DateTime?
+  currency          String          @default("INR")
+  notes             String?
+  terms             String?
+  themeColor        String?         @default("#1e40af")
+  themeFont         String?         @default("Helvetica")
+  status            QuotationStatus @default(DRAFT)
+  exchangeRate      Float           @default(1)
+
+  subTotal      Float
+  totalDiscount Float   @default(0)
+  totalTax      Float
+  taxJurisdiction String @default("INDIA_GST")
+  cgstAmount    Float   @default(0)
+  sgstAmount    Float   @default(0)
+  igstAmount    Float   @default(0)
+  vatAmount     Float   @default(0)
+  tdsPercentage Float   @default(0)
+  tdsAmount     Float   @default(0)
+  finalAmount   Float
+  pdfUrl        String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items    QuotationItem[]
+
+  @@unique([companyId, quotationNumber])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([status])
+  @@index([date])
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  INVOICED
+}
+
+model QuotationItem {
+  id            String  @id @default(cuid())
+  quotationId   String
+  description   String
+  hsnSac        String?
+  quantity      Float
+  unitPrice     Float
+  discount      Float   @default(0)
+  taxPercentage Float   @default(18)
+  taxableAmount Float   @default(0)
+  taxAmount     Float   @default(0)
+  total         Float
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserFeedback {
+  id        String   @id @default(cuid())
+  userId    String
+  companyId String?
+  rating    Int      // 1 to 5
+  comments  String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([companyId])
+}
+
+model TeamInvitation {
+  id        String   @id @default(cuid())
+  email     String
+  companyId String
+  role      Role     @default(STAFF)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([companyId])
+  @@index([token])
 }

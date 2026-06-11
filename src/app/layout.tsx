@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Providers } from "@/components/providers"
 import { Toaster } from "@/components/ui/sonner"
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
+import Script from "next/script"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -30,6 +32,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
 }
 
 export default function RootLayout({
@@ -40,11 +43,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <Script defer data-domain="open-invoice.com" src="https://plausible.io/js/script.js" />
+      </head>
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
         <Toaster />
+        <PwaInstallPrompt />
       </body>
     </html>
   )

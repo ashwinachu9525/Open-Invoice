@@ -254,3 +254,49 @@ export async function sendInvoiceEmail(params: {
     })
   }
 }
+
+export async function sendQuotationEmail(params: {
+  companyId: string
+  to: string
+  subject: string
+  html: string
+  attachments?: { filename: string; content: Buffer }[]
+  quotationId?: string
+}) {
+  const transporter = await getEmailTransporter(params.companyId)
+  const settings = await prisma.emailSetting.findUnique({
+    where: { companyId: params.companyId },
+  })
+  if (!transporter || !settings) throw new Error("SMTP not configured")
+
+  let status = "sent"
+  let errorMessage: string | undefined = undefined
+
+  try {
+    await transporter.sendMail({
+      from: settings.fromEmail
+        ? `"${settings.fromName ?? "Quotation"}" <${settings.fromEmail}>`
+        : settings.username,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+      attachments: params.attachments,
+    })
+  } catch (error) {
+    status = "failed"
+    errorMessage = error instanceof Error ? error.message : String(error)
+    throw error // Re-throw so caller knows it failed
+  } finally {
+    // Note: We don't have quotationId in EmailLog schema currently. If we want to log it, we could add it to schema, 
+    // or log without linking directly. The schema only has invoiceId. We will just create it without invoiceId or quotationId.
+    await prisma.emailLog.create({
+      data: {
+        companyId: params.companyId,
+        to: params.to,
+        subject: params.subject,
+        status,
+        error: errorMessage,
+      }
+    })
+  }
+}

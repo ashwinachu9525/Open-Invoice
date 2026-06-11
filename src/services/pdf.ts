@@ -68,3 +68,37 @@ export async function generateStatementPdf(customerId: string): Promise<Buffer> 
 
   return buffer
 }
+
+import { QuotationDocument } from "@/pdf/quotation-document"
+
+export async function generateQuotationPdf(quotationId: string): Promise<Buffer> {
+  const quotation = await prisma.quotation.findUnique({
+    where: { id: quotationId },
+    include: { items: true, customer: true, company: true },
+  })
+
+  if (!quotation) throw new Error("Quotation not found")
+
+  const qrData = JSON.stringify({
+    qt: quotation.quotationNumber,
+    amt: quotation.finalAmount,
+    date: quotation.date.toISOString().split("T")[0],
+  })
+
+  const qrCodeDataUrl = await QRCode.toDataURL(qrData, { width: 120, margin: 1 })
+
+  const buffer = await renderToBuffer(
+    QuotationDocument({ quotation, qrCodeDataUrl })
+  )
+
+  if (process.env.S3_ACCESS_KEY_ID) {
+    const key = `quotations/${quotation.companyId}/${quotation.quotationNumber}.pdf`
+    await uploadFile(key, buffer, "application/pdf")
+    await prisma.quotation.update({
+      where: { id: quotationId },
+      data: { pdfUrl: key },
+    })
+  }
+
+  return buffer
+}

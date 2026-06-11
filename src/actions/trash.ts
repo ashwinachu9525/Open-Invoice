@@ -15,15 +15,21 @@ export async function getDeletedItems() {
       orderBy: { deletedAt: "desc" }
     })
 
+    const quotations = await prisma.quotation.findMany({
+      where: { companyId: company.id, deletedAt: { not: null } },
+      include: { customer: true },
+      orderBy: { deletedAt: "desc" }
+    })
+
     const customers = await prisma.customer.findMany({
       where: { companyId: company.id, deletedAt: { not: null } },
       orderBy: { deletedAt: "desc" }
     })
 
-    return { invoices, customers }
+    return { invoices, quotations, customers }
   } catch (error) {
     console.error("Failed to fetch deleted items:", error)
-    return { invoices: [], customers: [] }
+    return { invoices: [], quotations: [], customers: [] }
   }
 }
 

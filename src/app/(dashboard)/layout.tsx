@@ -7,10 +7,13 @@ import { ThemeToggle } from "@/components/dashboard/theme-toggle"
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { PasskeyPromptModal } from "@/components/auth/passkey-prompt-modal"
+import { OfflineIndicator } from "@/components/layout/offline-indicator"
+import { RandomFeedbackModal } from "@/components/layout/random-feedback-modal"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/invoices", label: "Invoices", icon: FileText },
+  { href: "/quotations", label: "Quotations", icon: FileText },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/catalog", label: "Catalog", icon: Package },
   { href: "/reports", label: "Reports", icon: BarChart3 },
@@ -59,6 +62,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               {item.label}
             </Link>
           ))}
+          {session.user.role === "SUPER_ADMIN" && (
+            <Link
+              href="/admin"
+              className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-amber-500/80 transition-all duration-200 hover:bg-amber-500/10 hover:text-amber-500 hover:translate-x-0.5"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/5 group-hover:bg-amber-500/20 transition-all duration-200">
+                <Users className="h-4 w-4" />
+              </span>
+              Super Admin
+            </Link>
+          )}
         </nav>
 
         {/* Footer */}
@@ -112,6 +126,20 @@ export default async function DashboardLayout({ children }: { children: ReactNod
                     {item.label}
                   </SheetClose>
                 ))}
+                {session.user.role === "SUPER_ADMIN" && (
+                  <SheetClose
+                    key="/admin"
+                    render={
+                      <Link
+                        href="/admin"
+                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-amber-500/80 hover:bg-amber-500/10 hover:text-amber-500 transition-all"
+                      />
+                    }
+                  >
+                    <Users className="h-4 w-4" />
+                    Super Admin
+                  </SheetClose>
+                )}
               </nav>
               <div className="border-t border-white/8 p-4 shrink-0">
                 <SignOutButton />
@@ -120,6 +148,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           </Sheet>
 
           <div className="flex w-full items-center justify-end gap-3">
+            <OfflineIndicator />
             <ThemeToggle />
             <div className="h-8 w-px bg-white/10" />
             <div className="flex items-center gap-2">
@@ -140,6 +169,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       {session.user.id && session.user.passkeyPrompted === false && (
         <PasskeyPromptModal userId={session.user.id} />
       )}
+      <RandomFeedbackModal />
     </div>
   )
 }

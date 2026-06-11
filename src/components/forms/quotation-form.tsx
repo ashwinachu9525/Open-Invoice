@@ -1,0 +1,595 @@
+"use client"
+
+import { useForm, useFieldArray } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { quotationSchema, QuotationFormValues } from "@/validations/quotation"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Separator } from "@/components/ui/separator"
+import { createQuotation, updateQuotation } from "@/actions/quotation"
+import { calculateInvoiceTax, formatINR, TDS_RATES } from "@/services/tax-engine"
+import { getExchangeRates } from "@/services/currency"
+import { COMMON_CURRENCIES } from "@/lib/currencies"
+import { useState, useMemo, useEffect } from "react"
+import { Plus, Trash2, AlertCircle, TrendingDown, Receipt, Percent, Package } from "lucide-react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { BankAccount, ProductCatalog } from "@prisma/client"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+
+interface QuotationFormProps {
+  customers: { id: string; name: string; state?: string | null }[]
+  defaultQuotationNumber: string
+  sellerState?: string | null
+  
+  initialData?: QuotationFormValues
+  quotationId?: string
+  catalogItems?: ProductCatalog[]
+}
+
+export function QuotationForm({ customers, defaultQuotationNumber, sellerState, initialData, quotationId, catalogItems = [] }: QuotationFormProps) {
+  const router = useRouter()
+  const [isPending, setIsPending] = useState(false)
+  const [error, setError] = useState("")
+
+  const form = useForm<QuotationFormValues>({
+    resolver: zodResolver(quotationSchema) as any,
+    defaultValues: initialData || {
+      customerId: "",
+      quotationNumber: defaultQuotationNumber,
+      date: new Date(),
+      expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      currency: "INR",
+      exchangeRate: 1,
+      tdsPercentage: 0,
+      items: [{ description: "", quantity: 1, unitPrice: 0, discount: 0, taxPercentage: 18 }],
+    },
+  })
+
+  const [catalogSearch, setCatalogSearch] = useState("")
+  const [isCatalogOpen, setIsCatalogOpen] = useState(false)
+
+  const filteredCatalog = catalogItems.filter(item => 
+    item.name.toLowerCase().includes(catalogSearch.toLowerCase()) || 
+    (item.hsnSac && item.hsnSac.toLowerCase().includes(catalogSearch.toLowerCase()))
+  )
+
+  const handleAddFromCatalog = (item: ProductCatalog) => {
+    append({
+      description: item.name + (item.description ? ` - ${item.description}` : ""),
+      hsnSac: item.hsnSac || "",
+      quantity: 1,
+      unitPrice: item.unitPrice,
+      discount: 0,
+      taxPercentage: item.taxPercentage
+    })
+    setIsCatalogOpen(false)
+    setCatalogSearch("")
+  }
+
+  // Autofill default bank account if available
+  
+
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" })
+  const watched = form.watch()
+
+  const [isFetchingRate, setIsFetchingRate] = useState(false)
+  useEffect(() => {
+    if (watched.currency && watched.currency !== "INR") {
+      setIsFetchingRate(true)
+      getExchangeRates("INR").then(rates => {
+        const rateToInr = rates[watched.currency]
+        if (rateToInr) {
+          // If 1 INR = 0.012 USD, then 1 USD = 1/0.012 INR = 83.33 INR
+          const rate = parseFloat((1 / rateToInr).toFixed(2))
+          form.setValue("exchangeRate", rate)
+        }
+      }).finally(() => setIsFetchingRate(false))
+    } else {
+      form.setValue("exchangeRate", 1)
+    }
+  }, [watched.currency, form])
+
+  const taxPreview = useMemo(() => {
+    const customer = customers.find((c) => c.id === watched.customerId)
+    try {
+      return calculateInvoiceTax({
+        items: watched.items,
+        sellerState,
+        buyerState: customer?.state,
+        tdsPercentage: watched.tdsPercentage,
+      })
+    } catch {
+      return null
+    }
+  }, [watched, customers, sellerState])
+
+  async function onSubmit(data: QuotationFormValues) {
+    setIsPending(true)
+    setError("")
+    
+    const result = quotationId 
+      ? await updateQuotation(quotationId, data)
+      : await createQuotation(data)
+      
+    setIsPending(false)
+    if (result.error) {
+      setError(result.error)
+    } else if ("quotationId" in result && result.quotationId) {
+      router.push(`/quotations/${result.quotationId}`)
+    } else if (quotationId && "success" in result && result.success) {
+      router.push(`/quotations/${quotationId}`)
+    }
+  }
+
+  const inputClass = "glass border-white/10 focus:border-primary/50 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
+  const selectClass = "flex h-9 w-full rounded-md border border-white/10 bg-transparent px-3 py-1 text-sm backdrop-blur-sm focus:outline-none focus:border-primary/50 transition-all"
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Error Alert */}
+        {error && (
+          <Alert className="border-red-500/30 bg-red-500/10 animate-in fade-in duration-300">
+            <AlertCircle className="h-4 w-4 text-red-400" />
+            <AlertDescription className="text-red-400">{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* ── Section: Quotation Details ── */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quotation Details</p>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <FormField
+              control={form.control}
+              name="customerId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">
+                    Customer <span className="text-red-400">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <select className={selectClass} {...field}>
+                      <option value="">Select customer</option>
+                      {customers.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="quotationNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">
+                    Quotation # <span className="text-red-400">*</span>
+                  </FormLabel>
+                  <FormControl><Input className={inputClass} {...field} /></FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">
+                    Date <span className="text-red-400">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="date"
+                      className={inputClass}
+                      value={field.value instanceof Date ? field.value.toISOString().split("T")[0] : field.value}
+                      onChange={(e) => field.onChange(new Date(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="expiryDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Due Date</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="date"
+                      className={inputClass}
+                      value={field.value instanceof Date ? field.value.toISOString().split("T")[0] : field.value}
+                      onChange={(e) => field.onChange(new Date(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
+        <Separator className="bg-white/8" />
+
+        {/* ── Section: Line Items ── */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Receipt className="h-3.5 w-3.5" />
+              Line Items <span className="text-red-400 normal-case tracking-normal font-normal text-[10px] ml-1">(at least 1 required)</span>
+            </p>
+            <div className="flex items-center gap-2">
+              {catalogItems.length > 0 && (
+                <Dialog open={isCatalogOpen} onOpenChange={setIsCatalogOpen}>
+                  {/* @ts-ignore */}
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="glass border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 gap-1.5 text-xs">
+                      <Package className="h-3.5 w-3.5" /> From Catalog
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[600px] bg-black/90 border-white/10 text-white backdrop-blur-xl">
+                    <DialogHeader>
+                      <DialogTitle>Add from Catalog</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <Input 
+                        placeholder="Search products/services..." 
+                        value={catalogSearch}
+                        onChange={(e) => setCatalogSearch(e.target.value)}
+                        className="bg-white/5 border-white/10"
+                      />
+                      <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                        {filteredCatalog.length === 0 ? (
+                          <p className="text-center text-sm text-muted-foreground py-4">No items found.</p>
+                        ) : (
+                          filteredCatalog.map(item => (
+                            <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 transition-colors">
+                              <div>
+                                <p className="font-medium text-sm">{item.name}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {formatINR(item.unitPrice)} {item.unit ? `per ${item.unit}` : ''} 
+                                  {item.hsnSac ? ` • HSN/SAC: ${item.hsnSac}` : ''}
+                                  ` • Tax: ${item.taxPercentage}%`
+                                </p>
+                              </div>
+                              <Button type="button" size="sm" onClick={() => handleAddFromCatalog(item)} className="bg-indigo-600 hover:bg-indigo-700 h-8">
+                                Add
+                              </Button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => append({ description: "", quantity: 1, unitPrice: 0, discount: 0, taxPercentage: 18 })}
+                className="glass border-white/10 hover:bg-white/8 gap-1.5 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Custom Item
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {fields.map((field, index) => (
+              <div
+                key={field.id}
+                className="glass glass-card border-white/10 p-4 pt-10 md:pt-4 rounded-xl grid grid-cols-2 md:grid-cols-6 gap-3 items-end group relative"
+              >
+                <FormField
+                  control={form.control}
+                  name={`items.${index}.description`}
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel className="text-xs text-muted-foreground">Description *</FormLabel>
+                      <FormControl><Input className={inputClass} placeholder="Service / Product" {...field} /></FormControl>
+                      <FormMessage className="text-xs text-red-400" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`items.${index}.hsnSac`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-muted-foreground">HSN/SAC</FormLabel>
+                      <FormControl><Input className={inputClass} placeholder="e.g. 998314" {...field} /></FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`items.${index}.quantity`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-muted-foreground">Qty *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          className={inputClass}
+                          value={field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs text-red-400" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`items.${index}.unitPrice`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-muted-foreground">Rate *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          className={inputClass}
+                          value={field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs text-red-400" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`items.${index}.taxPercentage`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-muted-foreground">GST %</FormLabel>
+                      <FormControl>
+                        <select
+                          className={selectClass}
+                          value={field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        >
+                          {[0, 5, 12, 18, 28].map((r) => (
+                            <option key={r} value={r}>{r}%</option>
+                          ))}
+                        </select>
+                      </FormControl>
+                      <FormMessage className="text-xs text-red-400" />
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => remove(index)}
+                  disabled={fields.length === 1}
+                  className="absolute top-2 right-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10 hover:text-red-400 h-8 w-8"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          {/* Items validation error */}
+          {form.formState.errors.items?.root?.message && (
+            <p className="text-xs text-red-400 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              {form.formState.errors.items.root.message}
+            </p>
+          )}
+        </div>
+
+        <Separator className="bg-white/8" />
+
+        {/* ── Section: TDS ── */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <TrendingDown className="h-3.5 w-3.5 text-orange-400" />
+            TDS Configuration
+          </p>
+          <FormField
+            control={form.control}
+            name="tdsPercentage"
+            render={({ field }) => (
+              <FormItem className="max-w-xs">
+                <FormLabel className="text-sm font-medium flex items-center gap-1.5">
+                  <Percent className="h-3.5 w-3.5 text-orange-400" />
+                  TDS Rate
+                </FormLabel>
+                <FormControl>
+                  <select
+                    className={selectClass}
+                    value={field.value}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  >
+                    <option value={0}>No TDS (0%)</option>
+                    <option value={1}>1% — Sec 194C (Contractor)</option>
+                    <option value={2}>2% — Sec 194C / 194J (Technical)</option>
+                    <option value={5}>5% — Sec 194H (Commission)</option>
+                    <option value={10}>10% — Sec 194J (Professional)</option>
+                    {TDS_RATES.filter((r) => ![0, 1, 2, 5, 10].includes(r)).map((rate) => (
+                      <option key={rate} value={rate}>{rate}%</option>
+                    ))}
+                  </select>
+                </FormControl>
+                <FormMessage className="text-xs text-red-400" />
+              </FormItem>
+            )}
+          />
+        </div>
+        
+        <Separator className="bg-white/8" />
+
+        {/* ── Section: Notes & Terms ── */}
+        <div className="space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Additional Information</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Customer Notes</FormLabel>
+                  <FormControl>
+                    <textarea 
+                      className={`${inputClass} min-h-[80px] py-2 resize-y`} 
+                      placeholder="Thank you for your business!" 
+                      {...field} 
+                      value={field.value ?? ""} 
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="terms"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Terms & Conditions</FormLabel>
+                  <FormControl>
+                    <textarea 
+                      className={`${inputClass} min-h-[80px] py-2 resize-y`} 
+                      placeholder="Payment due within 30 days..." 
+                      {...field} 
+                      value={field.value ?? ""} 
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+          </div>
+
+        </div>
+        
+        <Separator className="bg-white/8" />
+
+        {/* ── Section: Customization ── */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quotation Design</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="themeColor"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Theme Color</FormLabel>
+                  <FormControl>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="color"
+                        className="h-10 w-20 p-1 border-white/10 bg-transparent rounded cursor-pointer"
+                        value={field.value ?? "#1e40af"}
+                        onChange={field.onChange}
+                      />
+                      <Input
+                        type="text"
+                        className={inputClass}
+                        value={field.value ?? "#1e40af"}
+                        onChange={field.onChange}
+                        placeholder="#1e40af"
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="themeFont"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Theme Font</FormLabel>
+                  <FormControl>
+                    <select
+                      className={selectClass}
+                      value={field.value ?? "Helvetica"}
+                      onChange={field.onChange}
+                    >
+                      <option value="Helvetica">Helvetica</option>
+                      <option value="Times-Roman">Times New Roman</option>
+                      <option value="Courier">Courier</option>
+                    </select>
+                  </FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
+        {/* ── Tax Preview ── */}
+        {taxPreview && (
+          <div className="glass glass-card border-white/10 p-4 rounded-xl space-y-2 text-sm animate-in fade-in duration-300">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Tax Preview</p>
+            <div className="flex justify-between text-muted-foreground">
+              <span>Subtotal</span>
+              <span>{formatINR(taxPreview.subTotal)}</span>
+            </div>
+            {taxPreview.cgstAmount > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>CGST</span>
+                <span>{formatINR(taxPreview.cgstAmount)}</span>
+              </div>
+            )}
+            {taxPreview.sgstAmount > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>SGST</span>
+                <span>{formatINR(taxPreview.sgstAmount)}</span>
+              </div>
+            )}
+            {taxPreview.igstAmount > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>IGST {taxPreview.isInterState ? "(Inter-state)" : ""}</span>
+                <span>{formatINR(taxPreview.igstAmount)}</span>
+              </div>
+            )}
+            {taxPreview.tdsAmount > 0 && (
+              <div className="flex justify-between text-orange-400">
+                <span className="flex items-center gap-1">
+                  <TrendingDown className="h-3.5 w-3.5" />
+                  TDS ({taxPreview.tdsPercentage}%)
+                </span>
+                <span>-{formatINR(taxPreview.tdsAmount)}</span>
+              </div>
+            )}
+            <Separator className="bg-white/10 my-1" />
+            <div className="flex justify-between font-bold text-base">
+              <span>Total</span>
+              <span className="text-primary">{formatINR(taxPreview.finalAmount)}</span>
+            </div>
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          disabled={isPending}
+          className="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-all w-full sm:w-auto px-8"
+        >
+          {isPending 
+            ? (quotationId ? "Saving..." : "Creating Quotation...") 
+            : (quotationId ? "Save Changes →" : "Create Quotation →")}
+        </Button>
+      </form>
+    </Form>
+  )
+}

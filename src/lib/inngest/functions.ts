@@ -37,7 +37,7 @@ export const processRecurringInvoices = inngest.createFunction(
         nextRunAt: { lte: new Date() },
       },
       include: {
-        invoice: { include: { items: true, customer: true, company: true } },
+        invoice: { include: { items: true, customer: true, company: { include: { users: true } } } },
       },
     })
 
@@ -102,6 +102,17 @@ export const processRecurringInvoices = inngest.createFunction(
         where: { id: schedule.id },
         data: { nextRunAt: getNextRunDate(schedule.frequency, schedule.nextRunAt) },
       })
+
+      // Send push notification
+      import("@/lib/push").then(({ sendPushNotification }) => {
+        source.company.users.forEach((u: any) => {
+          sendPushNotification(u.id, {
+            title: "Recurring Invoice Generated",
+            body: `Invoice ${invoiceNumber} has been automatically generated.`,
+            url: `/invoices/${newInvoice.id}`,
+          })
+        })
+      })
     }
 
     return { processed: schedules.length }
@@ -119,6 +130,29 @@ export const markOverdueInvoices = inngest.createFunction(
       },
       data: { status: InvoiceStatus.OVERDUE },
     })
+
+    // Also notify users about overdue invoices
+    const overdueInvoices = await prisma.invoice.findMany({
+      where: {
+        dueDate: { lt: new Date() },
+        status: InvoiceStatus.OVERDUE,
+        balanceDue: { gt: 0 },
+      },
+      include: { company: { include: { users: true } } }
+    })
+
+    import("@/lib/push").then(({ sendPushNotification }) => {
+      overdueInvoices.forEach(inv => {
+        inv.company.users.forEach(u => {
+          sendPushNotification(u.id, {
+            title: "Invoice Overdue",
+            body: `Invoice ${inv.invoiceNumber} is now overdue.`,
+            url: `/invoices/${inv.id}`,
+          })
+        })
+      })
+    })
+
     return { marked: overdue.count }
   }
 )
@@ -135,7 +169,7 @@ export const sendPaymentReminders = inngest.createFunction(
       },
       include: {
         customer: true,
-        company: { include: { reminderConfig: true } },
+        company: { include: { reminderConfig: true, users: true } },
       },
     })
 
@@ -190,6 +224,16 @@ export const sendPaymentReminders = inngest.createFunction(
             attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: pdf }],
           })
           remindersSent++
+
+          import("@/lib/push").then(({ sendPushNotification }) => {
+            invoice.company.users?.forEach(u => {
+              sendPushNotification(u.id, {
+                title: "Payment Reminder Sent",
+                body: `Reminder sent to ${invoice.customer.name} for ${invoice.invoiceNumber}.`,
+                url: `/invoices/${invoice.id}`,
+              })
+            })
+          })
         } catch (e) {
           console.error(`Failed to send reminder for invoice ${invoice.id}`, e)
         }

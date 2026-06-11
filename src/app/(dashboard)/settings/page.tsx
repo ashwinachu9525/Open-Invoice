@@ -10,6 +10,7 @@ import { DatabaseSettingsForm } from "@/components/forms/database-settings-form"
 import { BankAccountsForm } from "@/components/forms/bank-accounts-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { InvoicePrefixForm } from "@/components/forms/invoice-prefix-form"
+import { PushNotificationSettingsForm } from "@/components/forms/push-notifications-form"
 
 const isDevMode = process.env.NEXT_PUBLIC_ENV === "dev"
 
@@ -21,6 +22,15 @@ export default async function SettingsPage() {
     isDevMode ? getDatabaseSettings() : Promise.resolve(null),
     getBankAccounts(),
   ])
+
+  if (session?.user?.role === "STAFF") {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
+        <h2 className="text-2xl font-bold">Access Denied</h2>
+        <p className="text-muted-foreground mt-2">You do not have permission to view settings.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-8 max-w-4xl">
@@ -41,6 +51,18 @@ export default async function SettingsPage() {
             userId={session?.user?.id!} 
             initialEnabled={session?.user?.passkeyEnabled ?? false} 
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Notifications</CardTitle>
+          <CardDescription>
+            Enable push notifications on this device to stay updated on critical events.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PushNotificationSettingsForm />
         </CardContent>
       </Card>
 
@@ -109,6 +131,20 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <BankAccountsForm initialAccounts={bankAccounts} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Team Management</CardTitle>
+          <CardDescription>
+            Invite team members and manage their access roles.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <a href="/settings/team" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+            Manage Team
+          </a>
         </CardContent>
       </Card>
 

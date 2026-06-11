@@ -68,6 +68,15 @@ export async function recordPayment(data: unknown) {
     })
 
     revalidatePath(`/invoices/${invoice.id}`)
+
+    import("@/lib/push").then(({ sendPushNotification }) => {
+      sendPushNotification(session.user.id, {
+        title: "Payment Recorded",
+        body: `A payment of ₹${parsed.data.amount} was recorded for ${invoice.invoiceNumber}.`,
+        url: `/invoices/${invoice.id}`,
+      })
+    })
+
     return { success: true }
   } catch {
     return { error: "Failed to record payment" }

@@ -4,15 +4,25 @@ import { getCompany } from "@/actions/company"
 import { getBankAccounts } from "@/actions/bank-accounts"
 import { getCatalogItems } from "@/actions/catalog"
 import { InvoiceForm } from "@/components/forms/invoice-form"
+import { prisma } from "@/lib/prisma"
 import Link from "next/link"
 
 export default async function NewInvoicePage() {
-  const [customersData, invoiceNumber, company, bankAccounts, catalog] = await Promise.all([
+  const [customersData, invoiceNumber, company, bankAccounts, catalog, pastInvoices] = await Promise.all([
     getCustomers({ limit: 1000 }),
     getNextInvoiceNumber(),
     getCompany(),
     getBankAccounts(),
     getCatalogItems(),
+    prisma.invoice.findMany({
+      where: { companyId: (await getCompany())?.id, deletedAt: null },
+      orderBy: { date: "desc" },
+      take: 5,
+      include: {
+        customer: { select: { name: true } },
+        items: true,
+      }
+    })
   ])
   const customers = customersData.customers
 
@@ -39,6 +49,7 @@ export default async function NewInvoicePage() {
         sellerState={company?.state}
         bankAccounts={bankAccounts}
         catalogItems={catalog.items || []}
+        pastInvoices={pastInvoices}
       />
     </div>
   )
