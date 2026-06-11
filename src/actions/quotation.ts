@@ -305,7 +305,7 @@ export async function deleteQuotation(id: string) {
     const { session, company } = await requireCompany()
     await prisma.quotation.update({
       where: { id, companyId: company.id },
-      data: { deletedAt: new Date(), status: QuotationStatus.CANCELLED },
+      data: { deletedAt: new Date() },
     })
 
     await createAuditLog({
@@ -330,7 +330,7 @@ export async function bulkDeleteQuotations(ids: string[]) {
     
     await prisma.quotation.updateMany({
       where: { id: { in: ids }, companyId: company.id },
-      data: { deletedAt: new Date(), status: QuotationStatus.CANCELLED },
+      data: { deletedAt: new Date() },
     })
 
     await createAuditLog({

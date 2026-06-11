@@ -1,5 +1,6 @@
 import { auth } from "@/auth"
 import { PasskeySettingsForm } from "@/components/forms/passkey-settings-form"
+import { MfaSettingsForm } from "@/components/forms/mfa-settings-form"
 import { getCompany } from "@/actions/company"
 import { getEmailSettings } from "@/actions/email-settings"
 import { getDatabaseSettings } from "@/actions/database"
@@ -8,7 +9,7 @@ import { CompanyForm } from "@/components/forms/company-form"
 import { EmailSettingsForm } from "@/components/forms/email-settings-form"
 import { DatabaseSettingsForm } from "@/components/forms/database-settings-form"
 import { BankAccountsForm } from "@/components/forms/bank-accounts-form"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { InvoicePrefixForm } from "@/components/forms/invoice-prefix-form"
 import { PushNotificationSettingsForm } from "@/components/forms/push-notifications-form"
 
@@ -16,11 +17,12 @@ const isDevMode = process.env.NEXT_PUBLIC_ENV === "dev"
 
 export default async function SettingsPage() {
   const session = await auth()
-  const [company, emailSettings, databaseSettings, bankAccounts] = await Promise.all([
+  const [company, emailSettings, databaseSettings, bankAccounts, dbUser] = await Promise.all([
     getCompany(),
     getEmailSettings(),
     isDevMode ? getDatabaseSettings() : Promise.resolve(null),
     getBankAccounts(),
+    session?.user?.id ? import("@/lib/prisma").then(m => m.prisma.user.findUnique({ where: { id: session.user.id } })) : Promise.resolve(null),
   ])
 
   if (session?.user?.role === "STAFF") {
@@ -46,11 +48,15 @@ export default async function SettingsPage() {
             Manage your sign-in methods and account security.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <PasskeySettingsForm 
-            userId={session?.user?.id!} 
-            initialEnabled={session?.user?.passkeyEnabled ?? false} 
-          />
+        <CardContent className="space-y-6">
+          <MfaSettingsForm initialEnabled={dbUser?.mfaEnabled ?? false} />
+          
+          <div className="border-t pt-6">
+            <PasskeySettingsForm 
+              userId={session?.user?.id!} 
+              initialEnabled={dbUser?.passkeyEnabled ?? false} 
+            />
+          </div>
         </CardContent>
       </Card>
 

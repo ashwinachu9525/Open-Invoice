@@ -21,6 +21,8 @@ export function LoginForm() {
   const [error, setError] = useState("")
   const [isPending, setIsPending] = useState(false)
   const [hasPasskey, setHasPasskey] = useState(false)
+  const [requiresMfa, setRequiresMfa] = useState(false)
+  const [totpToken, setTotpToken] = useState("")
   const isVerified = searchParams.get("verified") === "true"
 
   const form = useForm<LoginFormValues>({
@@ -44,12 +46,17 @@ export function LoginForm() {
     setIsPending(true)
     setError("")
     try {
-      const result = await loginUser(data.email, data.password)
+      const result = await loginUser(data.email, data.password, requiresMfa ? totpToken : undefined)
       setIsPending(false)
       if (result?.error) {
-        setError(result.error)
-        if (result.requiresVerification) {
-          window.location.assign(`/verify-email?email=${encodeURIComponent(data.email)}`)
+        if (result.requiresMfa) {
+          setRequiresMfa(true)
+          setError("") // Clear error to show MFA field cleanly
+        } else {
+          setError(result.error === "MFA_REQUIRED" ? "Please enter your authenticator code." : result.error)
+          if (result.requiresVerification) {
+            window.location.assign(`/verify-email?email=${encodeURIComponent(data.email)}`)
+          }
         }
       } else {
         window.location.assign("/dashboard")
@@ -69,7 +76,7 @@ export function LoginForm() {
           control={form.control}
           name="email"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className={requiresMfa ? "hidden" : ""}>
               <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input type="email" placeholder="you@company.com" {...field} onBlur={(e) => { field.onBlur(); handleEmailBlur(); }} />
@@ -82,7 +89,7 @@ export function LoginForm() {
           control={form.control}
           name="password"
           render={({ field }) => (
-            <FormItem>
+            <FormItem className={requiresMfa ? "hidden" : ""}>
               <FormLabel>Password</FormLabel>
               <FormControl>
                 <Input type="password" {...field} />
@@ -91,8 +98,23 @@ export function LoginForm() {
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full" disabled={isPending}>
-          {isPending ? "Signing in..." : "Sign In"}
+        {requiresMfa && (
+          <FormItem>
+            <FormLabel>Authenticator Code</FormLabel>
+            <FormControl>
+              <Input 
+                type="text" 
+                placeholder="123456" 
+                value={totpToken} 
+                onChange={(e) => setTotpToken(e.target.value)} 
+                maxLength={6} 
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+        <Button type="submit" className="w-full" disabled={isPending || (requiresMfa && totpToken.length < 6)}>
+          {isPending ? "Signing in..." : requiresMfa ? "Verify Code" : "Sign In"}
         </Button>
         {hasPasskey && (
           <Button 

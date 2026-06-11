@@ -35,7 +35,7 @@ export function ReportsCharts({ revenueData, taxData, currencyData }: ReportsCha
               <RechartsTooltip 
                 cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                 contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                formatter={(value: number) => formatCurrency(value, "INR")}
+                formatter={(value: any) => formatCurrency(Number(value) || 0, "INR")}
               />
               <Bar dataKey="revenue" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -67,7 +67,7 @@ export function ReportsCharts({ revenueData, taxData, currencyData }: ReportsCha
                 </Pie>
                 <RechartsTooltip 
                   contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                  formatter={(value: number) => formatCurrency(value, "INR")}
+                  formatter={(value: any) => formatCurrency(Number(value) || 0, "INR")}
                 />
                 <Legend />
               </PieChart>

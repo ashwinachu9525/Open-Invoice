@@ -23,7 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-import { PastInvoiceModal } from "./past-invoice-modal"
+} from "@/components/ui/dialog"
+import { PastInvoiceModal } from "../invoices/past-invoice-modal"
 
 interface InvoiceFormProps {
   customers: { id: string; name: string; state?: string | null }[]

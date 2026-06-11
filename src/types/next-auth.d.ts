@@ -13,6 +13,7 @@ declare module "next-auth" {
       companyId?: string | null
       passkeyEnabled?: boolean
       passkeyPrompted?: boolean
+      mfaEnabled?: boolean
     }
   }
 
@@ -21,6 +22,7 @@ declare module "next-auth" {
     companyId?: string | null
     passkeyEnabled?: boolean
     passkeyPrompted?: boolean
+    mfaEnabled?: boolean
   }
 }
 

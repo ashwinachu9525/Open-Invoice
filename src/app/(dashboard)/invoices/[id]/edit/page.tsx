@@ -46,6 +46,7 @@ export default async function EditInvoicePage({ params }: EditInvoicePageProps) 
     dueDate: invoice.dueDate,
     currency: invoice.currency,
     exchangeRate: invoice.exchangeRate,
+    taxJurisdiction: (invoice as any).taxJurisdiction || "INDIA_GST",
     tdsPercentage: invoice.tdsPercentage,
     notes: invoice.notes || undefined,
     terms: invoice.terms || undefined,

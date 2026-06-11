@@ -60,7 +60,7 @@ export default async function QuotationDetailPage({
             </Button>
           </Link>
           
-          {quotation.status !== "INVOICED" && (
+          {(quotation.status as string) !== "INVOICED" && (
             <Link href={`/quotations/${quotation.id}/edit`}>
               <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8 gap-1.5">
                 Edit
@@ -70,9 +70,9 @@ export default async function QuotationDetailPage({
 
           <SendEmailButton quotationId={quotation.id} />
 
-          {quotation.status !== "INVOICED" && quotation.status !== "REJECTED" && (
+          {(quotation.status as string) !== "INVOICED" && quotation.status !== "REJECTED" && (
             <form action={convertAction}>
-              <Button disabled={quotation.status === "INVOICED"} type="submit" size="sm" className="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-lg gap-1.5">
+              <Button disabled={(quotation.status as string) === "INVOICED"} type="submit" size="sm" className="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-lg gap-1.5">
                 Convert to Invoice
                 <ArrowRight className="h-4 w-4" />
               </Button>
@@ -195,7 +195,7 @@ export default async function QuotationDetailPage({
       </Card>
 
       {/* ── Activity Log ── */}
-      {quotation.statusHistory && quotation.statusHistory.length > 0 && (
+      {(quotation as any).statusHistory && (quotation as any).statusHistory.length > 0 && (
         <Card className="glass glass-card border-white/10">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -209,7 +209,7 @@ export default async function QuotationDetailPage({
               {/* Vertical line */}
               <div className="absolute left-[7px] top-2 bottom-2 w-px bg-white/10" />
 
-              {quotation.statusHistory.map((h, i) => {
+              {(quotation as any).statusHistory.map((h: any, i: number) => {
                 const dt = new Date(h.createdAt)
                 const dateStr = dt.toLocaleDateString("en-IN", {
                   day: "numeric", month: "short", year: "numeric",

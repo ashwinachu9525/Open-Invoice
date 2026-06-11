@@ -7,6 +7,8 @@ import { prisma } from "@/lib/prisma"
 import { ComplianceClient } from "./compliance-client"
 import { Separator } from "@/components/ui/separator"
 import { ReportsCharts } from "./reports-charts"
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
 
 const reports = [
   {

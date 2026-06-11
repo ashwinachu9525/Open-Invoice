@@ -111,20 +111,27 @@ export async function verifyEmail(email: string, otp: string) {
   }
 }
 
-export async function loginUser(email: string, password: string) {
+export async function loginUser(email: string, password: string, totpToken?: string) {
   try {
     const user = await prisma.user.findUnique({ where: { email, deletedAt: null } })
     if (user && !user.emailVerified) {
       return { error: "Please verify your email address before logging in.", requiresVerification: true }
     }
 
-    await signIn("credentials", { email, password, redirect: false })
+    const payload: any = { email, password, redirect: false }
+    if (totpToken) {
+      payload.totpToken = totpToken
+    }
+    await signIn("credentials", payload)
     return { success: true }
   } catch (error: any) {
+    if (error?.message === "MFA_REQUIRED" || error?.cause?.err?.message === "MFA_REQUIRED") {
+      return { error: "MFA_REQUIRED", requiresMfa: true }
+    }
     if (error?.type === "CredentialsSignin") {
       return { error: "Invalid email or password" }
     }
-    return { error: "Invalid email or password" }
+    return { error: error?.message || "Invalid email or password" }
   }
 }
 

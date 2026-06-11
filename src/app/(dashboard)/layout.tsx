@@ -1,6 +1,6 @@
 import { ReactNode } from "react"
 import Link from "next/link"
-import { FileText, Home, Users, Settings, Menu, BarChart3, Sparkles, Zap, Package, Mail, Receipt } from "lucide-react"
+import { FileText, Home, Users, Settings, Menu, BarChart3, Sparkles, Zap, Package, Mail, Receipt, HelpCircle } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
 import { SignOutButton } from "@/components/dashboard/sign-out-button"
 import { ThemeToggle } from "@/components/dashboard/theme-toggle"
@@ -20,6 +20,7 @@ const navItems = [
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/email-logs", label: "Email Logs", icon: Mail },
   { href: "/ai", label: "AI Tools", icon: Sparkles },
+  { href: "/help", label: "Help Center", icon: HelpCircle },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 

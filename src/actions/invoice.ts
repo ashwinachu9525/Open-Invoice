@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache"
 import { InvoiceStatus } from "@prisma/client"
 import { generateInvoicePdf } from "@/services/pdf"
 import { sendInvoiceEmail } from "@/services/smtp"
+import { getOrSetCache, invalidateCachePattern } from "@/lib/redis"
 
 export async function createInvoice(data: unknown) {
   try {
@@ -99,6 +100,9 @@ export async function createInvoice(data: unknown) {
       entity: "Invoice",
       entityId: invoice.id,
     })
+
+    // Invalidate invoice list cache
+    await invalidateCachePattern(`invoices:${company.id}:*`)
 
     revalidatePath("/invoices")
     revalidatePath("/dashboard")
@@ -198,6 +202,10 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
       entityId: invoiceId,
     })
 
+    // Invalidate cache
+    await invalidateCachePattern(`invoice:${company.id}:${invoiceId}`)
+    await invalidateCachePattern(`invoices:${company.id}:*`)
+
     revalidatePath(`/invoices/${invoiceId}`)
     revalidatePath("/invoices")
     revalidatePath("/dashboard")
@@ -240,32 +248,36 @@ export async function getInvoices(opts?: {
         : {}),
     }
 
-    const [invoices, total, allForStats] = await Promise.all([
-      prisma.invoice.findMany({
-        where,
-        include: { customer: true, schedule: true },
-        orderBy: { date: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.invoice.count({ where }),
-      prisma.invoice.findMany({
-        where,
-        select: { finalAmount: true, status: true }
-      })
-    ])
+    const cacheKey = `invoices:${company.id}:page:${page}:limit:${limit}:search:${search || ""}:from:${dateFrom || ""}:to:${dateTo || ""}`
 
-    const totalAmount = allForStats.reduce((sum, inv) => sum + inv.finalAmount, 0)
-    const paidCount = allForStats.filter((i) => i.status === "PAID").length
-    const pendingCount = allForStats.filter((i) => ["SENT", "VIEWED", "PARTIALLY_PAID"].includes(i.status)).length
-    const overdueCount = allForStats.filter((i) => i.status === "OVERDUE").length
+    return await getOrSetCache(cacheKey, async () => {
+      const [invoices, total, allForStats] = await Promise.all([
+        prisma.invoice.findMany({
+          where,
+          include: { customer: true, schedule: true },
+          orderBy: { date: "desc" },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.invoice.count({ where }),
+        prisma.invoice.findMany({
+          where,
+          select: { finalAmount: true, status: true }
+        })
+      ])
 
-    return { 
-      invoices, 
-      totalPages: Math.ceil(total / limit), 
-      totalInvoices: total,
-      stats: { totalAmount, paidCount, pendingCount, overdueCount }
-    }
+      const totalAmount = allForStats.reduce((sum, inv) => sum + inv.finalAmount, 0)
+      const paidCount = allForStats.filter((i) => i.status === "PAID").length
+      const pendingCount = allForStats.filter((i) => ["SENT", "VIEWED", "PARTIALLY_PAID"].includes(i.status)).length
+      const overdueCount = allForStats.filter((i) => i.status === "OVERDUE").length
+
+      return { 
+        invoices, 
+        totalPages: Math.ceil(total / limit), 
+        totalInvoices: total,
+        stats: { totalAmount, paidCount, pendingCount, overdueCount }
+      }
+    }, 3600)
   } catch {
     return { invoices: [], totalPages: 0, totalInvoices: 0, stats: { totalAmount: 0, paidCount: 0, pendingCount: 0, overdueCount: 0 } }
   }
@@ -372,17 +384,19 @@ export async function sendInvoiceToClient(invoiceId: string) {
 export async function getInvoice(id: string) {
   try {
     const { company } = await requireCompany()
-    return await prisma.invoice.findFirst({
-      where: { id, companyId: company.id, deletedAt: null },
-      include: {
-        customer: true,
-        items: true,
-        payments: true,
-        statusHistory: { orderBy: { createdAt: "desc" } },
-        schedule: true,
-        company: true,
-      },
-    })
+    return await getOrSetCache(`invoice:${company.id}:${id}`, async () => {
+      return await prisma.invoice.findFirst({
+        where: { id, companyId: company.id, deletedAt: null },
+        include: {
+          customer: true,
+          items: true,
+          payments: true,
+          statusHistory: { orderBy: { createdAt: "desc" } },
+          schedule: true,
+          company: true,
+        },
+      })
+    }, 3600) // cache for 1 hour
   } catch {
     return null
   }
@@ -416,6 +430,10 @@ export async function updateInvoiceStatus(
       details: { status, note },
     })
 
+    // Invalidate cache
+    await invalidateCachePattern(`invoice:${company.id}:${id}`)
+    await invalidateCachePattern(`invoices:${company.id}:*`)
+
     revalidatePath(`/invoices/${id}`)
     revalidatePath("/invoices")
     revalidatePath("/dashboard")
@@ -440,6 +458,10 @@ export async function deleteInvoice(id: string) {
       entity: "Invoice",
       entityId: id,
     })
+
+    // Invalidate cache
+    await invalidateCachePattern(`invoice:${company.id}:${id}`)
+    await invalidateCachePattern(`invoices:${company.id}:*`)
 
     revalidatePath("/invoices")
     revalidatePath("/dashboard")
@@ -584,11 +606,17 @@ export async function bulkDeleteInvoices(ids: string[]) {
     await createAuditLog({
       companyId: company.id,
       userId: session.user.id,
-      action: "DELETE",
+      action: "BULK_DELETE",
       entity: "Invoice",
       entityId: "bulk",
-      details: { count: ids.length, ids }
+      details: { count: ids.length, ids },
     })
+
+    // Invalidate caches
+    for (const id of ids) {
+      await invalidateCachePattern(`invoice:${company.id}:${id}`)
+    }
+    await invalidateCachePattern(`invoices:${company.id}:*`)
 
     revalidatePath("/invoices")
     revalidatePath("/dashboard")
@@ -615,6 +643,10 @@ export async function restoreInvoice(id: string) {
       entityId: id,
       details: { action: "restored" }
     })
+
+    // Invalidate cache
+    await invalidateCachePattern(`invoice:${company.id}:${id}`)
+    await invalidateCachePattern(`invoices:${company.id}:*`)
 
     revalidatePath("/invoices")
     revalidatePath("/trash")

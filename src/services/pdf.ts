@@ -88,7 +88,7 @@ export async function generateQuotationPdf(quotationId: string): Promise<Buffer>
   const qrCodeDataUrl = await QRCode.toDataURL(qrData, { width: 120, margin: 1 })
 
   const buffer = await renderToBuffer(
-    QuotationDocument({ quotation, qrCodeDataUrl })
+    QuotationDocument({ quotation: quotation as any, qrCodeDataUrl })
   )
 
   if (process.env.S3_ACCESS_KEY_ID) {

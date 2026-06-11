@@ -52,6 +52,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        totpToken: { label: "Authenticator Code", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
@@ -71,6 +72,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!user.emailVerified) {
           throw new Error("Please verify your email address before logging in.")
+        }
+
+        if (user.mfaEnabled && user.mfaSecret) {
+          if (!credentials.totpToken || credentials.totpToken === "undefined") {
+            throw new Error("MFA_REQUIRED")
+          }
+          const { verifySync } = await import("otplib")
+          const isTotpValid = verifySync({
+            token: credentials.totpToken as string,
+            secret: user.mfaSecret,
+          })
+          if (!isTotpValid) {
+            throw new Error("Invalid authenticator code.")
+          }
         }
 
         return user
@@ -100,6 +115,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.companyId = (user as { companyId?: string }).companyId
         token.passkeyPrompted = (user as any).passkeyPrompted
         token.passkeyEnabled = (user as any).passkeyEnabled
+        token.mfaEnabled = (user as any).mfaEnabled
       }
 
       if (trigger === "update") {
@@ -111,6 +127,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.companyId = dbUser.companyId
           token.passkeyPrompted = dbUser.passkeyPrompted
           token.passkeyEnabled = dbUser.passkeyEnabled
+          token.mfaEnabled = dbUser.mfaEnabled
         }
       }
 
@@ -118,11 +135,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.id
-        session.user.role = token.role
-        session.user.companyId = token.companyId
-        session.user.passkeyPrompted = token.passkeyPrompted
-        session.user.passkeyEnabled = token.passkeyEnabled
+        session.user.id = token.id as string
+        session.user.role = token.role as Role
+        session.user.companyId = token.companyId as string
+        session.user.passkeyPrompted = token.passkeyPrompted as boolean
+        session.user.passkeyEnabled = token.passkeyEnabled as boolean
+        ;(session.user as any).mfaEnabled = token.mfaEnabled as boolean
       }
       return session
     },

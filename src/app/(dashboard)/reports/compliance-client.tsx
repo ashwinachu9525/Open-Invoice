@@ -34,8 +34,8 @@ export function ComplianceClient({ customers }: { customers: { id: string, name:
   const [customerId, setCustomerId] = useState<string>("")
   const [fy, setFy] = useState<string>("")
 
-  const handleFyChange = (val: string) => {
-    setFy(val)
+  const handleFyChange = (val: string | null) => {
+    setFy(val || "")
     if (val && val !== "custom") {
       const selectedFY = FY_OPTIONS.find(f => f.value === val)
       if (selectedFY) {
@@ -80,6 +80,7 @@ export function ComplianceClient({ customers }: { customers: { id: string, name:
             <div className="space-y-2">
               <Label>Date Range</Label>
               <Popover>
+                {/* @ts-expect-error asChild type issue */}
                 <PopoverTrigger asChild>
                   <Button
                     variant={"outline"}
@@ -105,15 +106,11 @@ export function ComplianceClient({ customers }: { customers: { id: string, name:
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 z-[100]" align="start">
                   <Calendar
-                    initialFocus
                     mode="range"
                     defaultMonth={date?.from}
                     selected={date}
                     onSelect={(r) => { setDate(r); setFy("custom"); }}
                     numberOfMonths={2}
-                    captionLayout="dropdown"
-                    fromYear={2015}
-                    toYear={new Date().getFullYear() + 1}
                   />
                 </PopoverContent>
               </Popover>
@@ -121,7 +118,7 @@ export function ComplianceClient({ customers }: { customers: { id: string, name:
 
             <div className="space-y-2">
               <Label>Filter by Client</Label>
-              <Select value={customerId} onValueChange={setCustomerId}>
+              <Select value={customerId} onValueChange={(val) => setCustomerId(val || "")}>
                 <SelectTrigger className="bg-white/5 border-white/10 w-full">
                   <SelectValue placeholder="All Clients" />
                 </SelectTrigger>

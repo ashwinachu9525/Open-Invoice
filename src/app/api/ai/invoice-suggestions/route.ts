@@ -3,6 +3,9 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { generateText } from "@/ai/orchestrator"
 
+import crypto from "crypto"
+import { getOrSetCache } from "@/lib/redis"
+
 export async function POST(request: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) {
@@ -42,9 +45,14 @@ Return ONLY a raw JSON object matching this schema for the items to include in t
 Do not include markdown formatting or \`\`\`json tags. Only return the JSON object.`
 
   try {
-    const responseText = await generateText({ companyId: user.companyId, prompt })
-    const cleanJson = responseText.replace(/```json/g, "").replace(/```/g, "").trim()
-    const parsed = JSON.parse(cleanJson)
+    const promptHash = crypto.createHash("sha256").update(prompt).digest("hex")
+    const cacheKey = `ai:suggest:${promptHash}`
+
+    const parsed = await getOrSetCache(cacheKey, async () => {
+      const responseText = await generateText({ companyId: user.companyId!, prompt })
+      const cleanJson = responseText.replace(/```json/g, "").replace(/```/g, "").trim()
+      return JSON.parse(cleanJson)
+    }, 86400 * 2) // Cache for 48 hours
     
     return NextResponse.json(parsed)
   } catch (error) {

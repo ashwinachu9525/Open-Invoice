@@ -22,6 +22,8 @@ model User {
   companyId       String?
   passkeyEnabled  Boolean   @default(false)
   passkeyPrompted Boolean   @default(false)
+  mfaEnabled      Boolean   @default(false)
+  mfaSecret       String?
 
   company        Company?        @relation(fields: [companyId], references: [id])
   accounts       Account[]

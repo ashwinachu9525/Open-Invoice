@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Providers } from "@/components/providers"
 import { Toaster } from "@/components/ui/sonner"
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
+import { Analytics } from "@vercel/analytics/react"
 import Script from "next/script"
 import "./globals.css"
 
@@ -53,6 +54,7 @@ export default function RootLayout({
         <Providers>{children}</Providers>
         <Toaster />
         <PwaInstallPrompt />
+        <Analytics />
       </body>
     </html>
   )

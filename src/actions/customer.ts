@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import { getTenantDb } from "@/lib/tenant-db"
 import { auth } from "@/auth"
 import { customerSchema, CustomerFormValues } from "@/validations/customer"
 import { revalidatePath } from "next/cache"
@@ -22,8 +23,10 @@ export async function createCustomer(data: CustomerFormValues) {
     const parsed = customerSchema.safeParse(data)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
 
-    await prisma.customer.create({
-      data: { ...parsed.data, companyId: user.companyId },
+    const db = getTenantDb(user.companyId)
+
+    await db.customer.create({
+      data: parsed.data as any,
     })
   } catch (error) {
     console.error("Failed to create customer:", error)
@@ -43,12 +46,14 @@ export async function updateCustomer(id: string, data: CustomerFormValues) {
     const parsed = customerSchema.safeParse(data)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
 
-    const existing = await prisma.customer.findFirst({
-      where: { id, companyId: user.companyId, deletedAt: null },
+    const db = getTenantDb(user.companyId)
+
+    const existing = await db.customer.findFirst({
+      where: { id, deletedAt: null },
     })
     if (!existing) return { error: "Customer not found" }
 
-    await prisma.customer.update({
+    await db.customer.update({
       where: { id },
       data: parsed.data,
     })
@@ -66,8 +71,9 @@ export async function getCustomer(id: string) {
   try {
     const user = await requireUser()
     if (!user?.companyId) return null
-    return await prisma.customer.findFirst({
-      where: { id, companyId: user.companyId, deletedAt: null },
+    const db = getTenantDb(user.companyId)
+    return await db.customer.findFirst({
+      where: { id, deletedAt: null },
     })
   } catch {
     return null
@@ -83,7 +89,6 @@ export async function getCustomers(params?: { search?: string; page?: number; li
     const skip = (page - 1) * limit
 
     const where = {
-      companyId: user.companyId,
       deletedAt: null,
       ...(search ? {
         OR: [
@@ -95,14 +100,16 @@ export async function getCustomers(params?: { search?: string; page?: number; li
       } : {})
     }
 
+    const db = getTenantDb(user.companyId)
+
     const [customers, total] = await Promise.all([
-      prisma.customer.findMany({
+      db.customer.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
-      prisma.customer.count({ where })
+      db.customer.count({ where })
     ])
 
     return {
