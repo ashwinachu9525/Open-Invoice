@@ -27,6 +27,7 @@ const navItems = [
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
+  if (session.user.role === "SUPER_ADMIN") redirect("/admin")
 
   const initials = session.user.name
     ? session.user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
