@@ -47,10 +47,8 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <head>
-        <Script defer data-domain="open-invoice.com" src="https://plausible.io/js/script.js" />
-      </head>
       <body className="min-h-full flex flex-col">
+        <Script defer data-domain="open-invoice.com" src="https://plausible.io/js/script.js" />
         <Providers>{children}</Providers>
         <Toaster />
         <PwaInstallPrompt />

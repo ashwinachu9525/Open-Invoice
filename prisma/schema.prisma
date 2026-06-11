@@ -24,6 +24,7 @@ model User {
   passkeyPrompted Boolean   @default(false)
   mfaEnabled      Boolean   @default(false)
   mfaSecret       String?
+  isBlocked       Boolean   @default(false)
 
   company        Company?        @relation(fields: [companyId], references: [id])
   accounts       Account[]
@@ -603,4 +604,14 @@ model TeamInvitation {
   @@index([email])
   @@index([companyId])
   @@index([token])
+}
+
+model AppError {
+  id        String   @id @default(cuid())
+  message   String
+  digest    String?
+  path      String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }

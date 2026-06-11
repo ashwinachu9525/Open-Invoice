@@ -63,6 +63,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!user || !user.password) return null
 
+        if (user.isBlocked) {
+          throw new Error("Your account has been blocked by the administrator.")
+        }
+
         const isValid = await argon2.verify(
           user.password,
           credentials.password as string
