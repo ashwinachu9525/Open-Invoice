@@ -106,6 +106,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         })
         
         if (existing) {
+          if (existing.isBlocked) {
+            // Throwing an error here will redirect to the error page with ?error=AccessDenied by default,
+            // or if we throw a custom error string, it might be visible.
+            throw new Error("Your account has been blocked by the administrator. Please contact us.")
+          }
+
           const dataToUpdate: any = {}
           
           if (account?.provider === "google" && !existing.emailVerified) {
@@ -126,28 +132,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return true
     },
-    async jwt({ token, user, trigger }) {
-      if (user) {
-        token.id = user.id!
-        token.role = (user as { role: Role }).role ?? Role.BUSINESS_OWNER
-        token.companyId = (user as { companyId?: string }).companyId
-        token.passkeyPrompted = (user as any).passkeyPrompted
-        token.passkeyEnabled = (user as any).passkeyEnabled
-        token.mfaEnabled = (user as any).mfaEnabled
-        token.hasSeenTour = (user as any).hasSeenTour
-      }
-
-      if (trigger === "update") {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-        })
-        if (dbUser) {
-          token.role = dbUser.role
-          token.companyId = dbUser.companyId
-          token.passkeyPrompted = dbUser.passkeyPrompted
-          token.passkeyEnabled = dbUser.passkeyEnabled
-          token.mfaEnabled = dbUser.mfaEnabled
-          token.hasSeenTour = dbUser.hasSeenTour
+    async jwt({ token, user, trigger, account }) {
+      // When a user signs in (account is available) or triggers an update, fetch fresh DB data
+      if (account || user || trigger === "update") {
+        const email = token.email ?? user?.email
+        if (email) {
+          const dbUser = await prisma.user.findUnique({
+            where: { email },
+          })
+          if (dbUser) {
+            token.id = dbUser.id
+            token.role = dbUser.role
+            token.companyId = dbUser.companyId
+            token.passkeyPrompted = dbUser.passkeyPrompted
+            token.passkeyEnabled = dbUser.passkeyEnabled
+            token.mfaEnabled = dbUser.mfaEnabled
+            token.hasSeenTour = dbUser.hasSeenTour
+          }
         }
       }
 
