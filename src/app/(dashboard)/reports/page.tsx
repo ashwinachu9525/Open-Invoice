@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import Link from "next/link"
 import { FileSpreadsheet } from "lucide-react"
 import { requireCompany } from "@/lib/auth-helpers"
@@ -136,20 +136,26 @@ export default async function ReportsPage(props: {
                 <CardDescription>{report.description}</CardDescription>
               </CardHeader>
               <CardContent className="flex gap-2">
-                <Link href={`/api/reports/${report.type}?from=${from}&to=${to}`} target="_blank">
-                  <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8">View JSON</Button>
+                <Link 
+                  href={`/api/reports/${report.type}?from=${from}&to=${to}`} 
+                  target="_blank"
+                  className={buttonVariants({ variant: "outline", size: "sm", className: "glass border-white/10 hover:bg-white/8" })}
+                >
+                  View JSON
                 </Link>
                 <Link
                   href={`/api/reports/${report.type}?from=${from}&to=${to}&format=csv`}
                   target="_blank"
+                  className={buttonVariants({ size: "sm", className: "bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 text-white" })}
                 >
-                  <Button size="sm" className="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 text-white">CSV</Button>
+                  CSV
                 </Link>
                 <Link
                   href={`/api/reports/${report.type}?from=${from}&to=${to}&format=pdf`}
                   target="_blank"
+                  className={buttonVariants({ size: "sm", className: "bg-indigo-600 hover:bg-indigo-700 text-white" })}
                 >
-                  <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">PDF</Button>
+                  PDF
                 </Link>
               </CardContent>
             </Card>

@@ -47,7 +47,7 @@ export function InvoiceActions({
   
   // Paid Dialog State
   const [showPaidDialog, setShowPaidDialog] = useState(false)
-  const [amountPaid, setAmountPaid] = useState("")
+  const [amountPaid, setAmountPaid] = useState(finalAmount ? String(finalAmount) : "")
   const [tdsOverride, setTdsOverride] = useState(String(tdsPercentage ?? 0))
   const [paymentDate, setPaymentDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -108,7 +108,13 @@ export function InvoiceActions({
       .join(" | ")
 
     setIsPending(true)
-    await updateInvoiceStatus(invoiceId, newStatus, noteLines)
+    const calculatedTdsAmount = tds > 0 ? (paid * tds) / 100 : 0
+    await updateInvoiceStatus(invoiceId, newStatus, noteLines, {
+      amountPaid: paid,
+      balanceDue: Math.max(0, finalAmount - paid),
+      tdsPercentage: tds,
+      tdsAmount: calculatedTdsAmount
+    })
     setIsPending(false)
     setSuccess(true)
     setTimeout(() => {

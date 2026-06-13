@@ -1,171 +1,187 @@
-# Indian Invoice SaaS
+<h1 align="center">Open Invoice</h1>
+<p align="center">
+  <strong>Open Source AI-Powered Invoicing & Estimation Platform</strong>
+</p>
 
-Production-ready invoice management platform for Indian freelancers, consultants, agencies, and SMBs. Built with Next.js 15+, React 19, Prisma, PostgreSQL, and Auth.js.
+<p align="center">
+  <a href="#-features">Features</a> •
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-tech-stack">Tech Stack</a> •
+  <a href="#-contributing">Contributing</a>
+</p>
 
-## Features
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version"/>
+  <img src="https://img.shields.io/badge/license-Custom-green.svg" alt="License"/>
+  <img src="https://img.shields.io/badge/node-20_LTS-brightgreen.svg" alt="Node"/>
+  <img src="https://img.shields.io/badge/Next.js-15.x-black.svg" alt="NextJS"/>
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6.svg" alt="TypeScript"/>
+  <img src="https://img.shields.io/badge/Prisma-ORM-2D3748.svg" alt="Prisma"/>
+</p>
 
-- **Authentication** — Email/password (Argon2), Google OAuth, email verification, password reset, RBAC
-- **Company & Customer Management** — GSTIN, PAN, state-based tax profiles
-- **Invoice Engine** — CGST/SGST/IGST auto-calculation, TDS (1–10%), line items with HSN/SAC
-- **PDF Generation** — Professional invoices with QR code, tax breakdown, watermark for drafts
-- **Payment Tracking** — UPI, bank transfer, Razorpay, Stripe
-- **Recurring Invoices** — Weekly/monthly/quarterly via Inngest cron jobs
-- **SMTP Module** — Encrypted credentials, test connection, invoice emails
-- **Dashboard** — Revenue, pending/overdue amounts, GST/TDS totals, Recharts graphs
-- **Reports** — GST, TDS, outstanding invoices (JSON/CSV export)
-- **AI Features** — Natural language invoice generation, email writer, business insights (OpenAI)
-- **Security** — Argon2 hashing, AES-256 encryption, rate limiting, audit logs, secure cookies
+---
 
-## Tech Stack
+## ✨ Why Open Invoice?
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js App Router, React 19, TypeScript, Tailwind CSS, shadcn/ui |
-| Forms | React Hook Form + Zod |
-| State | TanStack Query, Zustand |
-| Backend | Server Actions, Route Handlers, Middleware |
-| Database | PostgreSQL + Prisma ORM |
-| Auth | Auth.js (NextAuth v5) JWT sessions |
-| Jobs | Inngest |
-| PDF | @react-pdf/renderer |
-| Email | Nodemailer |
-| Storage | AWS S3 / Cloudflare R2 |
-| AI | OpenAI API |
+**Open Invoice** is a powerful, self-hostable invoicing and estimation platform designed for freelancers, agencies, and businesses who want full control over their billing workflows without paying monthly subscription fees.
 
-## Quick Start
+Built on a modern **Next.js 15 App Router** architecture, Open Invoice integrates seamlessly with cutting-edge AI (OpenAI, Gemini, NVIDIA) to automate invoice generation, while keeping your data private and secure.
 
-### 1. Clone and install
+|                               |                                                              |
+| ----------------------------- | ------------------------------------------------------------ |
+| 🔓 **100% Free Self-Hosted**  | Host it yourself and use all features for free forever       |
+| 🤖 **AI Native Generation**   | Chat with AI to instantly draft structured, GST-ready invoices|
+| 🏢 **Multi-Company Support**  | Manage multiple brands and SMTP settings in one dashboard    |
+| 🎨 **Stunning PDF Exports**   | Pixel-perfect, customizable PDFs rendered at the edge        |
+| 🔐 **Passkey Security**       | Modern WebAuthn and MFA for enterprise-grade protection      |
+
+---
+
+## 🎯 Features
+
+### Core Capabilities
+
+| Feature           | Status | Description                          |
+| ----------------- | ------ | ------------------------------------ |
+| Invoice Generator | ✅     | Create detailed invoices instantly   |
+| Quotation Builder | ✅     | Send estimates and quotes to clients |
+| Dashboard UI      | ✅     | Modern React UI for managing data    |
+| Multi-Company     | ✅     | Switch between different business profiles |
+| SMTP Integration  | ✅     | Send emails via your own mail server |
+
+### AI Integration
+
+| Feature           | Status | Description                      |
+| ----------------- | ------ | -------------------------------- |
+| OpenAI Support    | ✅     | Connect your OpenAI API keys     |
+| Google Gemini     | ✅     | Connect your Google AI keys      |
+| NVIDIA AI         | ✅     | Connect your NVIDIA AI keys      |
+| Chat-to-Invoice   | ✅     | Conversational AI generation     |
+
+### Security & Infrastructure
+
+| Feature             | Status | Description                        |
+| ------------------- | ------ | ---------------------------------- |
+| Passkey (WebAuthn)  | ✅     | Passwordless secure login          |
+| App Modes           | ✅     | Toggle between `selfhost` and `paid` SaaS modes |
+| Rate Limiting       | ✅     | IP and User-based usage quotas     |
+| XSS Protection      | ✅     | Aggressive isomorphic DOM sanitization |
+
+---
+
+## 🚀 Quick Start
+
+### Local Development
 
 ```bash
+# 1. Clone repository
+git clone https://github.com/your-username/open-invoice.git
+cd open-invoice
+
+# 2. Install dependencies
 npm install
-```
 
-### 2. Configure environment
-
-```bash
+# 3. Setup Environment Variables
 cp .env.example .env
-```
+# Important: Leave APP_MODE="" or APP_MODE="selfhost" to bypass all SaaS limits
 
-Generate secrets:
+# 4. Initialize Database
+npx prisma db push
 
-```bash
-openssl rand -base64 32  # AUTH_SECRET
-openssl rand -base64 32  # ENCRYPTION_KEY
-```
-
-### 3. Choose your database
-
-**Option A — SQLite (default, no setup required)**
-
-Database is stored locally inside the project at `data/invoice.db`:
-
-```bash
-npm run db:configure:sqlite
-```
-
-**Option B — PostgreSQL (production)**
-
-```bash
-# Set in .env or via Settings UI
-DATABASE_PROVIDER=postgresql
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/invoice_saas"
-
-npm run db:configure:postgres
-```
-
-You can also switch databases anytime in **Settings → Database** in the app UI.
-
-### 4. Database setup
-
-```bash
-npm run db:push    # or: npm run db:migrate
-```
-
-### 5. Run development server
-
-```bash
+# 5. Start Development Server
 npm run dev
+
+# Access
+# Dashboard: http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000), register, set up your company profile, add customers, and create invoices.
+---
 
-## Project Structure
+## 🎛️ Application Modes (SaaS vs Self-Host)
+
+Open Invoice is designed to be run as either a free self-hosted tool or a monetized SaaS. This is controlled entirely by the `APP_MODE` environment variable.
+
+- `APP_MODE="selfhost"` (or empty): **Fully Free Mode.** All SaaS rate limits and Pro upgrade paywalls are disabled.
+- `APP_MODE="paid"`: **SaaS Mode.** Activates strict usage quotas (e.g., 3 anonymous generations/day, 4 AI chats/user).
+
+---
+
+## 🛠 Tech Stack
+
+| Layer         | Technology              |
+| ------------- | ----------------------- |
+| **Runtime**   | Node.js 20 LTS          |
+| **Framework** | Next.js 15 (App Router) |
+| **Language**  | TypeScript 5.x          |
+| **Styling**   | Tailwind CSS + Radix UI |
+| **Database**  | SQLite / PostgreSQL     |
+| **ORM**       | Prisma                  |
+| **Auth**      | Auth.js (NextAuth v5)   |
+| **Cache**     | Redis / Valkey          |
+
+---
+
+## 📁 Project Structure
 
 ```
-src/
-├── app/              # Next.js App Router pages & API routes
-├── actions/          # Server Actions
-├── ai/               # OpenAI integrations
-├── components/       # UI components
-├── lib/              # Prisma, crypto, rate-limit, Inngest
-├── pdf/              # React PDF templates
-├── services/         # Tax engine, SMTP, storage, reports
-├── tests/            # Vitest unit tests
-├── types/            # TypeScript declarations
-└── validations/      # Zod schemas
-prisma/
-└── schema.prisma     # Database schema
+open-invoice/
+├── src/
+│   ├── app/                    # Next.js App Router (Pages & API)
+│   ├── components/             # React Components (UI, Modals, Forms)
+│   ├── lib/                    # Core libraries, Prisma, and Utilities
+│   ├── actions/                # Next.js Server Actions
+│   └── auth.ts                 # Auth.js Configuration
+├── prisma/                     # Database Schema & Migrations
+├── public/                     # Static Assets
+├── .env.example
+├── package.json
+└── README.md
 ```
 
-## Scripts
+---
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start dev server |
-| `npm run build` | Production build |
-| `npm run test` | Run unit tests |
-| `npm run db:migrate` | Run Prisma migrations |
-| `npm run db:push` | Push schema to DB |
-| `npm run db:studio` | Open Prisma Studio |
+## 🤝 Contributing
 
-## Deployment (Vercel + PostgreSQL)
+We welcome community contributions! Here's how to get started:
 
-### Vercel
+1. **Fork** the repository
+2. **Create** your feature branch (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'feat: Add amazing feature'`)
+4. **Push** to the branch (`git push origin feature/amazing-feature`)
+5. **Open** a Pull Request
 
-1. Push to GitHub and import in [Vercel](https://vercel.com)
-2. Add environment variables from `.env.example`
-3. Use [Vercel Postgres](https://vercel.com/storage/postgres) or [Neon](https://neon.tech) for `DATABASE_URL`
-4. Set `NEXTAUTH_URL` to your production domain
-5. Deploy — Vercel runs `prisma generate && next build` automatically
+Please read our [Development Guidelines](./docs/08-development-guidelines.md) for coding standards and best practices.
 
-### Database migrations
+---
 
-```bash
-npx prisma migrate deploy
-```
+## ⚖️ License & Usage Conditions
 
-### Inngest (recurring invoices)
+**CUSTOM NON-COMMERCIAL SELF-HOSTED LICENSE**
 
-1. Create an [Inngest](https://www.inngest.com) account
-2. Add `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` to Vercel env
-3. Register your app URL: `https://yourdomain.com/api/inngest`
+This project is open-source, but it comes with strict commercial limitations to protect the core intellectual property:
 
-### Docker
+✅ **ALLOWED:**
+- You may self-host this application for your own personal use.
+- You may use it internally to run your own freelance business or agency billing.
+- You may modify the code for your own internal workflows.
 
-```bash
-docker compose up --build
-```
+❌ **NOT ALLOWED:**
+- You may **NOT** sell or resell this software.
+- You may **NOT** deploy this application as a public SaaS (Software as a Service) to charge other users for access.
+- You may **NOT** re-package, white-label, or distribute this codebase for commercial profit.
 
-Runs the app on port 3000 with PostgreSQL on port 5432.
+See [LICENSE](./LICENSE) for details.
 
-## GST/TDS Tax Engine
+---
 
-The tax engine (`src/services/tax-engine.ts`) automatically:
+<div align="center">
 
-- Splits GST into **CGST + SGST** for intra-state transactions
-- Applies **IGST** for inter-state transactions
-- Calculates **TDS** on taxable amount (before GST)
-- Supports custom line-item GST rates and discounts
+**Open Invoice** – Free, Open Source AI Invoicing Platform
 
-## Security
+[🐛 Report Bug](https://github.com/your-username/open-invoice/issues) · [💡 Request Feature](https://github.com/your-username/open-invoice/issues)
 
-- Passwords hashed with **Argon2**
-- SMTP passwords encrypted with **AES-256-GCM**
-- Rate limiting on auth and AI endpoints
-- JWT sessions with secure/httpOnly cookies in production
-- Audit logs for all critical actions
-- Soft deletes on users, customers, invoices
+<br/>
 
-## License
+<sub>Made with ❤️ by the Open Invoice Community</sub>
 
-MIT
+</div>

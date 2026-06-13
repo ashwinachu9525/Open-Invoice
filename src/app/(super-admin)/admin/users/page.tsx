@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Search, ShieldAlert, ShieldCheck, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from "lucide-react"
 import { revalidatePath } from "next/cache"
 import Link from "next/link"
+import { IS_FREE_MODE } from "@/lib/app-mode"
 
 const ITEMS_PER_PAGE = 10
 
@@ -75,6 +76,19 @@ export default async function ManageUsersPage({
     revalidatePath("/admin/users")
   }
 
+  async function togglePro(userId: string, currentStatus: boolean) {
+    "use server"
+    await prisma.user.update({
+      where: { id: userId },
+      data: { 
+        isPro: !currentStatus,
+        proExpiry: !currentStatus ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) : null // 1 year by default
+      }
+    })
+    
+    revalidatePath("/admin/users")
+  }
+
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto pb-10">
       <div>
@@ -102,6 +116,7 @@ export default async function ManageUsersPage({
                   <th className="px-4 py-3 font-medium">Company</th>
                   <th className="px-4 py-3 font-medium">AI Configured</th>
                   <th className="px-4 py-3 font-medium">SMTP Configured</th>
+                  {!IS_FREE_MODE && <th className="px-4 py-3 font-medium">Plan</th>}
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium text-right">Actions</th>
                 </tr>
@@ -143,6 +158,19 @@ export default async function ManageUsersPage({
                           </span>
                         )}
                       </td>
+                      {!IS_FREE_MODE && (
+                        <td className="px-4 py-3">
+                          {u.isPro ? (
+                            <span className="inline-flex items-center text-white bg-blue-600 px-2 py-1 rounded text-xs font-bold">
+                              PRO
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center text-slate-600 bg-slate-200 px-2 py-1 rounded text-xs font-bold">
+                              FREE
+                            </span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         {u.isBlocked ? (
                           <span className="inline-flex items-center text-red-500 gap-1.5">
@@ -155,15 +183,28 @@ export default async function ManageUsersPage({
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <form action={toggleBlock.bind(null, u.id, u.isBlocked)}>
-                          <Button 
-                            type="submit" 
-                            variant={u.isBlocked ? "outline" : "destructive"} 
-                            size="sm"
-                          >
-                            {u.isBlocked ? "Unblock" : "Block"}
-                          </Button>
-                        </form>
+                        <div className="flex justify-end gap-2">
+                          {!IS_FREE_MODE && (
+                            <form action={togglePro.bind(null, u.id, u.isPro)}>
+                              <Button 
+                                type="submit" 
+                                variant={u.isPro ? "outline" : "secondary"} 
+                                size="sm"
+                              >
+                                {u.isPro ? "Revoke Pro" : "Make Pro"}
+                              </Button>
+                            </form>
+                          )}
+                          <form action={toggleBlock.bind(null, u.id, u.isBlocked)}>
+                            <Button 
+                              type="submit" 
+                              variant={u.isBlocked ? "outline" : "destructive"} 
+                              size="sm"
+                            >
+                              {u.isBlocked ? "Unblock" : "Block"}
+                            </Button>
+                          </form>
+                        </div>
                       </td>
                     </tr>
                   )

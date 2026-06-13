@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FileText } from "lucide-react"
 
 export default function RegisterPage() {
+  const googleAuthEnabled = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md glass glass-card border-white/10 shadow-2xl">
@@ -14,7 +16,7 @@ export default function RegisterPage() {
           <CardDescription>Start invoicing in minutes</CardDescription>
         </CardHeader>
         <CardContent>
-          <RegisterForm />
+          <RegisterForm googleAuthEnabled={googleAuthEnabled} />
         </CardContent>
       </Card>
     </div>

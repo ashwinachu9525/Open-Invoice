@@ -9,20 +9,10 @@ import { redirect } from "next/navigation"
 import { PasskeyPromptModal } from "@/components/auth/passkey-prompt-modal"
 import { OfflineIndicator } from "@/components/layout/offline-indicator"
 import { RandomFeedbackModal } from "@/components/layout/random-feedback-modal"
+import { DesktopNavLinks, MobileNavLinks } from "@/components/layout/sidebar-nav"
+import { ProductTour } from "@/components/dashboard/product-tour"
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/invoices", label: "Invoices", icon: FileText },
-  { href: "/quotations", label: "Quotations", icon: FileText },
-  { href: "/customers", label: "Customers", icon: Users },
-  { href: "/catalog", label: "Catalog", icon: Package },
-  { href: "/reports", label: "Reports", icon: BarChart3 },
-  { href: "/expenses", label: "Expenses", icon: Receipt },
-  { href: "/email-logs", label: "Email Logs", icon: Mail },
-  { href: "/ai", label: "AI Tools", icon: Sparkles },
-  { href: "/help", label: "Help Center", icon: HelpCircle },
-  { href: "/settings", label: "Settings", icon: Settings },
-]
+
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await auth()
@@ -32,6 +22,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const initials = session.user.name
     ? session.user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : (session.user.email?.[0] ?? "U").toUpperCase()
+
+  const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
 
   return (
     <div className="flex min-h-screen w-full">
@@ -44,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               <Zap className="h-5 w-5 text-white" />
             </div>
             <div>
-              <span className="font-bold text-base gradient-text">InvoiceAI</span>
+              <span className="font-bold text-base gradient-text">{APP_NAME}</span>
               <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Indian GST Suite</p>
             </div>
           </Link>
@@ -52,18 +44,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
         {/* Nav */}
         <nav className="flex-1 overflow-auto py-4 px-3 space-y-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-white/8 hover:text-foreground hover:translate-x-0.5"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 group-hover:bg-primary/20 group-hover:text-primary transition-all duration-200">
-                <item.icon className="h-4 w-4" />
-              </span>
-              {item.label}
-            </Link>
-          ))}
+          <DesktopNavLinks />
         </nav>
 
         {/* Footer */}
@@ -99,24 +80,11 @@ export default async function DashboardLayout({ children }: { children: ReactNod
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600">
                     <Zap className="h-5 w-5 text-white" />
                   </div>
-                  <span className="font-bold gradient-text">InvoiceAI</span>
+                  <span className="font-bold gradient-text">{APP_NAME}</span>
                 </Link>
               </div>
               <nav className="flex-1 overflow-auto grid gap-1 p-3 mt-2">
-                {navItems.map((item) => (
-                  <SheetClose
-                    key={item.href}
-                    render={
-                      <Link
-                        href={item.href}
-                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
-                      />
-                    }
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </SheetClose>
-                ))}
+                <MobileNavLinks />
               </nav>
               <div className="border-t border-white/8 p-4 shrink-0">
                 <SignOutButton />
@@ -147,6 +115,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         <PasskeyPromptModal userId={session.user.id} />
       )}
       <RandomFeedbackModal />
+      <ProductTour hasSeenTour={(session.user as any).hasSeenTour ?? false} />
     </div>
   )
 }

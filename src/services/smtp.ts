@@ -300,3 +300,40 @@ export async function sendQuotationEmail(params: {
     })
   }
 }
+
+export async function sendWelcomeEmail(to: string, name: string) {
+  const host = process.env.APP_SMTP_HOST
+  const port = Number(process.env.APP_SMTP_PORT) || 587
+  const user = process.env.APP_SMTP_USER
+  const pass = process.env.APP_SMTP_PASS
+  const from = process.env.APP_SMTP_FROM || user
+
+  if (!host || !user || !pass) {
+    console.warn("APP_SMTP environment variables are not configured. Cannot send welcome email.")
+    return
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 5000,
+  })
+
+  await transporter.sendMail({
+    from,
+    to,
+    subject: "Welcome to Open Invoice!",
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;color:#0f172a;border-radius:12px;border:1px solid #e2e8f0">
+        <h2 style="color:#4f46e5;margin:0 0 16px;text-align:center;">Welcome, ${name}!</h2>
+        <p style="margin:0 0 16px;font-size:16px;">We're thrilled to have you on board. Open Invoice makes it easy to manage your invoices, quotations, and customers in one place.</p>
+        <p style="margin:0 0 16px;font-size:16px;">Get started by creating your first invoice from the dashboard!</p>
+        <p style="margin:0;font-size:14px;color:#64748b;">If you have any questions, feel free to reach out to our support team.</p>
+      </div>
+    `,
+  })
+}

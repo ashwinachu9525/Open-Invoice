@@ -244,4 +244,52 @@ export const sendPaymentReminders = inngest.createFunction(
   }
 )
 
-export const inngestFunctions = [processRecurringInvoices, markOverdueInvoices, sendPaymentReminders]
+export const cleanupDeletedAccounts = inngest.createFunction(
+  { id: "cleanup-deleted-accounts", triggers: [{ cron: "0 2 * * *" }] }, // Run daily at 2 AM
+  async () => {
+    // 30 days ago
+    const thresholdDate = new Date()
+    thresholdDate.setDate(thresholdDate.getDate() - 30)
+
+    const deletedUsers = await prisma.user.findMany({
+      where: {
+        deletedAt: {
+          not: null,
+          lt: thresholdDate
+        }
+      }
+    })
+
+    let deletedCount = 0
+
+    for (const user of deletedUsers) {
+      try {
+        // First delete the user (this cascades to accounts, sessions, etc.)
+        await prisma.user.delete({
+          where: { id: user.id }
+        })
+
+        // Then clean up their company if they had one
+        // (assuming 1-to-1 relationship where they are the sole owner for this SAAS)
+        if (user.companyId) {
+          const remainingUsers = await prisma.user.count({
+            where: { companyId: user.companyId }
+          })
+          
+          if (remainingUsers === 0) {
+            await prisma.company.delete({
+              where: { id: user.companyId }
+            }).catch(e => console.error(`Failed to delete company ${user.companyId}:`, e))
+          }
+        }
+        deletedCount++
+      } catch (e) {
+        console.error(`Failed to delete user ${user.id}:`, e)
+      }
+    }
+
+    return { deletedCount }
+  }
+)
+
+export const inngestFunctions = [processRecurringInvoices, markOverdueInvoices, sendPaymentReminders, cleanupDeletedAccounts]

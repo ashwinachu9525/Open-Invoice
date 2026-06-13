@@ -168,3 +168,56 @@
     radial-gradient(ellipse 60% 40% at 80% 100%, oklch(0.80 0.10 240 / 20%) 0%, transparent 60%);
   background-attachment: fixed;
 }
+/* Driver.js Custom Glassmorphism Theme */
+.glass-tour-popover {
+  background: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px !important;
+  color: white !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+}
+
+.glass-tour-popover .driver-popover-title {
+  color: #fff !important;
+  font-weight: 700 !important;
+  font-size: 1.125rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.glass-tour-popover .driver-popover-description {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 0.875rem !important;
+}
+
+.glass-tour-popover .driver-popover-footer button {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+  border-radius: 8px !important;
+  padding: 0.5rem 1rem !important;
+  transition: all 0.2s !important;
+  text-shadow: none !important;
+}
+
+.glass-tour-popover .driver-popover-footer button:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.glass-tour-popover .driver-popover-footer .driver-popover-next-btn {
+  background: linear-gradient(to right, #7c3aed, #4f46e5) !important;
+  border: none !important;
+}
+
+.glass-tour-popover .driver-popover-footer .driver-popover-next-btn:hover {
+  background: linear-gradient(to right, #6d28d9, #4338ca) !important;
+}
+
+.glass-tour-popover .driver-popover-close-btn {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.glass-tour-popover .driver-popover-close-btn:hover {
+  color: white !important;
+}

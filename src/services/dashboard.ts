@@ -11,7 +11,7 @@ export async function getDashboardStats(companyId: string) {
     })
   ])
 
-  const activeInvoices = invoices.filter(i => i.status !== "CANCELLED")
+  const activeInvoices = invoices.filter(i => i.status !== "CANCELLED" && i.status !== "DRAFT")
 
   const totalRevenue = activeInvoices.reduce((s, i) => s + i.finalAmount, 0)
 
@@ -40,7 +40,7 @@ export async function getDashboardStats(companyId: string) {
     gstCollected,
     tdsDeducted,
     activeCustomers: customers,
-    invoicesSent: invoices.filter((i) => i.status !== "DRAFT" && i.status !== "CANCELLED").length,
+    invoicesSent: activeInvoices.length,
     monthlyRevenue,
     customerInsights,
     agingBuckets,

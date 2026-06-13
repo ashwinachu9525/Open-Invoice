@@ -12,6 +12,8 @@ import { BankAccountsForm } from "@/components/forms/bank-accounts-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { InvoicePrefixForm } from "@/components/forms/invoice-prefix-form"
 import { PushNotificationSettingsForm } from "@/components/forms/push-notifications-form"
+import { PrivacySettingsForm } from "@/components/forms/privacy-settings-form"
+import { AppearanceSettingsForm } from "@/components/forms/appearance-settings-form"
 
 const isDevMode = process.env.NEXT_PUBLIC_ENV === "dev"
 
@@ -69,6 +71,18 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <PushNotificationSettingsForm />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+          <CardDescription>
+            Customize the theme and look of your dashboard.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AppearanceSettingsForm />
         </CardContent>
       </Card>
 
@@ -165,6 +179,8 @@ export default async function SettingsPage() {
           <EmailSettingsForm initialData={emailSettings} />
         </CardContent>
       </Card>
+
+      <PrivacySettingsForm />
     </div>
   )
 }

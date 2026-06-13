@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { SendEmailButton } from "@/components/invoices/send-email-button"
+import { UpgradeModal } from "@/components/modals/upgrade-modal"
 
 interface ChatMessage {
   role: "user" | "assistant" | "system"
@@ -31,6 +32,10 @@ export default function AIChatPage() {
   // Wizard States
   const [customers, setCustomers] = useState<any[]>([])
   const [draftState, setDraftState] = useState<{ clientId?: string, clientName?: string, details?: string }>({})
+
+  // Upgrade Modal State
+  const [showUpgrade, setShowUpgrade] = useState(false)
+  const [upgradeReason, setUpgradeReason] = useState("")
 
   useEffect(() => {
     loadSessions()
@@ -65,10 +70,19 @@ export default function AIChatPage() {
     }
   }
 
+
+
   async function handleNewChat() {
     const s = await createChatSession("New Invoice Chat")
-    if (s) {
-      setSessions([s, ...sessions])
+    
+    if (s && "error" in s) {
+      setUpgradeReason(s.error as string)
+      setShowUpgrade(true)
+      return
+    }
+
+    if (s && !("error" in s)) {
+      setSessions([s as any, ...sessions])
       setActiveSessionId(s.id)
       setMessages([])
       setDraftState({})
@@ -485,6 +499,11 @@ Please generate the structured JSON payload for this invoice immediately. Do not
           </form>
         </div>
       </div>
+      <UpgradeModal 
+        open={showUpgrade} 
+        onOpenChange={setShowUpgrade} 
+        reason={upgradeReason} 
+      />
     </div>
   )
 }

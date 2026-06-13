@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core"
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, Save, Trash, AlertCircle } from "lucide-react"
+import { GripVertical, Save, Trash, AlertCircle, ExternalLink } from "lucide-react"
 import { saveAISettings } from "@/actions/ai-settings"
 import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
@@ -43,6 +43,49 @@ const PROVIDER_NAMES: Record<string, string> = {
   openai: "OpenAI",
   nvidia: "Nvidia NIM",
   openrouter: "OpenRouter",
+}
+
+const HELP_TEXTS: Record<string, { title: string; url: string; steps: string[] }> = {
+  gemini: { 
+    title: "Google AI Studio", 
+    url: "https://aistudio.google.com/app/apikey",
+    steps: [
+      "Sign in to Google AI Studio.",
+      "Click 'Get API key' in the left menu.",
+      "Click 'Create API key in new project'.",
+      "Copy the generated key."
+    ]
+  },
+  openai: { 
+    title: "OpenAI Platform", 
+    url: "https://platform.openai.com/api-keys",
+    steps: [
+      "Sign in to the OpenAI Platform.",
+      "Navigate to Dashboard > API keys.",
+      "Click 'Create new secret key'.",
+      "Give it a name and copy the key."
+    ]
+  },
+  nvidia: { 
+    title: "NVIDIA NGC", 
+    url: "https://build.nvidia.com/explore/discover",
+    steps: [
+      "Create or sign into your NVIDIA account.",
+      "Go to the API key section in your profile.",
+      "Click 'Generate Key'.",
+      "Copy the newly generated key."
+    ]
+  },
+  openrouter: { 
+    title: "OpenRouter", 
+    url: "https://openrouter.ai/keys",
+    steps: [
+      "Sign in to OpenRouter.",
+      "Go to your account Settings > Keys.",
+      "Click 'Create Key' and name it.",
+      "Copy the key value."
+    ]
+  },
 }
 
 function SortableItem({ id }: { id: string }) {
@@ -166,7 +209,7 @@ export function AISettingsForm({ initialData }: AISettingsFormProps) {
 
             return (
               <Card key={p} className="bg-transparent border-white/10">
-                <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                <CardContent className="p-4 flex flex-col sm:flex-row sm:items-start gap-4">
                   <div className="flex-1 space-y-1">
                     <Label className="font-semibold">{PROVIDER_NAMES[p]}</Label>
                     <div className="flex items-center gap-2 text-xs">
@@ -175,6 +218,19 @@ export function AISettingsForm({ initialData }: AISettingsFormProps) {
                       ) : (
                         <span className="text-amber-400 font-medium">Not Configured</span>
                       )}
+                    </div>
+                    <div className="text-xs mt-3 text-muted-foreground space-y-1.5 pt-1">
+                      <p className="font-medium text-foreground/80">How to get this key:</p>
+                      <ul className="list-decimal pl-4 space-y-1 text-muted-foreground">
+                        {HELP_TEXTS[p].steps.map((step, idx) => (
+                          <li key={idx}>{step}</li>
+                        ))}
+                      </ul>
+                      <div className="pt-1">
+                        <a href={HELP_TEXTS[p].url} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-400 hover:underline inline-flex items-center gap-1">
+                          Open {HELP_TEXTS[p].title} <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
                     </div>
                   </div>
                   <div className="flex-1 relative">

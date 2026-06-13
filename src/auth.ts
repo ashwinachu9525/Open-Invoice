@@ -9,6 +9,7 @@ import Passkey from "next-auth/providers/passkey"
 import * as argon2 from "argon2"
 import { Role } from "@prisma/client"
 import { authConfig } from "@/auth.config"
+import { sendWelcomeEmail } from "@/services/smtp"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -58,7 +59,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!credentials?.email || !credentials?.password) return null
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string, deletedAt: null },
+          where: { email: credentials.email as string },
         })
 
         if (!user || !user.password) return null
@@ -99,15 +100,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     ...authConfig.callbacks,
     async signIn({ user, account }) {
-      if (account?.provider === "google" && user.email) {
+      if (user.email) {
         const existing = await prisma.user.findUnique({
           where: { email: user.email },
         })
-        if (existing && !existing.emailVerified) {
-          await prisma.user.update({
-            where: { id: existing.id },
-            data: { emailVerified: new Date() },
-          })
+        
+        if (existing) {
+          const dataToUpdate: any = {}
+          
+          if (account?.provider === "google" && !existing.emailVerified) {
+            dataToUpdate.emailVerified = new Date()
+          }
+          
+          if (existing.deletedAt) {
+            dataToUpdate.deletedAt = null
+          }
+
+          if (Object.keys(dataToUpdate).length > 0) {
+            await prisma.user.update({
+              where: { id: existing.id },
+              data: dataToUpdate,
+            })
+          }
         }
       }
       return true
@@ -120,6 +134,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.passkeyPrompted = (user as any).passkeyPrompted
         token.passkeyEnabled = (user as any).passkeyEnabled
         token.mfaEnabled = (user as any).mfaEnabled
+        token.hasSeenTour = (user as any).hasSeenTour
       }
 
       if (trigger === "update") {
@@ -132,6 +147,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.passkeyPrompted = dbUser.passkeyPrompted
           token.passkeyEnabled = dbUser.passkeyEnabled
           token.mfaEnabled = dbUser.mfaEnabled
+          token.hasSeenTour = dbUser.hasSeenTour
         }
       }
 
@@ -145,8 +161,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.passkeyPrompted = token.passkeyPrompted as boolean
         session.user.passkeyEnabled = token.passkeyEnabled as boolean
         ;(session.user as any).mfaEnabled = token.mfaEnabled as boolean
+        ;(session.user as any).hasSeenTour = token.hasSeenTour as boolean
       }
       return session
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      if (user.id && user.name && user.email) {
+        // Create a default company for the newly created OAuth user
+        const company = await prisma.company.create({
+          data: { name: `${user.name}'s Business` },
+        })
+
+        // Link the company to the user and mark email as verified (since it's from Google)
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            companyId: company.id,
+            role: Role.BUSINESS_OWNER,
+            emailVerified: new Date(),
+          },
+        })
+
+        // Send a welcome email
+        try {
+          await sendWelcomeEmail(user.email, user.name)
+        } catch (emailError) {
+          console.error("Failed to send welcome email:", emailError)
+        }
+      }
     },
   },
 })

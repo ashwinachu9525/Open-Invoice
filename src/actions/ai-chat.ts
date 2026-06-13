@@ -40,9 +40,17 @@ export async function getChatSession(id: string) {
   }
 }
 
+import { checkUsage } from "@/lib/usage"
+
 export async function createChatSession(title: string) {
   try {
     const { session, company } = await requireCompany()
+    
+    // Check usage limits
+    const usage = await checkUsage(session.user.id, false, "ai_chat")
+    if (!usage.allowed) {
+      throw new Error(usage.reason || "Limit reached")
+    }
     
     const chat = await prisma.aIChatSession.create({
       data: {
@@ -56,7 +64,7 @@ export async function createChatSession(title: string) {
     return chat
   } catch (error) {
     console.error("Failed to create chat session:", error)
-    return null
+    return { error: error instanceof Error ? error.message : "Internal Server Error" }
   }
 }
 

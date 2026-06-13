@@ -23,8 +23,11 @@ model User {
   passkeyEnabled  Boolean   @default(false)
   passkeyPrompted Boolean   @default(false)
   mfaEnabled      Boolean   @default(false)
+  hasSeenTour     Boolean   @default(false)
   mfaSecret       String?
   isBlocked       Boolean   @default(false)
+  isPro           Boolean   @default(false)
+  proExpiry       DateTime?
 
   company        Company?        @relation(fields: [companyId], references: [id])
   accounts       Account[]
@@ -614,4 +617,16 @@ model AppError {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model PublicFeedback {
+  id        String   @id @default(cuid())
+  rating    Int      // 1 to 5
+  comments  String?
+  source    String   // "invoice-generator", "quotation-generator", etc.
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([source])
 }

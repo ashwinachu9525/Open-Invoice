@@ -171,16 +171,16 @@ export default function HelpPage() {
   }, [filtered]);
 
   return (
-    <div className="min-h-screen bg-background pb-12">
+    <div className="min-h-screen bg-background pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Help Center</h1>
-        <p className="text-muted-foreground">Find answers, learn how to use features, and get support.</p>
+        <p className="text-muted-foreground mt-1">Find answers, learn how to use features, and get support.</p>
       </div>
 
       <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
         
         {/* SIDEBAR / MOBILE STICKY HEADER */}
-        <div className="sticky top-0 z-20 -mx-4 bg-background/80 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:w-72 lg:shrink-0 lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none 2xl:w-80">
+        <div className="sticky top-16 z-20 -mx-4 bg-background/80 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:w-72 lg:shrink-0 lg:bg-transparent lg:px-0 lg:py-0 lg:backdrop-blur-none 2xl:w-80">
           <div className="flex flex-col gap-4 lg:sticky lg:top-24">
             
             {/* Search Input */}

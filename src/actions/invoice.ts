@@ -174,7 +174,8 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
           tdsPercentage: tax.tdsPercentage,
           tdsAmount: tax.tdsAmount,
           finalAmount: tax.finalAmount,
-          balanceDue: tax.finalAmount - existing.amountPaid, // Keep existing paid amount in mind
+          balanceDue: Math.max(0, tax.finalAmount - existing.amountPaid),
+          status: existing.amountPaid > 0 && tax.finalAmount <= existing.amountPaid ? "PAID" : existing.status,
           items: {
             create: tax.items.map((item) => ({
               description: item.description,
@@ -405,7 +406,13 @@ export async function getInvoice(id: string) {
 export async function updateInvoiceStatus(
   id: string,
   status: InvoiceStatus,
-  note?: string
+  note?: string,
+  paymentUpdate?: {
+    amountPaid?: number
+    balanceDue?: number
+    tdsPercentage?: number
+    tdsAmount?: number
+  }
 ) {
   try {
     const { session, company } = await requireCompany()
@@ -414,8 +421,16 @@ export async function updateInvoiceStatus(
     })
     if (!invoice) return { error: "Invoice not found" }
 
+    const dataToUpdate: any = { status }
+    if (paymentUpdate) {
+      if (paymentUpdate.amountPaid !== undefined) dataToUpdate.amountPaid = paymentUpdate.amountPaid
+      if (paymentUpdate.balanceDue !== undefined) dataToUpdate.balanceDue = paymentUpdate.balanceDue
+      if (paymentUpdate.tdsPercentage !== undefined) dataToUpdate.tdsPercentage = paymentUpdate.tdsPercentage
+      if (paymentUpdate.tdsAmount !== undefined) dataToUpdate.tdsAmount = paymentUpdate.tdsAmount
+    }
+
     await prisma.$transaction([
-      prisma.invoice.update({ where: { id }, data: { status } }),
+      prisma.invoice.update({ where: { id }, data: dataToUpdate }),
       prisma.invoiceStatusHistory.create({
         data: { invoiceId: id, status, note },
       }),
@@ -427,7 +442,7 @@ export async function updateInvoiceStatus(
       action: "STATUS_CHANGE",
       entity: "Invoice",
       entityId: id,
-      details: { status, note },
+      details: { status, note, ...paymentUpdate },
     })
 
     // Invalidate cache

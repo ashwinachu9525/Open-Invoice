@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FileText } from "lucide-react"
 
 export default function LoginPage() {
+  const googleAuthEnabled = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md glass glass-card border-white/10 shadow-2xl">
@@ -16,7 +18,7 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <Suspense fallback={<div className="h-24"></div>}>
-            <LoginForm />
+            <LoginForm googleAuthEnabled={googleAuthEnabled} />
           </Suspense>
         </CardContent>
       </Card>
