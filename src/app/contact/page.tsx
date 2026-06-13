@@ -23,7 +23,7 @@ export default function ContactPage() {
         </div>
 
         <a 
-          href="mailto:support@openinvoice.local?subject=Support Request from Open Invoice" 
+          href="mailto:ashwinachu9525@gmail.com?subject=Support Request from Open Invoice" 
           className="inline-flex items-center justify-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm w-full sm:w-auto"
         >
           <Mail className="w-5 h-5" />

@@ -1,71 +1,67 @@
 import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
+import { Metadata } from "next"
 
-export default function TermsPage() {
+export const metadata: Metadata = {
+  title: "Terms of Service",
+  description: "The rules, guidelines, and terms you agree to by using our application.",
+}
+
+export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm border p-8 md:p-12">
+      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border p-8 md:p-12">
         <Link 
-          href="/register" 
+          href="/" 
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 mb-8 transition-colors"
         >
           <ChevronLeft className="w-4 h-4 mr-1" />
-          Back to Registration
+          Back to Home
         </Link>
         
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-8">Terms and Conditions</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900 mb-8">Terms of Service</h1>
         
-        <div className="prose prose-blue max-w-none text-gray-600 space-y-6">
-          <p>
-            Welcome to Open Invoice. By registering for an account, you agree to comply with and be bound by the following terms and conditions of use. Please review these terms carefully. If you do not agree to these terms, you should not register for an account or use this application.
+        <div className="prose prose-blue max-w-none text-gray-700 space-y-6">
+          <p className="lead text-lg text-gray-500">
+            Welcome to Invoice AI. These Terms of Service ("Terms") govern your use of our website, applications, and services. By accessing or using our services, you agree to be bound by these Terms.
           </p>
 
-          <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">1. License and Permitted Use</h2>
-          <p>
-            Subject to your compliance with these Terms, you are granted a non-exclusive, non-transferable right to access and use the Open Invoice platform for your own personal use or internal business operations. You may not:
-          </p>
-          <ul className="list-disc pl-6 space-y-2">
-            <li>Resell, rent, lease, or distribute the platform as a commercial service.</li>
-            <li>Use the platform to host a public SaaS (Software as a Service) for third parties in exchange for financial compensation.</li>
-            <li>Remove or modify any copyright, trademark, or other proprietary rights notices.</li>
+          <h2 className="text-xl font-semibold text-gray-900 mt-8">1. Acceptance of Terms</h2>
+          <p>By creating an account, accessing, or using Invoice AI ("Service"), you agree to comply with and be bound by these Terms. If you do not agree to these Terms, you may not use the Service.</p>
+
+          <h2 className="text-xl font-semibold text-gray-900 mt-8">2. Account Registration and Responsibilities</h2>
+          <p>To use certain features of the Service, you must register for an account. You agree to provide accurate, current, and complete information during the registration process. You are solely responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You must immediately notify us of any unauthorized use of your account or any other breach of security.</p>
+
+          <h2 className="text-xl font-semibold text-gray-900 mt-8">3. Use of the Service</h2>
+          <p>You agree to use the Service only for lawful purposes and in accordance with these Terms. You agree not to use the Service:</p>
+          <ul className="list-disc pl-5 space-y-2">
+            <li>In any way that violates any applicable national or international law or regulation (including tax, invoicing, and accounting regulations).</li>
+            <li>To engage in any fraudulent activity, including issuing fake or unauthorized invoices.</li>
+            <li>To transmit, or procure the sending of, any advertising or promotional material, including any "junk mail," "chain letter," "spam," or any other similar solicitation.</li>
+            <li>To impersonate or attempt to impersonate Invoice AI, a company employee, another user, or any other person or entity.</li>
           </ul>
 
-          <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">2. User Accounts and Security</h2>
-          <p>
-            When you register for an account, you agree to provide accurate and complete information. You are solely responsible for maintaining the confidentiality of your account credentials, including any Passkeys or multi-factor authentication methods you configure. You agree to accept responsibility for all activities that occur under your account.
-          </p>
+          <h2 className="text-xl font-semibold text-gray-900 mt-8">4. Intellectual Property Rights</h2>
+          <p>The Service and its entire contents, features, and functionality (including but not limited to all information, software, text, displays, images, video, and audio, and the design, selection, and arrangement thereof) are owned by Invoice AI, its licensors, or other providers of such material and are protected by international copyright, trademark, patent, trade secret, and other intellectual property or proprietary rights laws.</p>
 
-          <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">3. Data Privacy and Content</h2>
-          <p>
-            You retain all rights to the data, invoices, customers, and content you generate or upload using the platform ("User Content"). By using the platform, you grant us a necessary license to store, process, and transmit your User Content solely for the purpose of providing the service to you. 
-          </p>
+          <h2 className="text-xl font-semibold text-gray-900 mt-8">5. User Data and Content</h2>
+          <p>You retain all rights to your data and the content of the invoices you generate. By using our Service, you grant us a worldwide, non-exclusive, royalty-free license to host, copy, transmit, and display your data strictly as necessary for us to provide the Service to you.</p>
 
-          <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">4. Acceptable Use and Rate Limiting</h2>
-          <p>
-            You agree not to misuse the platform. Misuse includes, but is not limited to:
-          </p>
-          <ul className="list-disc pl-6 space-y-2">
-            <li>Attempting to bypass, disable, or interfere with security-related features or rate limits.</li>
-            <li>Using the platform to generate spam, malicious files, or illegal content.</li>
-            <li>Subjecting the infrastructure to unreasonable loads or automated bot networks.</li>
-          </ul>
-          <p>
-            We reserve the right to enforce usage limits (such as AI chat limits or document generation quotas) depending on your application mode and subscription status.
-          </p>
+          <h2 className="text-xl font-semibold text-gray-900 mt-8">6. Termination</h2>
+          <p>We may terminate or suspend your account and bar access to the Service immediately, without prior notice or liability, under our sole discretion, for any reason whatsoever and without limitation, including but not limited to a breach of the Terms. If you wish to terminate your account, you may simply discontinue using the Service or delete your account in your Account Settings.</p>
 
-          <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">5. Disclaimer of Warranties</h2>
-          <p>
-            THE PLATFORM IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED. WE DO NOT GUARANTEE THAT THE PLATFORM WILL BE UNINTERRUPTED, ERROR-FREE, OR COMPLETELY SECURE.
-          </p>
+          <h2 className="text-xl font-semibold text-gray-900 mt-8">7. Limitation of Liability</h2>
+          <p>In no event shall Invoice AI, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from (i) your access to or use of or inability to access or use the Service; (ii) any conduct or content of any third party on the Service; and (iii) unauthorized access, use or alteration of your transmissions or content.</p>
 
-          <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-4">6. Changes to Terms</h2>
-          <p>
-            We reserve the right to modify these terms at any time. We will notify you of any significant changes by updating the terms on this page or through your account dashboard. Your continued use of the platform following the posting of changes constitutes your acceptance of such changes.
-          </p>
+          <h2 className="text-xl font-semibold text-gray-900 mt-8">8. Changes to Terms</h2>
+          <p>We reserve the right, at our sole discretion, to modify or replace these Terms at any time. We will provide notice of any material changes by posting the new Terms on this page and updating the "Last Updated" date.</p>
+
+          <h2 className="text-xl font-semibold text-gray-900 mt-8">9. Contact Us</h2>
+          <p>If you have any questions about these Terms, please contact us at ashwinachu9525@gmail.com.</p>
         </div>
         
         <div className="mt-12 pt-8 border-t text-sm text-gray-500">
-          Last Updated: {new Date().toLocaleDateString()}
+          Last Updated: June 13, 2026
         </div>
       </div>
     </div>

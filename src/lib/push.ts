@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 
 // Configure web-push with VAPID keys
 webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || "mailto:admin@openinvoice.com",
+  process.env.VAPID_SUBJECT || "mailto:ashwinachu9525@gmail.com",
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY as string,
   process.env.VAPID_PRIVATE_KEY as string
 )
