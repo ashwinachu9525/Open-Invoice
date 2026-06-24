@@ -11,6 +11,7 @@ import { InvoiceActions } from "@/components/invoices/invoice-actions"
 import { SendEmailButton } from "@/components/invoices/send-email-button"
 import { SendWhatsappButton } from "@/components/invoices/send-whatsapp-button"
 import { RecurringInvoiceModal } from "@/components/invoices/recurring-invoice-modal"
+import { WhatsAppShareButton } from "@/components/invoices/whatsapp-share-button"
 import { Download, Building2, User, FileText, AlertTriangle, Info, TrendingDown } from "lucide-react"
 
 const statusConfig: Record<string, { label: string; class: string }> = {
@@ -79,6 +80,12 @@ export default async function InvoiceDetailPage({
             customerPhone={invoice.customer.phone}
             customerName={invoice.customer.name}
             companyName={invoice.company.name}
+            pdfUrl={`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/invoices/${invoice.id}/pdf`}
+          />
+          <WhatsAppShareButton
+            invoiceNumber={invoice.invoiceNumber}
+            finalAmount={invoice.finalAmount}
+            customerName={invoice.customer.name}
             pdfUrl={`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/invoices/${invoice.id}/pdf`}
           />
           <RecurringInvoiceModal 

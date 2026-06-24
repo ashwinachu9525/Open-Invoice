@@ -171,6 +171,16 @@ export function LoginForm({ googleAuthEnabled = false }: { googleAuthEnabled?: b
             </Link>
           </span>
         </div>
+
+        {/* Referral nudge */}
+        <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-center">
+          <p className="text-xs text-amber-400 font-medium">
+            🎁 Refer a friend &amp; get <span className="font-bold">1 month Pro free</span> (₹299 value)
+          </p>
+          <Link href="/register" className="text-xs text-amber-300 hover:underline">
+            Create an account to get your referral link →
+          </Link>
+        </div>
       </form>
     </Form>
   )

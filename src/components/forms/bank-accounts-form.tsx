@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createBankAccount, deleteBankAccount, updateBankAccount } from "@/actions/bank-accounts"
 import { Trash2, Plus, Building, CheckCircle2, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 interface BankAccountsFormProps {
   initialAccounts: BankAccount[]
@@ -41,8 +42,9 @@ export function BankAccountsForm({ initialAccounts }: BankAccountsFormProps) {
       setIsAdding(false)
       // Reset form
       setBankName(""); setAccountName(""); setAccountNumber(""); setIfscCode(""); setAccountType(""); setIsDefault(false);
+      toast.success("Bank account added")
     } else {
-      alert(result.error)
+      toast.error(result.error)
     }
   }
 

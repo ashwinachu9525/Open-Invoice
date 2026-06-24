@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Download, Trash2, AlertTriangle } from "lucide-react"
+import { toast } from "sonner"
 
 export function PrivacySettingsForm() {
   const router = useRouter()
@@ -47,7 +48,7 @@ export function PrivacySettingsForm() {
       document.body.removeChild(a)
     } catch (error) {
       console.error(error)
-      alert("Failed to export data. Please try again.")
+      toast.error("Failed to export data. Please try again.")
     } finally {
       setIsExporting(false)
     }
@@ -67,7 +68,7 @@ export function PrivacySettingsForm() {
       await signOut({ callbackUrl: "/" })
     } catch (error) {
       console.error(error)
-      alert("Failed to schedule account deletion. Please try again.")
+      toast.error("Failed to schedule account deletion. Please try again.")
       setIsDeleting(false)
     }
   }

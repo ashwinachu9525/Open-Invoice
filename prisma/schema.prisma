@@ -29,6 +29,11 @@ model User {
   isPro           Boolean   @default(false)
   proExpiry       DateTime?
 
+  // Referral system
+  referralCode         String?   @unique  // e.g. "INV-AB12CD34"
+  referredBy           String?            // referral code used at signup
+  referralRewardClaimed Boolean  @default(false) // true once 1-month Pro reward is granted
+
   company        Company?        @relation(fields: [companyId], references: [id])
   accounts       Account[]
   sessions       Session[]
@@ -37,6 +42,7 @@ model User {
   aichatSessions AIChatSession[]
   pushSubscriptions PushSubscription[]
   feedbacks      UserFeedback[]
+  referralRedemptions ReferralRedemption[] @relation("ReferrerRedemptions")
 
   @@index([companyId])
   @@index([email])
@@ -164,6 +170,8 @@ model Company {
   openWaEnabled     Boolean   @default(false)
   openWaUrl         String?
   openWaToken       String?
+
+  proRequestStatus  String?  // PENDING, APPROVED, REJECTED
 
   whatsappProvider       String   @default("openwa") // "openwa" | "official"
   whatsappPhoneId        String?  // Meta Phone Number ID
@@ -672,4 +680,20 @@ model ApiKey {
 
   @@index([companyId])
   @@index([keyHash])
+}
+
+// Referral System
+model ReferralRedemption {
+  id              String   @id @default(cuid())
+  referrerId      String                        // User who owns the referral code
+  referredUserId  String                        // Newly registered user
+  referralCode    String                        // Code that was used
+  rewardGranted   Boolean  @default(false)      // Pro month activated
+  proGrantedAt    DateTime?                     // When Pro was activated
+  createdAt       DateTime @default(now())
+
+  referrer        User     @relation("ReferrerRedemptions", fields: [referrerId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+  @@index([referralCode])
 }

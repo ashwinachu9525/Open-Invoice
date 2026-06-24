@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { updateCompany } from "@/actions/company"
 import { useState } from "react"
 import { COMMON_CURRENCIES } from "@/lib/currencies"
+import { toast } from "sonner"
 
 export function CompanyForm({ initialData }: { initialData: any }) {
   const [isPending, setIsPending] = useState(false)
@@ -45,9 +46,9 @@ export function CompanyForm({ initialData }: { initialData: any }) {
     const result = await updateCompany(data)
     setIsPending(false)
     if (result.success) {
-      alert("Company updated successfully")
+      toast.success("Company updated successfully")
     } else {
-      alert(result.error || "Failed to update")
+      toast.error(result.error || "Failed to update")
     }
   }
 

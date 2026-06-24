@@ -3,8 +3,9 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, Building, FileText, Activity, AlertTriangle, MessageSquare } from "lucide-react"
+import { Users, Building, FileText, Activity, AlertTriangle, MessageSquare, BadgeCheck } from "lucide-react"
 import { ExtendTrialButton } from "@/components/admin/extend-trial-button"
+import { ProRequestActions } from "@/components/admin/pro-request-actions"
 
 export default async function SuperAdminDashboard() {
   const session = await auth()
@@ -30,7 +31,8 @@ export default async function SuperAdminDashboard() {
     systemLogs,
     errorLogs,
     appErrors,
-    companies
+    companies,
+    pendingProRequests
   ] = await Promise.all([
     prisma.user.count(),
     prisma.company.count(),
@@ -68,6 +70,12 @@ export default async function SuperAdminDashboard() {
     }),
     // Companies
     prisma.company.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { users: true }
+    }),
+    // Pending Pro Requests
+    prisma.company.findMany({
+      where: { proRequestStatus: "PENDING" },
       orderBy: { createdAt: "desc" },
       include: { users: true }
     })
@@ -121,9 +129,15 @@ export default async function SuperAdminDashboard() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
+        <TabsList className="grid w-full grid-cols-6 lg:w-[850px]">
           <TabsTrigger value="users"><Users className="w-4 h-4 mr-2"/> Users</TabsTrigger>
           <TabsTrigger value="companies"><Building className="w-4 h-4 mr-2"/> Companies</TabsTrigger>
+          <TabsTrigger value="requests">
+            <BadgeCheck className="w-4 h-4 mr-2"/> Pro Requests
+            {pendingProRequests.length > 0 && (
+              <span className="ml-2 bg-indigo-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingProRequests.length}</span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="logs"><Activity className="w-4 h-4 mr-2"/> Audit Logs</TabsTrigger>
           <TabsTrigger value="errors"><AlertTriangle className="w-4 h-4 mr-2"/> Errors</TabsTrigger>
           <TabsTrigger value="feedback"><MessageSquare className="w-4 h-4 mr-2"/> Feedback</TabsTrigger>
@@ -258,6 +272,64 @@ export default async function SuperAdminDashboard() {
                             ) : (
                               <span className="text-xs text-muted-foreground italic">No trial to extend</span>
                             )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab: Pro Requests */}
+        <TabsContent value="requests" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pro Upgrade Requests</CardTitle>
+              <CardDescription>Review and approve companies requesting to upgrade to the Pro tier.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Company Name</th>
+                      <th className="px-4 py-3 font-medium">Current Plan</th>
+                      <th className="px-4 py-3 font-medium">Contact / Owner</th>
+                      <th className="px-4 py-3 font-medium">Joined Date</th>
+                      <th className="px-4 py-3 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {pendingProRequests.length === 0 && (
+                      <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">No pending requests at the moment.</td></tr>
+                    )}
+                    {pendingProRequests.map((c) => {
+                      const owner = c.users.find(u => u.role === "BUSINESS_OWNER") || c.users[0]
+                      return (
+                        <tr key={c.id} className="hover:bg-muted/30">
+                          <td className="px-4 py-3 font-semibold">
+                            <div>{c.name || "Unnamed Company"}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono">{c.id}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center rounded-md bg-slate-500/10 text-slate-400 border border-slate-500/20 px-2 py-1 text-xs font-semibold">
+                              {c.subscriptionTier}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div>{owner?.name || "N/A"}</div>
+                            <div className="text-xs text-muted-foreground">{owner?.email}</div>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {new Date(c.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end">
+                              <ProRequestActions companyId={c.id} />
+                            </div>
                           </td>
                         </tr>
                       )

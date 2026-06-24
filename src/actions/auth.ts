@@ -9,12 +9,14 @@ import { hashToken } from "@/lib/crypto"
 import { Role } from "@prisma/client"
 import { signIn } from "@/auth"
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetSuccessEmail } from "@/services/smtp"
+import { applyReferralReward, ensureReferralCode } from "@/actions/referral"
 
 export async function registerUser(data: {
   name: string
   email: string
   password: string
   confirmPassword: string
+  referralCode?: string
 }) {
   try {
     const parsed = registerSchema.safeParse(data)
@@ -40,7 +42,7 @@ export async function registerUser(data: {
       data: { name: `${parsed.data.name}'s Business` },
     })
 
-    await prisma.user.create({
+    const newUser = await prisma.user.create({
       data: {
         name: parsed.data.name,
         email: parsed.data.email,
@@ -49,6 +51,14 @@ export async function registerUser(data: {
         companyId: company.id,
       },
     })
+
+    // Generate a unique referral code for the new user
+    await ensureReferralCode(newUser.id)
+
+    // Apply referral reward if a valid referral code was provided
+    if (parsed.data.referralCode) {
+      await applyReferralReward(parsed.data.referralCode, newUser.id)
+    }
 
     await prisma.verificationToken.deleteMany({
       where: { identifier: parsed.data.email }

@@ -16,17 +16,19 @@ import { PrivacySettingsForm } from "@/components/forms/privacy-settings-form"
 import { AppearanceSettingsForm } from "@/components/forms/appearance-settings-form"
 import { SubscriptionSettingsForm } from "@/components/forms/subscription-settings-form"
 import { IntegrationsForm } from "@/components/forms/integrations-form"
+import { getReferralData } from "@/actions/referral"
 
 const isDevMode = process.env.NEXT_PUBLIC_ENV === "dev"
 
 export default async function SettingsPage() {
   const session = await auth()
-  const [company, emailSettings, databaseSettings, bankAccounts, dbUser] = await Promise.all([
+  const [company, emailSettings, databaseSettings, bankAccounts, dbUser, referralData] = await Promise.all([
     getCompany(),
     getEmailSettings(),
     isDevMode ? getDatabaseSettings() : Promise.resolve(null),
     getBankAccounts(),
     session?.user?.id ? import("@/lib/prisma").then(m => m.prisma.user.findUnique({ where: { id: session.user.id } })) : Promise.resolve(null),
+    getReferralData(),
   ])
 
   if (session?.user?.role === "STAFF") {
@@ -50,6 +52,10 @@ export default async function SettingsPage() {
           subscriptionTier={company.subscriptionTier}
           trialStartsAt={company.trialStartsAt}
           trialEndsAt={company.trialEndsAt}
+          proRequestStatus={company.proRequestStatus}
+          referralCode={referralData?.referralCode ?? null}
+          referralRewardClaimed={referralData?.rewardClaimed ?? false}
+          successfulReferrals={referralData?.successfulReferrals ?? 0}
         />
       )}
 

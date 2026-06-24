@@ -12,6 +12,8 @@ import {
   TrendingUp, Clock, ReceiptText, Shield, Percent, PieChart, Activity
 } from "lucide-react"
 import { redirect } from "next/navigation"
+import { getReferralData } from "@/actions/referral"
+import { ReferralWidget } from "@/components/dashboard/referral-widget"
 
 // Always fetch fresh data — never serve a cached version
 
@@ -26,7 +28,10 @@ export default async function DashboardPage() {
 
   if (!user?.companyId) redirect("/settings")
 
-  const stats = await getDashboardStats(user.companyId)
+  const [stats, referralData] = await Promise.all([
+    getDashboardStats(user.companyId),
+    getReferralData(),
+  ])
 
   const hour = new Date().getHours()
   const greeting =
@@ -153,6 +158,15 @@ export default async function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* ── Refer & Earn ── */}
+      {referralData && (
+        <ReferralWidget
+          referralCode={referralData.referralCode ?? ""}
+          rewardClaimed={referralData.rewardClaimed}
+          successfulReferrals={referralData.successfulReferrals}
+        />
+      )}
 
       <Separator className="bg-white/8" />
 

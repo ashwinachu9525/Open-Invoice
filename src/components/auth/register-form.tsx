@@ -10,24 +10,67 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { registerUser } from "@/actions/auth"
 import { signIn as nextAuthSignIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { Gift, CheckCircle2 } from "lucide-react"
+import { validateReferralCode } from "@/actions/referral"
 
-export function RegisterForm({ googleAuthEnabled = false }: { googleAuthEnabled?: boolean }) {
+export function RegisterForm({
+  googleAuthEnabled = false,
+  initialReferralCode = "",
+}: {
+  googleAuthEnabled?: boolean
+  initialReferralCode?: string
+}) {
   const router = useRouter()
   const [error, setError] = useState("")
   const [isPending, setIsPending] = useState(false)
+  const [referralValid, setReferralValid] = useState<boolean | null>(null)
+  const [referralChecking, setReferralChecking] = useState(false)
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", password: "", confirmPassword: "", terms: false },
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      terms: false,
+      referralCode: initialReferralCode,
+    },
   })
+
+  // Auto-validate pre-filled referral code
+  useEffect(() => {
+    if (initialReferralCode) {
+      checkReferralCode(initialReferralCode)
+    }
+  }, [initialReferralCode])
+
+  async function checkReferralCode(code: string) {
+    if (!code || code.trim().length < 4) {
+      setReferralValid(null)
+      return
+    }
+    setReferralChecking(true)
+    try {
+      const result = await validateReferralCode(code.trim().toUpperCase())
+      setReferralValid(!!result)
+    } catch {
+      setReferralValid(null)
+    } finally {
+      setReferralChecking(false)
+    }
+  }
 
   async function onSubmit(data: RegisterFormValues) {
     setIsPending(true)
     setError("")
     try {
-      const result = await registerUser(data)
+      const result = await registerUser({
+        ...data,
+        referralCode: data.referralCode?.trim().toUpperCase() || undefined,
+      })
       if (result.error) {
         setError(result.error)
         setIsPending(false)
@@ -96,6 +139,51 @@ export function RegisterForm({ googleAuthEnabled = false }: { googleAuthEnabled?
             </FormItem>
           )}
         />
+
+        {/* Referral Code Field */}
+        <FormField
+          control={form.control}
+          name="referralCode"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="flex items-center gap-1.5 text-amber-400">
+                <Gift className="w-3.5 h-3.5" />
+                Referral Code
+                <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+              </FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <Input
+                    placeholder="INV-XXXXXXXX"
+                    {...field}
+                    value={field.value ?? ""}
+                    className="uppercase pr-8 tracking-widest font-mono"
+                    onChange={(e) => {
+                      field.onChange(e)
+                      checkReferralCode(e.target.value)
+                    }}
+                  />
+                  {referralValid === true && (
+                    <CheckCircle2 className="absolute right-2.5 top-2.5 h-4 w-4 text-emerald-500" />
+                  )}
+                  {referralValid === false && (
+                    <span className="absolute right-2.5 top-2 text-lg text-rose-500">✗</span>
+                  )}
+                </div>
+              </FormControl>
+              {referralValid === true && (
+                <p className="text-xs text-emerald-500 flex items-center gap-1 mt-1">
+                  🎁 Valid referral! Your friend will get 1 month Pro free on your signup.
+                </p>
+              )}
+              {referralValid === false && (
+                <p className="text-xs text-rose-500 mt-1">Invalid or already used referral code.</p>
+              )}
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name="terms"
@@ -131,10 +219,10 @@ export function RegisterForm({ googleAuthEnabled = false }: { googleAuthEnabled?
               </div>
             </div>
 
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full" 
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
               onClick={() => nextAuthSignIn("google", { callbackUrl: "/dashboard" })}
             >
               <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
