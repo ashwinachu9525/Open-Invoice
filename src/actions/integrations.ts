@@ -39,6 +39,7 @@ export async function debugWhatsAppConnection() {
           ...(token ? { "X-API-Key": token } : {}),
         },
         cache: "no-store",
+        signal: AbortSignal.timeout(5000),
       })
       sessionsStatus = res.status
       sessionsRaw = await res.json().catch(() => null)
@@ -103,6 +104,7 @@ async function findSessionIdByName(gatewayUrl: string, name: string, token: stri
         ...(token ? { "X-API-Key": token } : {}),
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(5000),
     })
     if (!res.ok) {
       console.error(`[WhatsApp] GET /api/sessions failed: HTTP ${res.status} ${res.statusText}`)
@@ -170,6 +172,7 @@ export async function getWhatsAppStatus() {
           ...(token ? { "X-API-Key": token } : {}),
         },
         cache: "no-store",
+        signal: AbortSignal.timeout(5000),
       })
     } catch (e: any) {
       return { status: "DOWN", error: `Gateway unreachable: ${e.message || String(e)}`, sessionId }
@@ -209,6 +212,7 @@ export async function getWhatsAppStatus() {
           ...(token ? { "X-API-Key": token } : {}),
         },
         cache: "no-store",
+        signal: AbortSignal.timeout(5000),
       })
 
       if (qrRes.ok) {
@@ -355,6 +359,7 @@ async function createWahaSession(gatewayUrl: string, name: string, token: string
         ...(token ? { "X-API-Key": token } : {}),
       },
       body: JSON.stringify({ name }),
+      signal: AbortSignal.timeout(10000),
     })
     if (response.ok) {
       const data = await response.json()
@@ -374,6 +379,7 @@ async function startWahaSession(gatewayUrl: string, sessionId: string, token: st
       headers: {
         ...(token ? { "X-API-Key": token } : {}),
       },
+      signal: AbortSignal.timeout(5000),
     }).catch(() => {})
   } catch (e) {
     console.error("Failed to start OpenWA session:", e)

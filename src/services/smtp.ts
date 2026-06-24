@@ -2,6 +2,47 @@ import nodemailer from "nodemailer"
 import { prisma } from "@/lib/prisma"
 import { decrypt } from "@/lib/crypto"
 
+function buildEmailLayout(title: string, bodyContent: string) {
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 40px 20px; -webkit-font-smoothing: antialiased; line-height: 1.6; color: #111827;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 48px; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+    
+    <!-- Header Logo -->
+    <div style="text-align: center; margin-bottom: 32px;">
+      <h2 style="margin: 0; font-size: 28px; font-weight: 800; color: #111827; display: inline-flex; align-items: center; gap: 8px;">
+        <span style="color: #4f46e5; font-size: 24px;">&#9632;</span> ${appName}
+      </h2>
+    </div>
+    
+    <!-- Title -->
+    <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 700; text-align: center; color: #111827;">
+      ${title}
+    </h1>
+
+    <!-- Body -->
+    <div style="font-size: 15px; color: #4b5563; text-align: center;">
+      ${bodyContent}
+    </div>
+
+    <!-- Footer -->
+    <div style="margin-top: 48px; text-align: center;">
+      <hr style="border: none; border-top: 1px solid #e5e7eb; width: 80%; margin: 0 auto 32px auto;" />
+      <p style="margin: 0 0 16px; color: #6b7280; font-size: 14px;">${appName}, an effortless solution with all the features you need.</p>
+      <p style="margin: 0; color: #9ca3af; font-size: 13px;">&copy; ${new Date().getFullYear()} ${appName}. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim()
+}
+
 export async function sendVerificationEmail(to: string, otp: string) {
   const host = process.env.APP_SMTP_HOST
   const port = Number(process.env.APP_SMTP_PORT) || 587
@@ -24,22 +65,22 @@ export async function sendVerificationEmail(to: string, otp: string) {
     socketTimeout: 5000,
   })
 
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
+
   await transporter.sendMail({
     from,
     to,
-    subject: "Verify Your Email Address",
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;color:#0f172a;border-radius:12px;border:1px solid #e2e8f0">
-        <h2 style="color:#4f46e5;margin:0 0 16px;text-align:center;">Email Verification</h2>
-        <p style="margin:0 0 16px;font-size:16px;">Please use the following 6-digit OTP to verify your email address:</p>
-        <div style="background:#fff;border:1px solid #e2e8f0;padding:16px;border-radius:8px;text-align:center;font-size:24px;letter-spacing:4px;font-weight:bold;color:#1e293b;margin:0 0 16px;">
-          ${otp}
-        </div>
-        <p style="margin:0;font-size:14px;color:#64748b;">This code will expire in 24 hours.</p>
+    subject: "Verify your email address",
+    html: buildEmailLayout(`Verify your ${appName} sign-up`, `
+      <p style="margin: 0 0 24px; line-height: 1.6;">We have received a sign-up attempt with the following code. Please enter it in the browser window where you started signing up for ${appName}.</p>
+      <div style="background-color: #f3f4f6; border-radius: 12px; padding: 32px; font-size: 36px; font-weight: 700; color: #111827; letter-spacing: 4px; margin: 0 0 24px;">
+        ${otp}
       </div>
-    `,
+      <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">If you did not attempt to sign up but received this email, please disregard it. The code will remain active for 24 hours.</p>
+    `),
   })
 }
+
 export async function sendPasswordResetEmail(to: string, otp: string) {
   const host = process.env.APP_SMTP_HOST
   const port = Number(process.env.APP_SMTP_PORT) || 587
@@ -62,18 +103,14 @@ export async function sendPasswordResetEmail(to: string, otp: string) {
   await transporter.sendMail({
     from,
     to,
-    subject: "Reset Your Password",
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;color:#0f172a;border-radius:12px;border:1px solid #e2e8f0">
-        <h2 style="color:#4f46e5;margin:0 0 16px;text-align:center;">Password Reset</h2>
-        <p style="margin:0 0 16px;font-size:16px;">We received a request to reset your password. Use the following 6-digit OTP to set a new password:</p>
-        <div style="background:#fff;border:1px solid #e2e8f0;padding:16px;border-radius:8px;text-align:center;font-size:24px;letter-spacing:4px;font-weight:bold;color:#1e293b;margin:0 0 16px;">
-          ${otp}
-        </div>
-        <p style="margin:0;font-size:14px;color:#64748b;">If you didn't request this, you can safely ignore this email.</p>
-        <p style="margin:8px 0 0;font-size:14px;color:#64748b;">This OTP will expire in 1 hour.</p>
+    subject: "Reset your password",
+    html: buildEmailLayout(`Reset your password`, `
+      <p style="margin: 0 0 24px; line-height: 1.6;">We received a request to reset your password. Please use the following code to set a new password.</p>
+      <div style="background-color: #f3f4f6; border-radius: 12px; padding: 32px; font-size: 36px; font-weight: 700; color: #111827; letter-spacing: 4px; margin: 0 0 24px;">
+        ${otp}
       </div>
-    `,
+      <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">If you didn't request this, you can safely disregard this email. This code will remain active for 1 hour.</p>
+    `),
   })
 }
 
@@ -102,16 +139,14 @@ export async function sendPasswordResetSuccessEmail(to: string) {
   await transporter.sendMail({
     from,
     to,
-    subject: "Password Reset Successful",
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;color:#0f172a;border-radius:12px;border:1px solid #e2e8f0">
-        <h2 style="color:#10b981;margin:0 0 16px;text-align:center;">Password Reset Successful</h2>
-        <p style="margin:0 0 16px;font-size:16px;">Hello,</p>
-        <p style="margin:0 0 16px;font-size:16px;">This email is to confirm that the password for your account has been successfully reset.</p>
-        <p style="margin:0 0 16px;font-size:16px;">If you did not make this change, please contact our support team immediately to secure your account.</p>
-        <p style="margin:0;font-size:14px;color:#64748b;">Thank you.</p>
+    subject: "Password reset successful",
+    html: buildEmailLayout("Password Reset Successful", `
+      <p style="margin: 0 0 24px; line-height: 1.6;">Your password has been successfully reset. You can now log in using your new password.</p>
+      <div style="background-color: #ecfdf5; border-radius: 12px; padding: 24px; font-size: 16px; font-weight: 500; color: #065f46; margin: 0 0 24px; text-align: center;">
+        Your account is fully secure.
       </div>
-    `,
+      <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">If you did not make this change, please contact our support team immediately.</p>
+    `),
   })
 }
 
@@ -193,19 +228,27 @@ export async function sendSmtpTestEmail(
   await transporter.sendMail({
     from,
     to: toEmail,
-    subject: "✅ InvoiceAI — SMTP Test Email",
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#0f0f1a;color:#e2e8f0;border-radius:12px">
-        <h2 style="color:#8b5cf6;margin:0 0 8px">SMTP Connection Verified ✓</h2>
-        <p style="color:#94a3b8;margin:0 0 16px">Your SMTP settings are working correctly.</p>
-        <table style="width:100%;border-collapse:collapse;font-size:13px">
-          <tr><td style="padding:6px 0;color:#64748b">SMTP Host</td><td style="color:#e2e8f0">${settings.host}</td></tr>
-          <tr><td style="padding:6px 0;color:#64748b">Port</td><td style="color:#e2e8f0">${settings.port}</td></tr>
-          <tr><td style="padding:6px 0;color:#64748b">Sender</td><td style="color:#e2e8f0">${from}</td></tr>
-        </table>
-        <p style="margin:16px 0 0;font-size:12px;color:#475569">Sent from InvoiceAI at ${new Date().toLocaleString("en-IN")}</p>
+    subject: "✅ SMTP Test Email",
+    html: buildEmailLayout("SMTP Connection Verified", `
+      <p style="margin: 0 0 24px; line-height: 1.6;">Hello ${settings.fromName ?? "Admin"},<br/>Your SMTP settings have been successfully verified.</p>
+      
+      <div style="background-color: #f3f4f6; border-radius: 12px; padding: 24px; text-align: left; margin: 0 0 24px;">
+        <h3 style="margin: 0 0 16px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #4b5563;">Connection Details</h3>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 12px;">
+          <span style="color: #6b7280; font-size: 14px;">SMTP Host</span>
+          <span style="font-weight: 500; color: #111827; font-size: 14px;">${settings.host}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 12px;">
+          <span style="color: #6b7280; font-size: 14px;">Port</span>
+          <span style="font-weight: 500; color: #111827; font-size: 14px;">${settings.port}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #6b7280; font-size: 14px;">Sender</span>
+          <span style="font-weight: 500; color: #111827; font-size: 14px;">${from.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>
+        </div>
       </div>
-    `,
+      <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">You are now ready to send invoices and quotations directly from the platform.</p>
+    `),
   })
 }
 
@@ -323,18 +366,21 @@ export async function sendWelcomeEmail(to: string, name: string) {
     socketTimeout: 5000,
   })
 
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
+
   await transporter.sendMail({
     from,
     to,
-    subject: "Welcome to Open Invoice!",
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;color:#0f172a;border-radius:12px;border:1px solid #e2e8f0">
-        <h2 style="color:#4f46e5;margin:0 0 16px;text-align:center;">Welcome, ${name}!</h2>
-        <p style="margin:0 0 16px;font-size:16px;">We're thrilled to have you on board. Open Invoice makes it easy to manage your invoices, quotations, and customers in one place.</p>
-        <p style="margin:0 0 16px;font-size:16px;">Get started by creating your first invoice from the dashboard!</p>
-        <p style="margin:0;font-size:14px;color:#64748b;">If you have any questions, feel free to reach out to our support team.</p>
+    subject: `Welcome to ${appName}!`,
+    html: buildEmailLayout(`Welcome, ${name}!`, `
+      <p style="margin: 0 0 24px; line-height: 1.6;">We're thrilled to have you on board! ${appName} makes it incredibly simple to manage your invoices, quotations, and customers in one unified workspace.</p>
+      
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${process.env.NEXTAUTH_URL || "http://localhost:3000"}/dashboard" style="background-color: #111827; color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block; font-size: 16px;">Go to Dashboard</a>
       </div>
-    `,
+
+      <p style="margin: 0 0 16px; font-size: 14px; color: #6b7280;">If you need help getting started, our support team is just an email away.</p>
+    `),
   })
 }
 
@@ -365,18 +411,19 @@ export async function sendTrialReminderEmail(to: string, companyName: string, da
   await transporter.sendMail({
     from,
     to,
-    subject: `Your Open-Invoice Free Trial Expires in ${daysLeft} ${daysLeft === 1 ? 'Day' : 'Days'}`,
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;color:#0f172a;border-radius:12px;border:1px solid #e2e8f0">
-        <h2 style="color:#4f46e5;margin:0 0 16px;text-align:center;">Trial Expiration Reminder</h2>
-        <p style="margin:0 0 16px;font-size:16px;">Hello,</p>
-        <p style="margin:0 0 16px;font-size:16px;">This is a friendly reminder that the 30-day Free Trial for <strong>${companyName}</strong> will expire in <strong>${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}</strong>.</p>
-        <p style="margin:0 0 24px;font-size:16px;">To keep enjoying unlimited invoice creation, AI assistant insights, and team collaboration, upgrade to the Pro plan before your trial ends.</p>
-        <div style="text-align:center;margin:0 0 24px;">
-          <a href="${appUrl}/settings" style="background:#4f46e5;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block;font-size:16px;">Upgrade to Pro</a>
-        </div>
-        <p style="margin:0;font-size:14px;color:#64748b;">If you have any questions, feel free to reply to this email.</p>
+    subject: `Your Free Trial Expires in ${daysLeft} ${daysLeft === 1 ? 'Day' : 'Days'}`,
+    html: buildEmailLayout("Trial Expiration Reminder", `
+      <p style="margin: 0 0 24px; line-height: 1.6;">This is a friendly reminder that the 30-day Free Trial for <strong>${companyName}</strong> will expire in <strong>${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}</strong>.</p>
+      
+      <div style="background-color: #fef3c7; border-radius: 12px; padding: 24px; color: #92400e; margin: 0 0 32px; text-align: center; font-size: 15px;">
+        To keep enjoying unlimited invoice creation, AI assistant insights, and team collaboration, please upgrade to the Pro plan before your trial ends.
       </div>
-    `,
+
+      <div style="text-align: center; margin: 0 0 32px;">
+        <a href="${appUrl}/settings" style="background-color: #111827; color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block; font-size: 16px;">Upgrade to Pro</a>
+      </div>
+
+      <p style="margin: 0; font-size: 14px; color: #6b7280;">If you have any questions, feel free to reply to this email.</p>
+    `),
   })
 }

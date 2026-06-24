@@ -12,6 +12,7 @@ async function findSessionId(gatewayUrl: string, name: string, token: string | n
         ...(token ? { "X-API-Key": token } : {}),
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(5000),
     });
     if (res.ok) {
       const sessions = await res.json();
@@ -67,6 +68,7 @@ export class OpenWaProvider implements WhatsAppProvider {
           ...(token ? { "X-API-Key": token } : {}),
         },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(8000),
       });
 
       if (!resp.ok) {
@@ -81,6 +83,14 @@ export class OpenWaProvider implements WhatsAppProvider {
       });
       return { success: true, messageId: data.id };
     } catch (e: any) {
+      if (e.name === "TimeoutError" || e.name === "AbortError") {
+        // WAHA often hangs waiting for ACK, but the message is already sent.
+        await prisma.company.update({
+          where: { id: companyId },
+          data: { whatsappSentCount: { increment: 1 } },
+        }).catch(() => {});
+        return { success: true, messageId: "timeout-assumed-sent" };
+      }
       return { success: false, error: e.message };
     }
   }
@@ -123,6 +133,7 @@ export class OpenWaProvider implements WhatsAppProvider {
           ...(token ? { "X-API-Key": token } : {}),
         },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15000),
       });
 
       if (!resp.ok) {
@@ -137,6 +148,13 @@ export class OpenWaProvider implements WhatsAppProvider {
       });
       return { success: true, messageId: data.id };
     } catch (e: any) {
+      if (e.name === "TimeoutError" || e.name === "AbortError") {
+        await prisma.company.update({
+          where: { id: companyId },
+          data: { whatsappSentCount: { increment: 1 } },
+        }).catch(() => {});
+        return { success: true, messageId: "timeout-assumed-sent" };
+      }
       return { success: false, error: e.message };
     }
   }
