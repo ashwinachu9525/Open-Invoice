@@ -1,8 +1,8 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
 import { revalidatePath } from "next/cache"
+import { getTenantDb } from "@/lib/tenant-db"
 
 export async function getCatalogItems() {
   const session = await auth()
@@ -11,6 +11,7 @@ export async function getCatalogItems() {
   }
 
   try {
+    const prisma = await getTenantDb(session.user.companyId)
     const items = await prisma.productCatalog.findMany({
       where: { 
         companyId: session.user.companyId,
@@ -39,6 +40,7 @@ export async function createCatalogItem(data: {
   }
 
   try {
+    const prisma = await getTenantDb(session.user.companyId)
     const item = await prisma.productCatalog.create({
       data: {
         ...data,
@@ -68,6 +70,7 @@ export async function updateCatalogItem(id: string, data: {
   }
 
   try {
+    const prisma = await getTenantDb(session.user.companyId)
     const item = await prisma.productCatalog.update({
       where: { 
         id,
@@ -90,6 +93,7 @@ export async function deleteCatalogItem(id: string) {
   }
 
   try {
+    const prisma = await getTenantDb(session.user.companyId)
     await prisma.productCatalog.update({
       where: { 
         id,

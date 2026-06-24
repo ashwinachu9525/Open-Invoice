@@ -14,6 +14,8 @@ import { InvoicePrefixForm } from "@/components/forms/invoice-prefix-form"
 import { PushNotificationSettingsForm } from "@/components/forms/push-notifications-form"
 import { PrivacySettingsForm } from "@/components/forms/privacy-settings-form"
 import { AppearanceSettingsForm } from "@/components/forms/appearance-settings-form"
+import { SubscriptionSettingsForm } from "@/components/forms/subscription-settings-form"
+import { IntegrationsForm } from "@/components/forms/integrations-form"
 
 const isDevMode = process.env.NEXT_PUBLIC_ENV === "dev"
 
@@ -42,6 +44,24 @@ export default async function SettingsPage() {
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-gray-500">Manage your company profile and email configuration.</p>
       </div>
+
+      {company && (
+        <SubscriptionSettingsForm
+          subscriptionTier={company.subscriptionTier}
+          trialStartsAt={company.trialStartsAt}
+          trialEndsAt={company.trialEndsAt}
+        />
+      )}
+
+      {company && (
+        <IntegrationsForm
+          companyId={company.id}
+          initialEnabled={company.openWaEnabled}
+          initialUrl={company.openWaUrl}
+          initialToken={company.openWaToken}
+          initialProvider={company.whatsappProvider}
+        />
+      )}
 
       <Card>
         <CardHeader>
@@ -114,6 +134,20 @@ export default async function SettingsPage() {
         <CardContent>
           <a href="/settings/ai" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
             Manage AI Settings
+          </a>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Developer Settings</CardTitle>
+          <CardDescription>
+            Generate API keys, manage credentials, and build embeddable invoice widgets.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <a href="/settings/developer" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+            Open Developer Portal
           </a>
         </CardContent>
       </Card>

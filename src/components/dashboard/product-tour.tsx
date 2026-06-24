@@ -10,6 +10,9 @@ export function ProductTour({ hasSeenTour }: { hasSeenTour: boolean }) {
   const [showPrompt, setShowPrompt] = useState(false)
 
   useEffect(() => {
+    const tourSeenLocal = localStorage.getItem("tour_seen")
+    if (tourSeenLocal === "true") return
+
     // Only show prompt if they haven't seen the tour yet
     if (hasSeenTour === false) {
       // Add a slight delay so it doesn't instantly pop up over loading states
@@ -20,6 +23,7 @@ export function ProductTour({ hasSeenTour }: { hasSeenTour: boolean }) {
 
   const handleSkip = async () => {
     setShowPrompt(false)
+    localStorage.setItem("tour_seen", "true")
     await markTourCompleted()
   }
 
@@ -68,6 +72,7 @@ export function ProductTour({ hasSeenTour }: { hasSeenTour: boolean }) {
       ],
       onDestroyed: async () => {
         // Mark as completed when the tour finishes
+        localStorage.setItem("tour_seen", "true")
         await markTourCompleted()
       }
     })

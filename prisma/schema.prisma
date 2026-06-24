@@ -1,5 +1,5 @@
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 generator client {
@@ -156,6 +156,19 @@ model Company {
   expenses       Expense[]
   feedbacks      UserFeedback[]
   teamInvitations TeamInvitation[]
+  apiKeys        ApiKey[]
+  customDbUrlEncrypted String?
+  trialStartsAt     DateTime?
+  trialEndsAt       DateTime?
+  trialReminderSent DateTime?
+  openWaEnabled     Boolean   @default(false)
+  openWaUrl         String?
+  openWaToken       String?
+
+  whatsappProvider       String   @default("openwa") // "openwa" | "official"
+  whatsappPhoneId        String?  // Meta Phone Number ID
+  whatsappMetaToken      String?  // Encrypted token
+  whatsappSentCount      Int      @default(0)    // usage tracking
 
   @@index([gstNumber])
 }
@@ -176,6 +189,9 @@ model Customer {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
+  crmStatus   String                 @default("LEAD")
+  interactions CustomerInteraction[]
+
   company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoices Invoice[]
   quotations Quotation[]
@@ -183,6 +199,17 @@ model Customer {
   @@index([companyId])
   @@index([name])
   @@index([gstin])
+}
+
+model CustomerInteraction {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  type        String   // NOTE, CALL, EMAIL, WHATSAPP
+  content     String
+  createdAt   DateTime @default(now())
+
+  @@index([customerId])
 }
 
 model Invoice {
@@ -629,4 +656,20 @@ model PublicFeedback {
 
   @@index([createdAt])
   @@index([source])
+}
+
+model ApiKey {
+  id        String    @id @default(cuid())
+  name      String
+  keyHash   String    @unique
+  keyHint   String    // e.g. "op_inv_live_...abcd"
+  companyId String
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([keyHash])
 }

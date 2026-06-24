@@ -48,6 +48,7 @@ Built on a modern **Next.js 15 App Router** architecture, Open Invoice integrate
 | Dashboard UI      | ✅     | Modern React UI for managing data    |
 | Multi-Company     | ✅     | Switch between different business profiles |
 | SMTP Integration  | ✅     | Send emails via your own mail server |
+| WhatsApp Integration| ✅     | Send msg via your own whatsapp server or public ass  |
 
 ### AI Integration
 

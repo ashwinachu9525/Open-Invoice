@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signIn } from "next-auth/webauthn"
 import { ShieldCheck, Fingerprint } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -17,12 +17,20 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 
 export function PasskeyPromptModal({ userId }: { userId: string }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
+  useEffect(() => {
+    const passkeyDismissedLocal = localStorage.getItem("passkey_dismissed")
+    if (passkeyDismissedLocal !== "true") {
+      setOpen(true)
+    }
+  }, [])
+
   const handleDismiss = async () => {
     setOpen(false)
+    localStorage.setItem("passkey_dismissed", "true")
     await dismissPasskeyPrompt(userId)
     router.refresh()
   }
@@ -30,14 +38,12 @@ export function PasskeyPromptModal({ userId }: { userId: string }) {
   const handleEnable = async () => {
     setLoading(true)
     try {
-      // This triggers WebAuthn registration in next-auth if action="register" is supported
-      // Or we can just call setPasskeyEnabled and let the user do it on the settings page
-      // NextAuth actually registers passkeys when you do: signIn("passkey", { action: "register" })
       const res = await signIn("passkey", { action: "register", redirect: false })
       
       if (res?.error) {
         toast.error("Failed to register passkey: " + res.error)
       } else {
+        localStorage.setItem("passkey_dismissed", "true")
         await setPasskeyEnabled(userId, true)
         toast.success("Passkey registered successfully!")
         setOpen(false)

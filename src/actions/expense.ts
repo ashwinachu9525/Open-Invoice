@@ -1,12 +1,13 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { requireCompany } from "@/lib/auth-helpers"
 import { revalidatePath } from "next/cache"
+import { getTenantDb } from "@/lib/tenant-db"
 
 export async function getExpenses() {
   try {
     const { company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
     const expenses = await prisma.expense.findMany({
       where: { companyId: company.id },
       orderBy: { date: "desc" },
@@ -27,6 +28,7 @@ export async function createExpense(data: {
 }) {
   try {
     const { company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
     
     await prisma.expense.create({
       data: {
@@ -50,6 +52,7 @@ export async function createExpense(data: {
 export async function deleteExpense(id: string) {
   try {
     const { company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
     
     await prisma.expense.delete({
       where: { id, companyId: company.id },

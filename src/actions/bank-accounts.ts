@@ -1,9 +1,9 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { requireCompany } from "@/lib/auth-helpers"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { getTenantDb } from "@/lib/tenant-db"
 
 const bankAccountSchema = z.object({
   bankName: z.string().min(1, "Bank name is required"),
@@ -17,6 +17,7 @@ const bankAccountSchema = z.object({
 export async function getBankAccounts() {
   try {
     const { company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
     return await prisma.bankAccount.findMany({
       where: { companyId: company.id },
       orderBy: [
@@ -32,6 +33,7 @@ export async function getBankAccounts() {
 export async function createBankAccount(data: unknown) {
   try {
     const { company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
     const parsed = bankAccountSchema.safeParse(data)
     
     if (!parsed.success) {
@@ -64,6 +66,7 @@ export async function createBankAccount(data: unknown) {
 export async function updateBankAccount(id: string, data: unknown) {
   try {
     const { company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
     const parsed = bankAccountSchema.safeParse(data)
     
     if (!parsed.success) {
@@ -94,6 +97,7 @@ export async function updateBankAccount(id: string, data: unknown) {
 export async function deleteBankAccount(id: string) {
   try {
     const { company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
     await prisma.bankAccount.delete({
       where: { id, companyId: company.id },
     })

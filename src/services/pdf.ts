@@ -4,9 +4,11 @@ import { InvoiceDocument } from "@/pdf/invoice-document"
 import { StatementDocument } from "@/pdf/statement-document"
 import { uploadFile } from "@/services/storage"
 import { prisma } from "@/lib/prisma"
+import { getTenantDb } from "@/lib/tenant-db"
 
-export async function generateInvoicePdf(invoiceId: string): Promise<Buffer> {
-  const invoice = await prisma.invoice.findUnique({
+export async function generateInvoicePdf(invoiceId: string, companyId?: string): Promise<Buffer> {
+  const db = companyId ? await getTenantDb(companyId) : prisma
+  const invoice = await db.invoice.findUnique({
     where: { id: invoiceId },
     include: { items: true, customer: true, company: true },
   })
@@ -38,21 +40,23 @@ export async function generateInvoicePdf(invoiceId: string): Promise<Buffer> {
   return buffer
 }
 
-export async function generateStatementPdf(customerId: string): Promise<Buffer> {
-  const customer = await prisma.customer.findUnique({
+export async function generateStatementPdf(customerId: string, companyId?: string): Promise<Buffer> {
+  const db = companyId ? await getTenantDb(companyId) : prisma
+
+  const customer = await db.customer.findUnique({
     where: { id: customerId },
     include: { company: true },
   })
 
   if (!customer) throw new Error("Customer not found")
 
-  const invoices = await prisma.invoice.findMany({
+  const invoices = await db.invoice.findMany({
     where: { customerId, deletedAt: null, status: { notIn: ["DRAFT", "CANCELLED"] } },
     orderBy: { date: "asc" },
   })
 
-  const totalBilled = invoices.reduce((s, i) => s + i.finalAmount, 0)
-  const totalOutstanding = invoices.reduce((s, i) => s + i.balanceDue, 0)
+  const totalBilled = invoices.reduce((s: number, i: any) => s + i.finalAmount, 0)
+  const totalOutstanding = invoices.reduce((s: number, i: any) => s + i.balanceDue, 0)
   const totalPaid = totalBilled - totalOutstanding
 
   const buffer = await renderToBuffer(
@@ -71,8 +75,9 @@ export async function generateStatementPdf(customerId: string): Promise<Buffer> 
 
 import { QuotationDocument } from "@/pdf/quotation-document"
 
-export async function generateQuotationPdf(quotationId: string): Promise<Buffer> {
-  const quotation = await prisma.quotation.findUnique({
+export async function generateQuotationPdf(quotationId: string, companyId?: string): Promise<Buffer> {
+  const db = companyId ? await getTenantDb(companyId) : prisma
+  const quotation = await db.quotation.findUnique({
     where: { id: quotationId },
     include: { items: true, customer: true, company: true },
   })

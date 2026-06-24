@@ -18,7 +18,7 @@ export async function GET(
       return new Response("Customer not found", { status: 404 })
     }
 
-    const buffer = await generateStatementPdf(id)
+    const buffer = await generateStatementPdf(id, company.id)
 
     return new Response(new Uint8Array(buffer), {
       headers: {

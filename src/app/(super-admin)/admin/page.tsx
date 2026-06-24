@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, Building, FileText, Activity, AlertTriangle, MessageSquare } from "lucide-react"
+import { ExtendTrialButton } from "@/components/admin/extend-trial-button"
 
 export default async function SuperAdminDashboard() {
   const session = await auth()
@@ -28,7 +29,8 @@ export default async function SuperAdminDashboard() {
     recentFeedback,
     systemLogs,
     errorLogs,
-    appErrors
+    appErrors,
+    companies
   ] = await Promise.all([
     prisma.user.count(),
     prisma.company.count(),
@@ -63,6 +65,11 @@ export default async function SuperAdminDashboard() {
     prisma.appError.findMany({
       orderBy: { createdAt: "desc" },
       take: 15
+    }),
+    // Companies
+    prisma.company.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { users: true }
     })
   ])
 
@@ -114,8 +121,9 @@ export default async function SuperAdminDashboard() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
           <TabsTrigger value="users"><Users className="w-4 h-4 mr-2"/> Users</TabsTrigger>
+          <TabsTrigger value="companies"><Building className="w-4 h-4 mr-2"/> Companies</TabsTrigger>
           <TabsTrigger value="logs"><Activity className="w-4 h-4 mr-2"/> Audit Logs</TabsTrigger>
           <TabsTrigger value="errors"><AlertTriangle className="w-4 h-4 mr-2"/> Errors</TabsTrigger>
           <TabsTrigger value="feedback"><MessageSquare className="w-4 h-4 mr-2"/> Feedback</TabsTrigger>
@@ -154,6 +162,106 @@ export default async function SuperAdminDashboard() {
                         <td className="px-4 py-3">{u.createdAt.toLocaleDateString()}</td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab: Companies */}
+        <TabsContent value="companies" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Company Management & Trial Overrides</CardTitle>
+              <CardDescription>Monitor company subscription plans, active trials, and extend trial durations.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Company Name</th>
+                      <th className="px-4 py-3 font-medium">Plan Tier</th>
+                      <th className="px-4 py-3 font-medium">Trial Start</th>
+                      <th className="px-4 py-3 font-medium">Trial End</th>
+                      <th className="px-4 py-3 font-medium">Days Left / Status</th>
+                      <th className="px-4 py-3 font-medium">Reminder Email</th>
+                      <th className="px-4 py-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {companies.length === 0 && (
+                      <tr><td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">No companies found.</td></tr>
+                    )}
+                    {companies.map((c) => {
+                      const now = new Date()
+                      const endsDate = c.trialEndsAt ? new Date(c.trialEndsAt) : null
+                      const isTrialActive = endsDate && now < endsDate
+                      const isTrialExpired = endsDate && now >= endsDate
+
+                      let daysRemaining = 0
+                      if (endsDate && isTrialActive) {
+                        const diffTime = endsDate.getTime() - now.getTime()
+                        daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                      }
+
+                      return (
+                        <tr key={c.id} className="hover:bg-muted/30">
+                          <td className="px-4 py-3 font-semibold">
+                            <div>{c.name || "Unnamed Company"}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono">{c.id}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold ${
+                              c.subscriptionTier === "PRO" ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" :
+                              c.subscriptionTier === "ENTERPRISE" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                              isTrialActive ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" :
+                              "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                            }`}>
+                              {isTrialActive ? "TRIAL (PRO)" : c.subscriptionTier}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {c.trialStartsAt ? new Date(c.trialStartsAt).toLocaleDateString() : "N/A"}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {c.trialEndsAt ? new Date(c.trialEndsAt).toLocaleDateString() : "N/A"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isTrialActive ? (
+                              <span className="text-xs font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
+                                {daysRemaining} days left
+                              </span>
+                            ) : isTrialExpired ? (
+                              <span className="text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">
+                                Expired
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">No Trial</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {c.trialReminderSent ? (
+                              <span className="text-xs text-amber-400 font-semibold bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                                Sent ({new Date(c.trialReminderSent).toLocaleDateString()})
+                              </span>
+                            ) : c.trialStartsAt ? (
+                              <span className="text-xs text-muted-foreground font-semibold">Pending</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground font-semibold">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {c.trialStartsAt ? (
+                              <ExtendTrialButton companyId={c.id} />
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">No trial to extend</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -36,15 +36,15 @@ export function DesktopNavLinks() {
             className={cn(
               "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:translate-x-0.5",
               isActive 
-                ? "bg-white/10 text-white shadow-sm" 
-                : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                ? "bg-slate-900 text-slate-50 dark:bg-white/10 dark:text-white shadow-sm" 
+                : "text-muted-foreground hover:bg-slate-100 dark:hover:bg-white/5 hover:text-foreground"
             )}
           >
             <span className={cn(
               "flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200",
               isActive 
-                ? "bg-primary/20 text-primary" 
-                : "bg-white/5 group-hover:bg-primary/20 group-hover:text-primary"
+                ? "bg-white/20 text-white dark:bg-primary/20 dark:text-primary" 
+                : "bg-slate-100 dark:bg-white/5 group-hover:bg-primary/20 group-hover:text-primary"
             )}>
               <item.icon className="h-4 w-4" />
             </span>
@@ -72,8 +72,8 @@ export function MobileNavLinks() {
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
                   isActive 
-                    ? "bg-white/10 text-white" 
-                    : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                    ? "bg-slate-900 text-slate-50 dark:bg-white/10 dark:text-white" 
+                    : "text-muted-foreground hover:bg-slate-100 dark:hover:bg-white/5 hover:text-foreground"
                 )}
               />
             }

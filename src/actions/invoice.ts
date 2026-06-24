@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import { getTenantDb } from "@/lib/tenant-db"
 import { invoiceSchema } from "@/validations/invoice"
 import { calculateInvoiceTax } from "@/services/tax-engine"
 import { createAuditLog } from "@/services/audit"
@@ -10,16 +11,18 @@ import { InvoiceStatus } from "@prisma/client"
 import { generateInvoicePdf } from "@/services/pdf"
 import { sendInvoiceEmail } from "@/services/smtp"
 import { getOrSetCache, invalidateCachePattern } from "@/lib/redis"
+import { sendWhatsAppMessage, sendWhatsAppDocument } from "@/actions/integrations"
 
 export async function createInvoice(data: unknown) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     const parsed = invoiceSchema.safeParse(data)
     if (!parsed.success) {
       return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
     }
 
-    if (company.subscriptionTier === "FREE") {
+    const isTrialActive = company.trialEndsAt && new Date() < new Date(company.trialEndsAt)
+    if (company.subscriptionTier === "FREE" && !isTrialActive) {
       const invoiceCount = await prisma.invoice.count({
         where: { companyId: company.id, deletedAt: null }
       })
@@ -40,7 +43,7 @@ export async function createInvoice(data: unknown) {
       tdsPercentage: parsed.data.tdsPercentage,
     })
 
-    const invoice = await prisma.$transaction(async (tx) => {
+    const invoice = await prisma.$transaction(async (tx: any) => {
       const inv = await tx.invoice.create({
         data: {
           companyId: company.id,
@@ -115,7 +118,7 @@ export async function createInvoice(data: unknown) {
 
 export async function updateInvoice(invoiceId: string, data: unknown) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     const existing = await prisma.invoice.findFirst({
       where: { id: invoiceId, companyId: company.id, deletedAt: null }
@@ -141,7 +144,7 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
       tdsPercentage: parsed.data.tdsPercentage,
     })
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // Delete old items
       await tx.invoiceItem.deleteMany({ where: { invoiceId } })
       
@@ -225,7 +228,7 @@ export async function getInvoices(opts?: {
   limit?: number
 }) {
   try {
-    const { company } = await requireCompany()
+    const { company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     const { search, dateFrom, dateTo, page = 1, limit = 10 } = opts ?? {}
     
     const where = {
@@ -267,10 +270,10 @@ export async function getInvoices(opts?: {
         })
       ])
 
-      const totalAmount = allForStats.reduce((sum, inv) => sum + inv.finalAmount, 0)
-      const paidCount = allForStats.filter((i) => i.status === "PAID").length
-      const pendingCount = allForStats.filter((i) => ["SENT", "VIEWED", "PARTIALLY_PAID"].includes(i.status)).length
-      const overdueCount = allForStats.filter((i) => i.status === "OVERDUE").length
+      const totalAmount = allForStats.reduce((sum: number, inv: any) => sum + inv.finalAmount, 0)
+      const paidCount = allForStats.filter((i: any) => i.status === "PAID").length
+      const pendingCount = allForStats.filter((i: any) => ["SENT", "VIEWED", "PARTIALLY_PAID"].includes(i.status)).length
+      const overdueCount = allForStats.filter((i: any) => i.status === "OVERDUE").length
 
       return { 
         invoices, 
@@ -285,7 +288,7 @@ export async function getInvoices(opts?: {
 }
 
 export async function getRecentInvoices(limit = 5) {
-  const { company } = await requireCompany()
+  const { company } = await requireCompany(); const prisma = await getTenantDb(company.id)
   return prisma.invoice.findMany({
     where: { companyId: company.id },
     orderBy: { createdAt: "desc" },
@@ -296,7 +299,7 @@ export async function getRecentInvoices(limit = 5) {
 
 export async function sendInvoiceToClient(invoiceId: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     // 1. Fetch invoice with relations
     const invoice = await prisma.invoice.findFirst({
@@ -308,7 +311,7 @@ export async function sendInvoiceToClient(invoiceId: string) {
     if (!invoice.customer.email) return { error: "Customer does not have an email address" }
 
     // 2. Generate PDF Buffer
-    const pdfBuffer = await generateInvoicePdf(invoice.id)
+    const pdfBuffer = await generateInvoicePdf(invoice.id, company.id)
 
     // 3. Construct Email HTML
     const contactPersonName = invoice.customer.name // Using customer name as contact person name per approval
@@ -345,6 +348,27 @@ export async function sendInvoiceToClient(invoiceId: string) {
         content: Buffer.from(pdfBuffer)
       }]
     })
+
+    // Send WhatsApp if enabled
+    if (company.openWaEnabled && invoice.customer.phone) {
+      try {
+        const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+        const waMessage = `Hi ${contactPersonName}, please find your invoice ${invoiceNumber} for amount ₹${invoice.finalAmount.toLocaleString("en-IN")}. You can view and pay online here: ${appUrl}/invoices/${invoice.id}`
+        await sendWhatsAppMessage(invoice.customerId, waMessage)
+
+        // Convert the invoice PDF buffer to base64 and dispatch it as a PDF document on WhatsApp
+        const base64Pdf = Buffer.from(pdfBuffer).toString("base64")
+        const pdfFilename = `${invoiceNumber.replace(/\//g, "-")}.pdf`
+        await sendWhatsAppDocument(
+          invoice.customerId,
+          base64Pdf,
+          pdfFilename,
+          `PDF Invoice ${invoiceNumber}`
+        )
+      } catch (waError) {
+        console.error("Failed to send WhatsApp notification/document during invoice send:", waError)
+      }
+    }
 
     // 5. Update Status and Create Audit Log
     if (invoice.status === "DRAFT") {
@@ -384,7 +408,7 @@ export async function sendInvoiceToClient(invoiceId: string) {
 
 export async function getInvoice(id: string) {
   try {
-    const { company } = await requireCompany()
+    const { company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     return await getOrSetCache(`invoice:${company.id}:${id}`, async () => {
       return await prisma.invoice.findFirst({
         where: { id, companyId: company.id, deletedAt: null },
@@ -415,7 +439,7 @@ export async function updateInvoiceStatus(
   }
 ) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     const invoice = await prisma.invoice.findFirst({
       where: { id, companyId: company.id, deletedAt: null },
     })
@@ -460,7 +484,7 @@ export async function updateInvoiceStatus(
 
 export async function deleteInvoice(id: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     await prisma.invoice.update({
       where: { id, companyId: company.id },
       data: { deletedAt: new Date(), status: InvoiceStatus.CANCELLED },
@@ -488,7 +512,7 @@ export async function deleteInvoice(id: string) {
 
 export async function deleteInvoiceByNumber(invoiceNumber: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     // First find the invoice by number
     const invoice = await prisma.invoice.findFirst({
@@ -519,7 +543,7 @@ export async function deleteInvoiceByNumber(invoiceNumber: string) {
 }
 export async function getNextInvoiceNumber() {
   try {
-    const { company } = await requireCompany()
+    const { company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     const count = await prisma.invoice.count({ where: { companyId: company.id } })
     const year = new Date().getFullYear()
     const prefix = company.invoicePrefix || "INV"
@@ -531,7 +555,7 @@ export async function getNextInvoiceNumber() {
 
 export async function cloneInvoice(id: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     const invoice = await prisma.invoice.findFirst({
       where: { id, companyId: company.id, deletedAt: null },
@@ -573,7 +597,7 @@ export async function cloneInvoice(id: string) {
         finalAmount: invoice.finalAmount,
         balanceDue: invoice.finalAmount,
         items: {
-          create: invoice.items.map((item) => ({
+          create: invoice.items.map((item: any) => ({
             description: item.description,
             hsnSac: item.hsnSac,
             quantity: item.quantity,
@@ -611,7 +635,7 @@ export async function cloneInvoice(id: string) {
 
 export async function bulkDeleteInvoices(ids: string[]) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     await prisma.invoice.updateMany({
       where: { id: { in: ids }, companyId: company.id },
@@ -643,7 +667,7 @@ export async function bulkDeleteInvoices(ids: string[]) {
 
 export async function restoreInvoice(id: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     await prisma.invoice.update({
       where: { id, companyId: company.id },
@@ -674,7 +698,7 @@ export async function restoreInvoice(id: string) {
 
 export async function permanentlyDeleteInvoice(id: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     await prisma.invoice.delete({
       where: { id, companyId: company.id },
@@ -695,3 +719,83 @@ export async function permanentlyDeleteInvoice(id: string) {
     return { error: "Failed to permanently delete invoice" }
   }
 }
+
+export async function sendInvoiceViaWhatsApp(invoiceId: string) {
+  try {
+    const { session, company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
+
+    // 1. Fetch invoice with relations
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: invoiceId, companyId: company.id },
+      include: { customer: true, company: true }
+    })
+
+    if (!invoice) return { error: "Invoice not found" }
+    if (!company.openWaEnabled) {
+      return { error: "WhatsApp integration is disabled. Please enable it in Settings." }
+    }
+    if (!invoice.customer.phone) {
+      return { error: "Customer does not have a phone number configured." }
+    }
+
+    // 2. Generate PDF Buffer
+    const pdfBuffer = await generateInvoicePdf(invoice.id, company.id)
+
+    // 3. Construct WhatsApp Message text
+    const contactPersonName = invoice.customer.name
+    const invoiceNumber = invoice.invoiceNumber
+    const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+    const waMessage = `Hi ${contactPersonName}, please find your invoice ${invoiceNumber} for amount ₹${invoice.finalAmount.toLocaleString("en-IN")}. You can view and pay online here: ${appUrl}/invoices/${invoice.id}`
+
+    // 4. Send text message
+    await sendWhatsAppMessage(invoice.customerId, waMessage)
+
+    // 5. Send PDF document
+    const base64Pdf = Buffer.from(pdfBuffer).toString("base64")
+    const pdfFilename = `${invoiceNumber.replace(/\//g, "-")}.pdf`
+    const docResult = await sendWhatsAppDocument(
+      invoice.customerId,
+      base64Pdf,
+      pdfFilename,
+      `PDF Invoice ${invoiceNumber}`
+    )
+
+    if (docResult.error) {
+      return { error: docResult.error }
+    }
+
+    // 6. Update Status
+    if (invoice.status === "DRAFT") {
+      await prisma.invoice.update({
+        where: { id: invoice.id },
+        data: { status: "SENT" }
+      })
+    }
+
+    await prisma.invoiceStatusHistory.create({
+      data: {
+        invoiceId: invoice.id,
+        status: invoice.status === "DRAFT" ? "SENT" : invoice.status,
+        note: `Invoice sent via WhatsApp (OpenWA)`,
+      }
+    })
+
+    await createAuditLog({
+      companyId: company.id,
+      userId: session.user.id,
+      action: "UPDATE",
+      entity: "Invoice",
+      entityId: invoice.id,
+      details: { action: "sent via WhatsApp (OpenWA)" }
+    })
+
+    revalidatePath(`/invoices/${invoice.id}`)
+    revalidatePath("/invoices")
+    return { success: true }
+  } catch (error: any) {
+    console.error("Failed to send WhatsApp manually:", error)
+    return { error: error.message || "Failed to send WhatsApp" }
+  }
+}
+

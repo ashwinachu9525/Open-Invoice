@@ -1,11 +1,11 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { requireCompany } from "@/lib/auth-helpers"
 import { createAuditLog } from "@/services/audit"
 import { InvoiceStatus, PaymentMethod } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { getTenantDb } from "@/lib/tenant-db"
 
 const paymentSchema = z.object({
   invoiceId: z.string(),
@@ -19,6 +19,7 @@ const paymentSchema = z.object({
 export async function recordPayment(data: unknown) {
   try {
     const { session, company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
     const parsed = paymentSchema.safeParse(data)
     if (!parsed.success) return { error: "Invalid payment data" }
 
@@ -34,7 +35,7 @@ export async function recordPayment(data: unknown) {
     if (balanceDue <= 0) status = InvoiceStatus.PAID
     else if (newAmountPaid > 0) status = InvoiceStatus.PARTIALLY_PAID
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.payment.create({
         data: {
           invoiceId: invoice.id,

@@ -2,7 +2,9 @@ import { inngest } from "./client"
 import { prisma } from "@/lib/prisma"
 import { InvoiceStatus, RecurringFrequency, ScheduleStatus } from "@prisma/client"
 import { generateInvoicePdf } from "@/services/pdf"
-import { sendInvoiceEmail } from "@/services/smtp"
+import { sendInvoiceEmail, sendTrialReminderEmail } from "@/services/smtp"
+import { sendWhatsAppMessage } from "@/actions/integrations"
+
 
 function getNextRunDate(frequency: RecurringFrequency, from: Date): Date {
   const next = new Date(from)
@@ -96,6 +98,17 @@ export const processRecurringInvoices = inngest.createFunction(
           where: { id: newInvoice.id },
           data: { status: InvoiceStatus.SENT },
         })
+
+        // Send WhatsApp if enabled
+        if (source.company.openWaEnabled && source.customer.phone) {
+          try {
+            const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+            const waMessage = `Hi ${source.customer.name}, please find your auto-generated invoice ${invoiceNumber} for amount ₹${newInvoice.finalAmount.toLocaleString("en-IN")}. You can view and pay online here: ${appUrl}/invoices/${newInvoice.id}`
+            await sendWhatsAppMessage(source.customerId, waMessage)
+          } catch (e) {
+            console.error("Failed to send recurring invoice WhatsApp reminder:", e)
+          }
+        }
       }
 
       await prisma.recurringSchedule.update({
@@ -225,6 +238,17 @@ export const sendPaymentReminders = inngest.createFunction(
           })
           remindersSent++
 
+          // Send WhatsApp payment reminder if enabled
+          if (invoice.company.openWaEnabled && invoice.customer.phone) {
+            try {
+              const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+              const waMessage = `Hi ${invoice.customer.name}, this is a payment reminder for invoice ${invoice.invoiceNumber}. The outstanding balance is ₹${invoice.balanceDue.toLocaleString("en-IN")} (${messageType}). You can view and pay here: ${appUrl}/invoices/${invoice.id}`
+              await sendWhatsAppMessage(invoice.customerId, waMessage)
+            } catch (e) {
+              console.error("Failed to send WhatsApp payment reminder:", e)
+            }
+          }
+
           import("@/lib/push").then(({ sendPushNotification }) => {
             invoice.company.users?.forEach(u => {
               sendPushNotification(u.id, {
@@ -292,4 +316,56 @@ export const cleanupDeletedAccounts = inngest.createFunction(
   }
 )
 
-export const inngestFunctions = [processRecurringInvoices, markOverdueInvoices, sendPaymentReminders, cleanupDeletedAccounts]
+export const checkTrialReminders = inngest.createFunction(
+  { id: "check-trial-reminders", triggers: [{ cron: "0 8 * * *" }] },
+  async () => {
+    const now = new Date()
+    const companies = await prisma.company.findMany({
+      where: {
+        trialStartsAt: { not: null },
+        trialEndsAt: { gt: now },
+        trialReminderSent: null,
+      },
+      include: {
+        users: true,
+      },
+    })
+
+    let emailsSentCount = 0
+
+    for (const company of companies) {
+      if (!company.trialEndsAt) continue
+
+      const diffTime = company.trialEndsAt.getTime() - now.getTime()
+      const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+      // If 5 days or less remaining (meaning day 25 onwards)
+      if (daysRemaining <= 5) {
+        for (const user of company.users) {
+          if (!user.email) continue
+          try {
+            await sendTrialReminderEmail(user.email, company.name || "your company", daysRemaining)
+            emailsSentCount++
+          } catch (e) {
+            console.error(`Failed to send trial reminder email to ${user.email} for company ${company.id}`, e)
+          }
+        }
+
+        await prisma.company.update({
+          where: { id: company.id },
+          data: { trialReminderSent: new Date() },
+        })
+      }
+    }
+
+    return { companiesChecked: companies.length, emailsSent: emailsSentCount }
+  }
+)
+
+export const inngestFunctions = [
+  processRecurringInvoices,
+  markOverdueInvoices,
+  sendPaymentReminders,
+  cleanupDeletedAccounts,
+  checkTrialReminders,
+]

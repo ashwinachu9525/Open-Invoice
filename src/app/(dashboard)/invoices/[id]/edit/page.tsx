@@ -57,7 +57,7 @@ export default async function EditInvoicePage({ params }: EditInvoicePageProps) 
     bankAccountType: invoice.bankAccountType || "",
     themeColor: invoice.themeColor || "#6366f1",
     themeFont: invoice.themeFont || "inter",
-    items: invoice.items.map(item => ({
+    items: invoice.items.map((item: any) => ({
       description: item.description,
       hsnSac: item.hsnSac || "",
       quantity: item.quantity,

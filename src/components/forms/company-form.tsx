@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { companySchema, CompanyFormValues } from "@/validations/company"
 import { Button } from "@/components/ui/button"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import {
   Form,
   FormControl,
@@ -34,6 +35,7 @@ export function CompanyForm({ initialData }: { initialData: any }) {
       address: initialData?.address || "",
       state: initialData?.state || "",
       baseCurrency: initialData?.baseCurrency || "INR",
+      whatsappProvider: initialData?.whatsappProvider || "",
       invoiceTemplate: initialData?.invoiceTemplate || "modern",
     },
   })
@@ -198,6 +200,28 @@ export function CompanyForm({ initialData }: { initialData: any }) {
               </FormItem>
             )}
           />
+
+            <FormField
+              control={form.control}
+              name="whatsappProvider"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>WhatsApp Provider</FormLabel>
+                  <FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select provider" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="official">Official Meta Cloud API</SelectItem>
+                        <SelectItem value="openwa">OpenWA</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
           <FormField
             control={form.control}

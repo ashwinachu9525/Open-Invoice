@@ -86,7 +86,7 @@ export default async function CustomersPage(props: CustomersPageProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {customers.map((customer) => (
+                  {customers.map((customer: any) => (
                     <TableRow
                       key={customer.id}
                       className="border-white/5 hover:bg-white/4 transition-colors group"

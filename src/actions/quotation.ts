@@ -1,6 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
+import { getTenantDb } from "@/lib/tenant-db"
 import { quotationSchema } from "@/validations/quotation"
 import { calculateInvoiceTax } from "@/services/tax-engine"
 import { createAuditLog } from "@/services/audit"
@@ -10,7 +11,7 @@ import { QuotationStatus, InvoiceStatus } from "@prisma/client"
 
 export async function createQuotation(data: unknown) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     const parsed = quotationSchema.safeParse(data)
     if (!parsed.success) {
       return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
@@ -28,7 +29,7 @@ export async function createQuotation(data: unknown) {
       tdsPercentage: parsed.data.tdsPercentage,
     })
 
-    const quotation = await prisma.$transaction(async (tx) => {
+    const quotation = await prisma.$transaction(async (tx: any) => {
       const q = await tx.quotation.create({
         data: {
           companyId: company.id,
@@ -89,12 +90,100 @@ export async function createQuotation(data: unknown) {
 }
 
 export async function updateQuotation(id: string, data: unknown) {
-  return { error: "Update not implemented yet" }
+  try {
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
+    
+    const existing = await prisma.quotation.findFirst({
+      where: { id, companyId: company.id, deletedAt: null }
+    })
+    
+    if (!existing) return { error: "Quotation not found" }
+    if (existing.status === QuotationStatus.INVOICED) {
+      return { error: "Invoiced quotations cannot be edited" }
+    }
+
+    const parsed = quotationSchema.safeParse(data)
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
+    }
+
+    const customer = await prisma.customer.findFirst({
+      where: { id: parsed.data.customerId, companyId: company.id, deletedAt: null },
+    })
+    if (!customer) return { error: "Customer not found" }
+
+    const tax = calculateInvoiceTax({
+      items: parsed.data.items,
+      sellerState: company.state,
+      buyerState: customer.state,
+      tdsPercentage: parsed.data.tdsPercentage,
+    })
+
+    await prisma.$transaction(async (tx: any) => {
+      // Delete old items
+      await tx.quotationItem.deleteMany({ where: { quotationId: id } })
+      
+      // Update quotation and add new items
+      await tx.quotation.update({
+        where: { id },
+        data: {
+          customerId: customer.id,
+          quotationNumber: parsed.data.quotationNumber,
+          date: parsed.data.date,
+          expiryDate: parsed.data.expiryDate,
+          currency: parsed.data.currency,
+          exchangeRate: parsed.data.exchangeRate,
+          notes: parsed.data.notes,
+          terms: parsed.data.terms,
+          themeColor: parsed.data.themeColor,
+          themeFont: parsed.data.themeFont,
+          subTotal: tax.subTotal,
+          totalDiscount: tax.totalDiscount,
+          totalTax: tax.totalTax,
+          cgstAmount: tax.cgstAmount,
+          sgstAmount: tax.sgstAmount,
+          igstAmount: tax.igstAmount,
+          tdsPercentage: tax.tdsPercentage,
+          tdsAmount: tax.tdsAmount,
+          finalAmount: tax.finalAmount,
+          items: {
+            create: tax.items.map((item) => ({
+              description: item.description,
+              hsnSac: item.hsnSac,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: item.discount,
+              taxPercentage: item.taxPercentage,
+              taxableAmount: item.taxableAmount,
+              taxAmount: item.taxAmount,
+              total: item.total,
+            })),
+          },
+        },
+      })
+    })
+
+    await createAuditLog({
+      companyId: company.id,
+      userId: session.user.id,
+      action: "UPDATE",
+      entity: "Quotation",
+      entityId: id,
+    })
+
+    revalidatePath("/quotations")
+    revalidatePath(`/quotations/${id}`)
+    revalidatePath("/dashboard")
+    return { success: true }
+  } catch (error) {
+    console.error("Update quotation error:", error)
+    return { error: error instanceof Error ? error.message : "Failed to update quotation" }
+  }
 }
 
 export async function convertToInvoice(quotationId: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     const quotation = await prisma.quotation.findFirst({
       where: { id: quotationId, companyId: company.id, deletedAt: null },
@@ -109,7 +198,7 @@ export async function convertToInvoice(quotationId: string) {
     const prefix = company.invoicePrefix || "INV"
     const newInvoiceNumber = `${prefix}-${year}-${String(count + 1).padStart(4, "0")}`
     
-    const newInvoice = await prisma.$transaction(async (tx) => {
+    const newInvoice = await prisma.$transaction(async (tx: any) => {
       const inv = await tx.invoice.create({
         data: {
           companyId: company.id,
@@ -135,7 +224,7 @@ export async function convertToInvoice(quotationId: string) {
           finalAmount: quotation.finalAmount,
           balanceDue: quotation.finalAmount,
           items: {
-            create: quotation.items.map((item) => ({
+            create: quotation.items.map((item: any) => ({
               description: item.description,
               hsnSac: item.hsnSac,
               quantity: item.quantity,
@@ -181,7 +270,7 @@ export async function convertToInvoice(quotationId: string) {
 
 export async function getNextQuotationNumber() {
   try {
-    const { company } = await requireCompany()
+    const { company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     const count = await prisma.quotation.count({ where: { companyId: company.id } })
     const year = new Date().getFullYear()
     return `QT-${year}-${String(count + 1).padStart(4, "0")}`
@@ -198,7 +287,7 @@ export async function getQuotations(opts?: {
   limit?: number
 }) {
   try {
-    const { company } = await requireCompany()
+    const { company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     const { search, dateFrom, dateTo, page = 1, limit = 10 } = opts ?? {}
     
     const where = {
@@ -237,9 +326,9 @@ export async function getQuotations(opts?: {
       })
     ])
 
-    const totalAmount = allForStats.reduce((sum, q) => sum + q.finalAmount, 0)
-    const acceptedCount = allForStats.filter((q) => q.status === "ACCEPTED").length
-    const pendingCount = allForStats.filter((q) => ["SENT", "DRAFT"].includes(q.status)).length
+    const totalAmount = allForStats.reduce((sum: number, q: any) => sum + q.finalAmount, 0)
+    const acceptedCount = allForStats.filter((q: any) => q.status === "ACCEPTED").length
+    const pendingCount = allForStats.filter((q: any) => ["SENT", "DRAFT"].includes(q.status)).length
 
     return { 
       quotations, 
@@ -254,7 +343,7 @@ export async function getQuotations(opts?: {
 
 export async function getQuotation(id: string) {
   try {
-    const { company } = await requireCompany()
+    const { company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     return await prisma.quotation.findFirst({
       where: { id, companyId: company.id, deletedAt: null },
       include: {
@@ -274,7 +363,7 @@ export async function updateQuotationStatus(
   note?: string
 ) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     const quotation = await prisma.quotation.findFirst({
       where: { id, companyId: company.id, deletedAt: null },
     })
@@ -302,7 +391,7 @@ export async function updateQuotationStatus(
 
 export async function deleteQuotation(id: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     await prisma.quotation.update({
       where: { id, companyId: company.id },
       data: { deletedAt: new Date() },
@@ -326,7 +415,7 @@ export async function deleteQuotation(id: string) {
 
 export async function bulkDeleteQuotations(ids: string[]) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     await prisma.quotation.updateMany({
       where: { id: { in: ids }, companyId: company.id },
@@ -352,7 +441,7 @@ export async function bulkDeleteQuotations(ids: string[]) {
 
 export async function restoreQuotation(id: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     await prisma.quotation.update({
       where: { id, companyId: company.id },
@@ -379,7 +468,7 @@ export async function restoreQuotation(id: string) {
 
 export async function permanentlyDeleteQuotation(id: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     await prisma.quotation.delete({
       where: { id, companyId: company.id },
@@ -403,7 +492,7 @@ export async function permanentlyDeleteQuotation(id: string) {
 
 export async function cloneQuotation(id: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     const quotation = await prisma.quotation.findFirst({
       where: { id, companyId: company.id, deletedAt: null },
@@ -438,7 +527,7 @@ export async function cloneQuotation(id: string) {
         tdsAmount: quotation.tdsAmount,
         finalAmount: quotation.finalAmount,
         items: {
-          create: quotation.items.map((item) => ({
+          create: quotation.items.map((item: any) => ({
             description: item.description,
             hsnSac: item.hsnSac,
             quantity: item.quantity,
@@ -473,10 +562,11 @@ export async function cloneQuotation(id: string) {
 
 import { generateQuotationPdf } from "@/services/pdf"
 import { sendQuotationEmail } from "@/services/smtp"
+import { sendWhatsAppMessage } from "@/actions/integrations"
 
 export async function sendQuotationToClient(quotationId: string) {
   try {
-    const { session, company } = await requireCompany()
+    const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     
     const quotation = await prisma.quotation.findFirst({
       where: { id: quotationId, companyId: company.id },
@@ -486,7 +576,7 @@ export async function sendQuotationToClient(quotationId: string) {
     if (!quotation) return { error: "Quotation not found" }
     if (!quotation.customer.email) return { error: "Customer does not have an email address" }
 
-    const pdfBuffer = await generateQuotationPdf(quotation.id)
+    const pdfBuffer = await generateQuotationPdf(quotation.id, company.id)
 
     const contactPersonName = quotation.customer.name
     const quotationNumber = quotation.quotationNumber
@@ -521,6 +611,17 @@ export async function sendQuotationToClient(quotationId: string) {
         content: Buffer.from(pdfBuffer)
       }]
     })
+
+    // Send WhatsApp if enabled
+    if (company.openWaEnabled && quotation.customer.phone) {
+      try {
+        const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+        const waMessage = `Hi ${contactPersonName}, please find your quotation ${quotationNumber} for amount ₹${quotation.finalAmount.toLocaleString("en-IN")}. You can view it online here: ${appUrl}/quotations/${quotation.id}`
+        await sendWhatsAppMessage(quotation.customerId, waMessage)
+      } catch (waError) {
+        console.error("Failed to send WhatsApp message during quotation send:", waError)
+      }
+    }
 
     if (quotation.status === "DRAFT") {
       await prisma.quotation.update({

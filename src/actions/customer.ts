@@ -23,7 +23,7 @@ export async function createCustomer(data: CustomerFormValues) {
     const parsed = customerSchema.safeParse(data)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
 
-    const db = getTenantDb(user.companyId)
+    const db = await getTenantDb(user.companyId)
 
     await db.customer.create({
       data: parsed.data as any,
@@ -46,7 +46,7 @@ export async function updateCustomer(id: string, data: CustomerFormValues) {
     const parsed = customerSchema.safeParse(data)
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
 
-    const db = getTenantDb(user.companyId)
+    const db = await getTenantDb(user.companyId)
 
     const existing = await db.customer.findFirst({
       where: { id, deletedAt: null },
@@ -71,7 +71,7 @@ export async function getCustomer(id: string) {
   try {
     const user = await requireUser()
     if (!user?.companyId) return null
-    const db = getTenantDb(user.companyId)
+    const db = await getTenantDb(user.companyId)
     return await db.customer.findFirst({
       where: { id, deletedAt: null },
     })
@@ -100,7 +100,7 @@ export async function getCustomers(params?: { search?: string; page?: number; li
       } : {})
     }
 
-    const db = getTenantDb(user.companyId)
+    const db = await getTenantDb(user.companyId)
 
     const [customers, total] = await Promise.all([
       db.customer.findMany({

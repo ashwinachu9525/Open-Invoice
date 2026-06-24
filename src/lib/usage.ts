@@ -77,10 +77,16 @@ async function checkIsPro(identifier: string, isAnonymous: boolean): Promise<boo
 
   const user = await prisma.user.findUnique({
     where: { id: identifier },
-    select: { isPro: true, proExpiry: true },
+    include: { company: true },
   })
 
-  if (!user?.isPro) return false
+  if (!user) return false
+
+  if (user.company?.trialEndsAt && new Date() < new Date(user.company.trialEndsAt)) {
+    return true
+  }
+
+  if (!user.isPro) return false
 
   if (user.proExpiry && user.proExpiry < new Date()) {
     return false // Pro expired

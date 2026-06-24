@@ -57,7 +57,7 @@ export default async function ExpensesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {expenses.map((expense) => (
+                  {expenses.map((expense: any) => (
                     <tr key={expense.id} className="hover:bg-white/5 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">

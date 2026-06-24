@@ -74,6 +74,7 @@ export default async function InvoiceDetailPage({
           )}
           <SendEmailButton invoiceId={invoice.id} />
           <SendWhatsappButton 
+            invoiceId={invoice.id}
             invoiceNumber={invoice.invoiceNumber}
             customerPhone={invoice.customer.phone}
             customerName={invoice.customer.name}
@@ -171,7 +172,7 @@ export default async function InvoiceDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {invoice.items.map((item, i) => (
+                {invoice.items.map((item: any, i: number) => (
                   <tr key={item.id} className={`border-b border-white/5 hover:bg-white/3 transition-colors ${i % 2 === 0 ? "" : "bg-white/2"}`}>
                     <td className="py-3 pr-4 font-medium">{item.description}</td>
                     <td className="py-3 text-right text-muted-foreground">{item.quantity}</td>
@@ -266,7 +267,7 @@ export default async function InvoiceDetailPage({
               {/* Vertical line */}
               <div className="absolute left-[7px] top-2 bottom-2 w-px bg-white/10" />
 
-              {invoice.statusHistory.map((h, i) => {
+              {invoice.statusHistory.map((h: any, i: number) => {
                 const dt = new Date(h.createdAt)
                 const dateStr = dt.toLocaleDateString("en-IN", {
                   day: "numeric", month: "short", year: "numeric",

@@ -12,6 +12,7 @@ export const companySchema = z.object({
   state: z.string().optional(),
   baseCurrency: z.string().optional(),
   invoiceTemplate: z.string().optional(),
+  whatsappProvider: z.enum(["official", "openwa"]).optional(),
 })
 
 export type CompanyFormValues = z.infer<typeof companySchema>

@@ -1,16 +1,7 @@
-import { Document, Page, Text, View, StyleSheet, Font, Image, Link } from "@react-pdf/renderer"
-
-// Register font (Inter)
-Font.register({
-  family: "inter",
-  fonts: [
-    { src: "https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiA.woff2" },
-    { src: "https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuI6fAZ9hiA.woff2", fontWeight: "bold" },
-  ],
-})
+import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer"
 
 const styles = StyleSheet.create({
-  page: { padding: 40, fontFamily: "inter", fontSize: 10, color: "#1e293b", backgroundColor: "#ffffff" },
+  page: { padding: 40, fontFamily: "Helvetica", fontSize: 10, color: "#1e293b", backgroundColor: "#ffffff" },
   header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 30 },
   title: { fontSize: 24, fontWeight: "bold", letterSpacing: 1 },
   label: { fontSize: 9, color: "#64748b", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 },

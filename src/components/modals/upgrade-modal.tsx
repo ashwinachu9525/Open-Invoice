@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,9 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2, Sparkles } from "lucide-react"
+import { getTrialEligibility, startTrial } from "@/actions/trial"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 interface UpgradeModalProps {
   open: boolean
@@ -17,6 +21,36 @@ interface UpgradeModalProps {
 }
 
 export function UpgradeModal({ open, onOpenChange, reason }: UpgradeModalProps) {
+  const router = useRouter()
+  const [isEligible, setIsEligible] = useState(false)
+  const [trialLoading, setTrialLoading] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      getTrialEligibility().then((res) => {
+        setIsEligible(res.eligible)
+      })
+    }
+  }, [open])
+
+  async function handleStartTrial() {
+    setTrialLoading(true)
+    try {
+      const res = await startTrial()
+      if (res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success(res.message || "Free trial started!")
+        onOpenChange(false)
+        router.refresh()
+      }
+    } catch {
+      toast.error("Failed to start free trial.")
+    } finally {
+      setTrialLoading(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -65,6 +99,23 @@ export function UpgradeModal({ open, onOpenChange, reason }: UpgradeModalProps) 
           >
             Upgrade to Pro
           </Button>
+
+          {isEligible && (
+            <div className="border-t border-white/10 pt-3 mt-1 flex flex-col gap-1.5">
+              <Button
+                variant="outline"
+                className="w-full border-blue-500/30 hover:border-blue-500 hover:bg-blue-500/10 text-blue-400 font-semibold"
+                disabled={trialLoading}
+                onClick={handleStartTrial}
+              >
+                {trialLoading ? "Starting Trial..." : "Try Pro Free for 30 Days"}
+              </Button>
+              <p className="text-[10px] text-center text-slate-500 leading-normal">
+                No credit card required. Completely free trial. Expires automatically after 30 days.
+              </p>
+            </div>
+          )}
+
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Maybe Later
           </Button>

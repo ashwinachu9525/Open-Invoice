@@ -22,7 +22,7 @@ function createSqliteClient(log: ("error" | "warn")[]): PrismaClient {
   return new PrismaClient({ adapter, log })
 }
 
-function createPostgresClient(databaseUrl: string, log: ("error" | "warn")[]): PrismaClient {
+export function createPostgresClient(databaseUrl: string, log: ("error" | "warn")[]): PrismaClient {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PrismaPg } = require("@prisma/adapter-pg") as typeof import("@prisma/adapter-pg")
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -31,13 +31,23 @@ function createPostgresClient(databaseUrl: string, log: ("error" | "warn")[]): P
   // Cloud providers (Aiven, Supabase, Neon, etc.) require SSL but use custom certificates.
   // We MUST strip sslmode from the URL and configure ssl on the Pool object directly —
   // otherwise the pg driver's URL parser fights with our ssl config and rejects the cert.
-  const cleanUrl = databaseUrl
-    .replace(/[?&]sslmode=[^&]*/g, "")
-    .replace(/[?&]supa=[^&]*/g, "")
-    .replace(/[?&]pool_mode=[^&]*/g, "")
-    .replace(/[?&]pgbouncer=[^&]*/g, "")
-    .replace(/\?$/, "")
-    .replace(/&$/, "")
+  let cleanUrl = databaseUrl
+  try {
+    const urlObj = new URL(databaseUrl)
+    urlObj.searchParams.delete("sslmode")
+    urlObj.searchParams.delete("supa")
+    urlObj.searchParams.delete("pool_mode")
+    urlObj.searchParams.delete("pgbouncer")
+    cleanUrl = urlObj.toString()
+  } catch {
+    cleanUrl = databaseUrl
+      .replace(/[?&]sslmode=[^&]*/g, "")
+      .replace(/[?&]supa=[^&]*/g, "")
+      .replace(/[?&]pool_mode=[^&]*/g, "")
+      .replace(/[?&]pgbouncer=[^&]*/g, "")
+      .replace(/\?$/, "")
+      .replace(/&$/, "")
+  }
 
   const needsSsl = /^postgres(ql)?s?:\/\//i.test(databaseUrl) ||
     databaseUrl.includes("sslmode=require") ||
@@ -57,7 +67,12 @@ function createPostgresClient(databaseUrl: string, log: ("error" | "warn")[]): P
   })
 
   const adapter = new PrismaPg(pool)
-  return new PrismaClient({ adapter, log })
+  const provider = getActiveProvider()
+  const PrismaClientClass = provider === "sqlite"
+    ? require("@prisma/client-postgres").PrismaClient
+    : require("@prisma/client").PrismaClient
+
+  return new PrismaClientClass({ adapter, log }) as any
 }
 
 function createPrismaClient(): PrismaClient {

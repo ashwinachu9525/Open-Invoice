@@ -337,3 +337,46 @@ export async function sendWelcomeEmail(to: string, name: string) {
     `,
   })
 }
+
+export async function sendTrialReminderEmail(to: string, companyName: string, daysLeft: number) {
+  const host = process.env.APP_SMTP_HOST
+  const port = Number(process.env.APP_SMTP_PORT) || 587
+  const user = process.env.APP_SMTP_USER
+  const pass = process.env.APP_SMTP_PASS
+  const from = process.env.APP_SMTP_FROM || user
+
+  if (!host || !user || !pass) {
+    console.warn("APP_SMTP environment variables are not configured. Cannot send trial reminder email.")
+    return
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 5000,
+  })
+
+  const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+
+  await transporter.sendMail({
+    from,
+    to,
+    subject: `Your Open-Invoice Free Trial Expires in ${daysLeft} ${daysLeft === 1 ? 'Day' : 'Days'}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#f8fafc;color:#0f172a;border-radius:12px;border:1px solid #e2e8f0">
+        <h2 style="color:#4f46e5;margin:0 0 16px;text-align:center;">Trial Expiration Reminder</h2>
+        <p style="margin:0 0 16px;font-size:16px;">Hello,</p>
+        <p style="margin:0 0 16px;font-size:16px;">This is a friendly reminder that the 30-day Free Trial for <strong>${companyName}</strong> will expire in <strong>${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}</strong>.</p>
+        <p style="margin:0 0 24px;font-size:16px;">To keep enjoying unlimited invoice creation, AI assistant insights, and team collaboration, upgrade to the Pro plan before your trial ends.</p>
+        <div style="text-align:center;margin:0 0 24px;">
+          <a href="${appUrl}/settings" style="background:#4f46e5;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block;font-size:16px;">Upgrade to Pro</a>
+        </div>
+        <p style="margin:0;font-size:14px;color:#64748b;">If you have any questions, feel free to reply to this email.</p>
+      </div>
+    `,
+  })
+}
