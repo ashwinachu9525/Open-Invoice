@@ -68,10 +68,9 @@ export function createPostgresClient(databaseUrl: string, log: ("error" | "warn"
 
   const adapter = new PrismaPg(pool)
   const provider = getActiveProvider()
-  const pkg = "@prisma/client-postgres"
   const PrismaClientClass = provider === "sqlite"
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    ? require(pkg).PrismaClient
+    ? require("@prisma/client-postgres").PrismaClient
     : require("@prisma/client").PrismaClient
 
   return new PrismaClientClass({ adapter, log }) as any

@@ -73,6 +73,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['192.168.0.4'],
   serverExternalPackages: [
     "@prisma/client",
+    "@prisma/client-postgres",
     "@prisma/adapter-pg",
     "@prisma/adapter-libsql",
     "@libsql/client",
