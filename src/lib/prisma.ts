@@ -68,10 +68,15 @@ export function createPostgresClient(databaseUrl: string, log: ("error" | "warn"
 
   const adapter = new PrismaPg(pool)
   const provider = getActiveProvider()
-  const PrismaClientClass = provider === "sqlite"
+  let PrismaClientClass;
+  if (provider === "sqlite") {
+    // Hide from Vercel's strict Turbopack static analysis
+    const getPrisma = new Function("return require('@prisma/client-postgres').PrismaClient")
+    PrismaClientClass = getPrisma()
+  } else {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    ? require("@prisma/client-postgres").PrismaClient
-    : require("@prisma/client").PrismaClient
+    PrismaClientClass = require("@prisma/client").PrismaClient
+  }
 
   return new PrismaClientClass({ adapter, log }) as any
 }
