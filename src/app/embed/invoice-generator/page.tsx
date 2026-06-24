@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useTransition } from "react"
+import { useState, useEffect, useTransition, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Plus, Trash, Download, Sparkles, Building, User, FileText, Percent, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,7 +13,7 @@ interface InvoiceItem {
   taxPercentage: number
 }
 
-export default function EmbedInvoiceGenerator() {
+function InvoiceGeneratorForm() {
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
 
@@ -612,5 +612,13 @@ export default function EmbedInvoiceGenerator() {
 
       </form>
     </div>
+  )
+}
+
+export default function EmbedInvoiceGenerator() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-400">Loading...</div>}>
+      <InvoiceGeneratorForm />
+    </Suspense>
   )
 }

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { getDeletedItems } from "@/actions/trash"
 import { TrashClient } from "@/components/trash/trash-client"
 import { Trash2 } from "lucide-react"
