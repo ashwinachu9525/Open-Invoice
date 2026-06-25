@@ -16,6 +16,15 @@ export default async function EmailLogsPage() {
   const session = await auth()
   if (!session?.user?.companyId) redirect("/login")
 
+  if (session.user.role === "STAFF") {
+    return (
+      <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 flex flex-col items-center justify-center text-center min-h-[400px]">
+        <h2 className="text-2xl font-bold">Access Denied</h2>
+        <p className="text-muted-foreground mt-2">You do not have permission to view email logs.</p>
+      </div>
+    )
+  }
+
   const logs = await prisma.emailLog.findMany({
     where: { companyId: session.user.companyId },
     orderBy: { sentAt: "desc" },

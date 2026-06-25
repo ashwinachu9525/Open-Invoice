@@ -234,12 +234,11 @@ export function QuotationForm({ customers, defaultQuotationNumber, sellerState, 
             <div className="flex items-center gap-2">
               {catalogItems.length > 0 && (
                 <Dialog open={isCatalogOpen} onOpenChange={setIsCatalogOpen}>
-                  {/* @ts-ignore */}
-                  <DialogTrigger asChild>
+                  <DialogTrigger render={
                     <Button type="button" variant="outline" size="sm" className="glass border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 gap-1.5 text-xs">
                       <Package className="h-3.5 w-3.5" /> From Catalog
                     </Button>
-                  </DialogTrigger>
+                  } />
                   <DialogContent className="sm:max-w-[600px] bg-black/90 border-white/10 text-white backdrop-blur-xl">
                     <DialogHeader>
                       <DialogTitle>Add from Catalog</DialogTitle>

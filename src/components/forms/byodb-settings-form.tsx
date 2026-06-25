@@ -9,13 +9,25 @@ import { saveCustomDbSettings } from "@/actions/byodb"
 import { toast } from "sonner"
 import { Database, ShieldAlert, KeyRound, CheckCircle, RefreshCcw, Save, ShieldCheck } from "lucide-react"
 import { signOut } from "next-auth/react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface ByodbSettingsFormProps {
   initialUrl: string | null
   isConfigured: boolean
+  isPro?: boolean
 }
 
-export function ByodbSettingsForm({ initialUrl, isConfigured: initialConfigured }: ByodbSettingsFormProps) {
+export function ByodbSettingsForm({ initialUrl, isConfigured: initialConfigured, isPro = false }: ByodbSettingsFormProps) {
   const [dbUrl, setDbUrl] = useState(initialUrl || "")
   const [isConfigured, setIsConfigured] = useState(initialConfigured)
   const [testing, setTesting] = useState(false)
@@ -87,10 +99,6 @@ export function ByodbSettingsForm({ initialUrl, isConfigured: initialConfigured 
   }
 
   async function handleDisconnect() {
-    if (!confirm("Are you sure you want to disconnect your custom database? Future invoicing data will revert to the default shared SaaS database.")) {
-      return
-    }
-
     setDisconnecting(true)
     try {
       const res = await saveCustomDbSettings(null)
@@ -171,10 +179,10 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO open_invo
               <Input
                 id="db-url"
                 type="text"
-                placeholder="postgresql://username:password@host:5432/dbname?sslmode=require"
+                placeholder={isPro ? "postgresql://username:password@host:5432/dbname?sslmode=require" : "Upgrade to Pro to enable custom database connections"}
                 value={dbUrl}
                 onChange={(e) => setDbUrl(e.target.value)}
-                disabled={saving || disconnecting}
+                disabled={saving || disconnecting || !isPro}
                 className="glass border-white/10 font-mono text-xs"
               />
               <p className="text-[10px] text-slate-500 leading-normal">
@@ -183,24 +191,51 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO open_invo
             </div>
 
             <div className="flex gap-2">
-              <Button type="submit" disabled={saving || disconnecting} className="bg-indigo-600 hover:bg-indigo-700 h-9 text-xs">
+              <Button type="submit" disabled={saving || disconnecting || !isPro} className="bg-indigo-600 hover:bg-indigo-700 h-9 text-xs">
                 {saving ? <RefreshCcw className="w-4 h-4 animate-spin mr-1.5" /> : <Save className="w-4 h-4 mr-1.5" />}
                 {isConfigured ? "Verify & Save Updates" : "Test Connection & Enable"}
               </Button>
 
               {isConfigured && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={saving || disconnecting}
-                  onClick={handleDisconnect}
-                  className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 h-9 text-xs"
-                >
-                  {disconnecting ? <RefreshCcw className="w-4 h-4 animate-spin mr-1.5" /> : null}
-                  Disconnect Database
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={saving || disconnecting}
+                      className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 h-9 text-xs"
+                    >
+                      {disconnecting ? <RefreshCcw className="w-4 h-4 animate-spin mr-1.5" /> : null}
+                      Disconnect Database
+                    </Button>
+                  } />
+                  <AlertDialogContent className="bg-slate-900 border-slate-800 text-slate-100">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-slate-100 font-semibold">Disconnect Custom Database?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-slate-400">
+                        Are you sure you want to disconnect your custom database? Future invoicing data will revert to the default shared SaaS database.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex gap-2 justify-end">
+                      <AlertDialogCancel className="border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDisconnect}
+                        className="bg-rose-600 hover:bg-rose-700 text-slate-100"
+                      >
+                        Disconnect
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
+            {!isPro && (
+              <p className="text-xs text-indigo-400 font-semibold bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3">
+                🔒 Bring Your Own Database (BYODB) configuration is exclusive to Pro plan users. Please upgrade to configure custom storage.
+              </p>
+            )}
           </form>
 
         </CardContent>

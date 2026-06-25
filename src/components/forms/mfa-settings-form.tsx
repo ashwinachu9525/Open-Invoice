@@ -7,6 +7,17 @@ import { generateMfaSecret, verifyAndEnableMfa, disableMfa } from "@/actions/mfa
 import { toast } from "sonner"
 import Image from "next/image"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface MfaSettingsFormProps {
   initialEnabled: boolean
@@ -51,7 +62,6 @@ export function MfaSettingsForm({ initialEnabled }: MfaSettingsFormProps) {
   }
 
   const handleDisable = async () => {
-    if (!confirm("Are you sure you want to disable MFA? This will make your account less secure.")) return
     setIsPending(true)
     const result = await disableMfa()
     setIsPending(false)
@@ -73,9 +83,32 @@ export function MfaSettingsForm({ initialEnabled }: MfaSettingsFormProps) {
           </p>
         </div>
         {enabled ? (
-          <Button variant="destructive" onClick={handleDisable} disabled={isPending}>
-            Disable
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger render={
+              <Button variant="destructive" disabled={isPending}>
+                Disable
+              </Button>
+            } />
+            <AlertDialogContent className="bg-slate-900 border-slate-800 text-slate-100">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-slate-100 font-semibold">Disable MFA?</AlertDialogTitle>
+                <AlertDialogDescription className="text-slate-400">
+                  Are you sure you want to disable MFA? This will make your account less secure.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="flex gap-2 justify-end">
+                <AlertDialogCancel className="border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200">
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDisable}
+                  className="bg-rose-600 hover:bg-rose-700 text-slate-100"
+                >
+                  Disable MFA
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         ) : (
           <Button onClick={handleSetup} disabled={isPending || setupMode}>
             Setup MFA

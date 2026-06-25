@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { SheetClose } from "@/components/ui/sheet"
+import { useSession } from "next-auth/react"
 
 import { FileText, Home, Users, Settings, BarChart3, Sparkles, Package, Mail, Receipt, HelpCircle } from "lucide-react"
 
@@ -23,10 +24,19 @@ export const navItems = [
 
 export function DesktopNavLinks() {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const role = session?.user?.role
+
+  const filteredItems = navItems.filter((item) => {
+    if (role === "STAFF") {
+      return !["/reports", "/expenses", "/email-logs"].includes(item.href)
+    }
+    return true
+  })
   
   return (
     <>
-      {navItems.map((item) => {
+      {filteredItems.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
         return (
           <Link
@@ -58,10 +68,19 @@ export function DesktopNavLinks() {
 
 export function MobileNavLinks() {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const role = session?.user?.role
+
+  const filteredItems = navItems.filter((item) => {
+    if (role === "STAFF") {
+      return !["/reports", "/expenses", "/email-logs"].includes(item.href)
+    }
+    return true
+  })
   
   return (
     <>
-      {navItems.map((item) => {
+      {filteredItems.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
         return (
           <SheetClose

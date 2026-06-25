@@ -2,8 +2,21 @@ import { ExpenseForm } from "@/components/forms/expense-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { ArrowLeft, Receipt } from "lucide-react"
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
 
-export default function NewExpensePage() {
+export default async function NewExpensePage() {
+  const session = await auth()
+  if (!session?.user) redirect("/login")
+
+  if (session.user.role === "STAFF") {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
+        <h2 className="text-2xl font-bold">Access Denied</h2>
+        <p className="text-muted-foreground mt-2">You do not have permission to record expenses.</p>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col gap-6 max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4">

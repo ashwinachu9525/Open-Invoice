@@ -25,6 +25,7 @@ export function LoginForm({ googleAuthEnabled = false }: { googleAuthEnabled?: b
   const [requiresMfa, setRequiresMfa] = useState(false)
   const [totpToken, setTotpToken] = useState("")
   const isVerified = searchParams.get("verified") === "true"
+  const isAccessRemoved = searchParams.get("error") === "AccessRemoved"
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -47,7 +48,11 @@ export function LoginForm({ googleAuthEnabled = false }: { googleAuthEnabled?: b
     setIsPending(true)
     setError("")
     try {
-      const result = await loginUser(data.email, data.password, requiresMfa ? totpToken : undefined)
+      const result = await loginUser(
+        data.email,
+        data.password,
+        requiresMfa ? totpToken : undefined
+      )
       setIsPending(false)
       if (result?.error) {
         if (result.requiresMfa) {
@@ -76,6 +81,7 @@ export function LoginForm({ googleAuthEnabled = false }: { googleAuthEnabled?: b
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         {isVerified && <p className="text-sm text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded text-center">Email verified successfully! You can now log in.</p>}
+        {isAccessRemoved && <p className="text-sm text-red-600 bg-red-500/10 border border-red-500/20 p-2 rounded text-center font-medium">Your access to the company was removed by the owner.</p>}
         {error && <p className="text-sm text-red-600 bg-red-500/10 border border-red-500/20 p-2 rounded">{error}</p>}
         <FormField
           control={form.control}
@@ -103,6 +109,7 @@ export function LoginForm({ googleAuthEnabled = false }: { googleAuthEnabled?: b
             </FormItem>
           )}
         />
+
         {requiresMfa && (
           <FormItem>
             <FormLabel>Authenticator Code</FormLabel>

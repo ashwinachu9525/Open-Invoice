@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
 import { revalidatePath } from "next/cache"
+import { requireCompany } from "@/lib/auth-helpers"
 
 export async function requestProUpgrade() {
   const session = await auth()
@@ -81,5 +82,14 @@ export async function rejectProRequest(companyId: string) {
   } catch (error: any) {
     console.error("Error rejecting pro request:", error)
     return { success: false, error: "Failed to reject pro request." }
+  }
+}
+
+export async function getProRequestStatus() {
+  try {
+    const { company } = await requireCompany()
+    return { proRequestStatus: company.proRequestStatus }
+  } catch {
+    return { proRequestStatus: null }
   }
 }

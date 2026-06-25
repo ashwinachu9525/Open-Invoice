@@ -173,7 +173,7 @@ export function RegisterForm({
               </FormControl>
               {referralValid === true && (
                 <p className="text-xs text-emerald-500 flex items-center gap-1 mt-1">
-                  🎁 Valid referral! Your friend will get 1 month Pro free on your signup.
+                  🎁 Valid referral! You and your friend will both get 1 month of Pro free.
                 </p>
               )}
               {referralValid === false && (

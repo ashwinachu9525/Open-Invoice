@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { Role } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { redirect } from "next/navigation"
 
 export async function requireAuth() {
   const session = await auth()
@@ -18,7 +19,7 @@ export async function requireCompany() {
   })
 
   if (!user?.companyId || !user.company) {
-    throw new Error("Company setup required")
+    redirect("/login?error=AccessRemoved")
   }
 
   return { session, user, company: user.company }

@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
 import NextAuth from "next-auth"
 import { authConfig } from "@/auth.config"
 
 const { auth } = NextAuth(authConfig)
 
 // A very basic in-memory store for rate limiting at the Edge.
-// Note: In a serverless environment (like Vercel), this Map is scoped to the specific isolate
-// handling the request, meaning it's not a true global rate limit but still provides
-// significant protection against individual bot spam targeting a specific edge node.
 const edgeRateLimitStore = new Map<string, { count: number; resetAt: number }>()
 
 function applyRateLimit(ip: string, maxRequests: number, windowMs: number): boolean {
@@ -29,13 +25,12 @@ function applyRateLimit(ip: string, maxRequests: number, windowMs: number): bool
 }
 
 export default auth((request) => {
-  // Only apply rate limiting to specific public API endpoints to prevent spam
   const path = request.nextUrl.pathname
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set("x-pathname", path)
   
   if (path.startsWith("/api/feedback") || path.startsWith("/api/public/")) {
     const ip = request.headers.get("x-forwarded-for") ?? "unknown"
-    
-    // Allow 10 requests per minute per IP for public APIs
     const isAllowed = applyRateLimit(ip, 10, 60_000)
     
     if (!isAllowed) {
@@ -49,9 +44,11 @@ export default auth((request) => {
     }
   }
 
-  // We intentionally do NOT modify headers here to ensure we don't accidentally
-  // break the CSP headers defined in next.config.ts which allow the PDF blob previews.
-  return NextResponse.next()
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
 })
 
 export const config = {

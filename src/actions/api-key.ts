@@ -24,6 +24,10 @@ export async function generateApiKey(name: string) {
   try {
     const { company } = await requireCompany()
 
+    if (company.subscriptionTier !== "PRO" && company.subscriptionTier !== "ENTERPRISE") {
+      return { error: "Pro subscription required to generate API keys." }
+    }
+
     if (!name || name.trim().length === 0) {
       return { error: "API Key name is required" }
     }

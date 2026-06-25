@@ -67,7 +67,7 @@ export function SubscriptionSettingsForm({
 
   const whatsappShareText = referralCode
     ? encodeURIComponent(
-        `🚀 I'm using Open-Invoice to manage my business invoices professionally. Join using my referral code *${referralCode}* and I get 1 month Pro free!\n\nSign up here: ${referralLink}`
+        `🚀 Join Open-Invoice using my referral code *${referralCode}* and we both get 1 month of Pro features free!\n\nSign up here: ${referralLink}`
       )
     : ""
 
@@ -253,7 +253,7 @@ export function SubscriptionSettingsForm({
       </Card>
 
       {/* ── Referral Program Card ── */}
-      {referralCode && (
+      {referralCode && !isPro && (
         <Card className="glass border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-transparent relative overflow-hidden">
           <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-amber-500/8 blur-3xl pointer-events-none" />
           <CardHeader>
@@ -306,38 +306,11 @@ export function SubscriptionSettingsForm({
               </Button>
             </div>
 
-            {/* Enable Pro Free button — locked until earned */}
-            <div className="rounded-xl border border-white/8 bg-white/3 p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-200">Enable Pro via Referral</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {referralRewardClaimed
-                      ? "Your 1-month Pro reward is already active. Enjoy unlimited features!"
-                      : "Share your link. When a friend signs up, Pro activates automatically — no admin approval."}
-                  </p>
-                </div>
-                {referralRewardClaimed ? (
-                  <span className="shrink-0 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5" /> Active
-                  </span>
-                ) : (
-                  <Button
-                    size="sm"
-                    disabled
-                    className="shrink-0 bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 cursor-not-allowed flex items-center gap-1.5 h-8 text-xs"
-                    title="Share your referral link to earn this reward"
-                  >
-                    <Lock className="w-3 h-3" />
-                    Enable Pro Free
-                  </Button>
-                )}
-              </div>
-              {!referralRewardClaimed && (
-                <p className="text-[10px] text-slate-500">
-                  🔒 Activates automatically when someone registers with your referral link — one-time reward per account.
-                </p>
-              )}
+            {/* Referral Info */}
+            <div className="rounded-xl border border-white/8 bg-white/3 p-4">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                🎉 Pro activates automatically for 1 month for you and your referred friend when they register or log in using your referral code.
+              </p>
             </div>
 
             {/* Share buttons */}

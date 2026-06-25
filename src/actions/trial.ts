@@ -79,6 +79,82 @@ export async function extendTrial(companyId: string, days: number) {
 }
 
 /**
+ * Starts a TRIAL (PRO) for any company by setting trialStartsAt and trialEndsAt.
+ * Accessible only by Super Admins.
+ */
+export async function adminStartTrial(companyId: string, days: number = 30) {
+  try {
+    const session = await auth()
+    if (!session?.user || session.user.role !== "SUPER_ADMIN") {
+      return { error: "Unauthorized. Super Admin access required." }
+    }
+
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+    })
+
+    if (!company) {
+      return { error: "Company not found." }
+    }
+
+    const now = new Date()
+    const trialEndsAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+
+    await prisma.company.update({
+      where: { id: companyId },
+      data: {
+        trialStartsAt: now,
+        trialEndsAt: trialEndsAt,
+        trialReminderSent: null,
+      },
+    })
+
+    revalidatePath("/admin")
+    return { success: true, message: `Successfully started a ${days}-day trial.` }
+  } catch (error: any) {
+    console.error("Failed to start admin trial:", error)
+    return { error: error.message || "An unexpected error occurred while starting trial." }
+  }
+}
+
+/**
+ * Removes/cancels any trial (active or expired) for a company, resetting trial fields.
+ * Accessible only by Super Admins.
+ */
+export async function adminRemoveTrial(companyId: string) {
+  try {
+    const session = await auth()
+    if (!session?.user || session.user.role !== "SUPER_ADMIN") {
+      return { error: "Unauthorized. Super Admin access required." }
+    }
+
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+    })
+
+    if (!company) {
+      return { error: "Company not found." }
+    }
+
+    await prisma.company.update({
+      where: { id: companyId },
+      data: {
+        trialStartsAt: null,
+        trialEndsAt: null,
+        trialReminderSent: null,
+      },
+    })
+
+    revalidatePath("/admin")
+    return { success: true, message: "Successfully removed trial." }
+  } catch (error: any) {
+    console.error("Failed to remove trial:", error)
+    return { error: error.message || "An unexpected error occurred while removing the trial." }
+  }
+}
+
+
+/**
  * Returns the trial eligibility details of the current user's company.
  */
 export async function getTrialEligibility() {

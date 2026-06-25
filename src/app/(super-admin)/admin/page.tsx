@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Users, Building, FileText, Activity, AlertTriangle, MessageSquare, BadgeCheck } from "lucide-react"
-import { ExtendTrialButton } from "@/components/admin/extend-trial-button"
+import { AdminCompanyActions } from "@/components/admin/admin-company-actions"
 import { ProRequestActions } from "@/components/admin/pro-request-actions"
 
 export default async function SuperAdminDashboard() {
@@ -267,11 +267,11 @@ export default async function SuperAdminDashboard() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            {c.trialStartsAt ? (
-                              <ExtendTrialButton companyId={c.id} />
-                            ) : (
-                              <span className="text-xs text-muted-foreground italic">No trial to extend</span>
-                            )}
+                            <AdminCompanyActions
+                              companyId={c.id}
+                              currentTier={c.subscriptionTier}
+                              trialEndsAt={c.trialEndsAt}
+                            />
                           </td>
                         </tr>
                       )

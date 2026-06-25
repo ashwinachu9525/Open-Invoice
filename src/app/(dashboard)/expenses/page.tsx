@@ -4,8 +4,22 @@ import Link from "next/link"
 import { Plus, Receipt, Trash2, Calendar, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/utils"
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
 
 export default async function ExpensesPage() {
+  const session = await auth()
+  if (!session?.user) redirect("/login")
+
+  if (session.user.role === "STAFF") {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
+        <h2 className="text-2xl font-bold">Access Denied</h2>
+        <p className="text-muted-foreground mt-2">You do not have permission to view expenses.</p>
+      </div>
+    )
+  }
+
   const expenses = await getExpenses()
   const company = await getCompany()
   

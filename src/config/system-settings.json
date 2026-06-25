@@ -1,0 +1,6 @@
+{
+  "maintenanceMode": true,
+  "registrationOpen": false,
+  "systemLogLevel": "info",
+  "requireEmailVerification": false
+}

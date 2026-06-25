@@ -14,6 +14,7 @@ import {
 import { redirect } from "next/navigation"
 import { getReferralData } from "@/actions/referral"
 import { ReferralWidget } from "@/components/dashboard/referral-widget"
+import { GoogleReferralWrapper } from "@/components/dashboard/google-referral-wrapper"
 
 // Always fetch fresh data — never serve a cached version
 
@@ -107,8 +108,15 @@ export default async function DashboardPage() {
     },
   ]
 
+  const isPro = user.company?.subscriptionTier === "PRO" || user.company?.subscriptionTier === "ENTERPRISE" || user.isPro
+  const isStaff = session.user.role === "STAFF"
+
+  const isGoogleUser = user?.password === null
+  const showReferralPrompt = isGoogleUser && user?.referredBy === null && !isPro && !isStaff
+
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <GoogleReferralWrapper showPrompt={showReferralPrompt} />
       {/* ── Header ── */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
@@ -160,7 +168,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── Refer & Earn ── */}
-      {referralData && (
+      {referralData && !isPro && !isStaff && (
         <ReferralWidget
           referralCode={referralData.referralCode ?? ""}
           rewardClaimed={referralData.rewardClaimed}

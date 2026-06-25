@@ -40,6 +40,19 @@ export async function createBankAccount(data: unknown) {
       return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
     }
 
+    // Check bank account limit for FREE accounts (limit = 2)
+    const isPro = company.subscriptionTier === "PRO" || company.subscriptionTier === "ENTERPRISE"
+    if (!isPro) {
+      const existingCount = await prisma.bankAccount.count({
+        where: { companyId: company.id },
+      })
+      if (existingCount >= 2) {
+        return {
+          error: "Free accounts are limited to 2 bank accounts. Upgrade to Pro for unlimited bank accounts.",
+        }
+      }
+    }
+
     if (parsed.data.isDefault) {
       await prisma.bankAccount.updateMany({
         where: { companyId: company.id },

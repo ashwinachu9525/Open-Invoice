@@ -31,11 +31,58 @@ export default async function SettingsPage() {
     getReferralData(),
   ])
 
-  if (session?.user?.role === "STAFF") {
+  const isStaff = session?.user?.role === "STAFF"
+
+  if (isStaff) {
     return (
-      <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
-        <h2 className="text-2xl font-bold">Access Denied</h2>
-        <p className="text-muted-foreground mt-2">You do not have permission to view settings.</p>
+      <div className="flex flex-col gap-8 max-w-4xl">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-gray-500">Manage your user profile, authentication, and appearance.</p>
+        </div>
+
+        <Card className="glass border-white/10">
+          <CardHeader>
+            <CardTitle>Security &amp; Authentication</CardTitle>
+            <CardDescription>
+              Manage your sign-in methods and account security.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <MfaSettingsForm initialEnabled={dbUser?.mfaEnabled ?? false} />
+            
+            <div className="border-t border-white/5 pt-6">
+              <PasskeySettingsForm 
+                userId={session?.user?.id!} 
+                initialEnabled={dbUser?.passkeyEnabled ?? false} 
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass border-white/10">
+          <CardHeader>
+            <CardTitle>Notifications</CardTitle>
+            <CardDescription>
+              Enable push notifications on this device to stay updated on critical events.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PushNotificationSettingsForm />
+          </CardContent>
+        </Card>
+
+        <Card className="glass border-white/10">
+          <CardHeader>
+            <CardTitle>Appearance</CardTitle>
+            <CardDescription>
+              Customize the theme and look of your dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AppearanceSettingsForm />
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -190,7 +237,7 @@ export default async function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <BankAccountsForm initialAccounts={bankAccounts} />
+          <BankAccountsForm initialAccounts={bankAccounts} isPro={company?.subscriptionTier === "PRO" || company?.subscriptionTier === "ENTERPRISE"} />
         </CardContent>
       </Card>
 

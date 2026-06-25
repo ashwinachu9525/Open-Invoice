@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Plus, Trash, Download, Sparkles, Building, User, FileText, Percent, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 
 interface InvoiceItem {
   description: string
@@ -91,7 +92,7 @@ function InvoiceGeneratorForm() {
   async function handleDownload(e: React.FormEvent) {
     e.preventDefault()
     if (!companyName || !customerName) {
-      alert("Please fill in Company Name and Client Name at minimum.")
+      toast.error("Please fill in Company Name and Client Name at minimum.")
       return
     }
 
@@ -179,7 +180,7 @@ function InvoiceGeneratorForm() {
       window.URL.revokeObjectURL(url)
     } catch (err) {
       console.error(err)
-      alert("An error occurred while generating the PDF. Please check your data.")
+      toast.error("An error occurred while generating the PDF. Please check your data.")
     } finally {
       setDownloading(false)
     }

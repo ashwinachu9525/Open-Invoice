@@ -5,10 +5,17 @@ import { EmbedWidgetConfig } from "@/components/forms/embed-widget-config"
 import { ByodbSettingsForm } from "@/components/forms/byodb-settings-form"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Key, Code, ArrowLeft, Database } from "lucide-react"
+import { requireCompany } from "@/lib/auth-helpers"
 
 export const dynamic = "force-dynamic"
 
 export default async function DeveloperPortalPage() {
+  const { company } = await requireCompany()
+  
+  const isPro = company.subscriptionTier === "PRO" || company.subscriptionTier === "ENTERPRISE"
+
+
+
   const [keysResult, customDbResult] = await Promise.all([
     getApiKeys(),
     getCustomDbSettings(),
@@ -70,17 +77,18 @@ export default async function DeveloperPortalPage() {
         </TabsList>
 
         <TabsContent value="keys" className="space-y-6 outline-none">
-          <DeveloperKeysForm initialKeys={formattedKeys} />
+          <DeveloperKeysForm initialKeys={formattedKeys} isPro={isPro} />
         </TabsContent>
-
+ 
         <TabsContent value="embed" className="outline-none">
           <EmbedWidgetConfig apiKeys={formattedKeys} />
         </TabsContent>
-
+ 
         <TabsContent value="byodb" className="outline-none">
           <ByodbSettingsForm 
             initialUrl={customDbResult.url || null} 
             isConfigured={!!customDbResult.isConfigured} 
+            isPro={isPro}
           />
         </TabsContent>
       </Tabs>

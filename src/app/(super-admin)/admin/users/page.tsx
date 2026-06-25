@@ -6,9 +6,10 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Search, ShieldAlert, ShieldCheck, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from "lucide-react"
-import { revalidatePath } from "next/cache"
 import Link from "next/link"
 import { IS_FREE_MODE } from "@/lib/app-mode"
+import { UserActions } from "@/components/admin/user-actions"
+
 
 const ITEMS_PER_PAGE = 10
 
@@ -54,40 +55,6 @@ export default async function ManageUsersPage({
 
   const totalPages = Math.ceil(totalUsers / ITEMS_PER_PAGE)
 
-  // Inline Server Action to toggle block status
-  async function toggleBlock(userId: string, currentStatus: boolean) {
-    "use server"
-    await prisma.user.update({
-      where: { id: userId },
-      data: { isBlocked: !currentStatus }
-    })
-    
-    // Log the action globally
-    await prisma.auditLog.create({
-      data: {
-        companyId: "system",
-        userId: session?.user?.id!,
-        action: !currentStatus ? "USER_BLOCKED" : "USER_UNBLOCKED",
-        entity: "User",
-        entityId: userId,
-      }
-    }).catch(() => {})
-
-    revalidatePath("/admin/users")
-  }
-
-  async function togglePro(userId: string, currentStatus: boolean) {
-    "use server"
-    await prisma.user.update({
-      where: { id: userId },
-      data: { 
-        isPro: !currentStatus,
-        proExpiry: !currentStatus ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) : null // 1 year by default
-      }
-    })
-    
-    revalidatePath("/admin/users")
-  }
 
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto pb-10">
@@ -183,28 +150,12 @@ export default async function ManageUsersPage({
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-2">
-                          {!IS_FREE_MODE && (
-                            <form action={togglePro.bind(null, u.id, u.isPro)}>
-                              <Button 
-                                type="submit" 
-                                variant={u.isPro ? "outline" : "secondary"} 
-                                size="sm"
-                              >
-                                {u.isPro ? "Revoke Pro" : "Make Pro"}
-                              </Button>
-                            </form>
-                          )}
-                          <form action={toggleBlock.bind(null, u.id, u.isBlocked)}>
-                            <Button 
-                              type="submit" 
-                              variant={u.isBlocked ? "outline" : "destructive"} 
-                              size="sm"
-                            >
-                              {u.isBlocked ? "Unblock" : "Block"}
-                            </Button>
-                          </form>
-                        </div>
+                        <UserActions
+                          userId={u.id}
+                          isPro={u.isPro}
+                          isBlocked={u.isBlocked}
+                          currentRole={u.role}
+                        />
                       </td>
                     </tr>
                   )

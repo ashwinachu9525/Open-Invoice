@@ -103,6 +103,10 @@ export async function saveCustomDbSettings(postgresqlUrl: string | null) {
   try {
     const { company } = await requireCompany()
 
+    if (postgresqlUrl && company.subscriptionTier !== "PRO" && company.subscriptionTier !== "ENTERPRISE") {
+      return { error: "Pro subscription required to configure a custom database." }
+    }
+
     // 1. If null, disable BYODB and fall back to global SQLite/PostgreSQL (.env)
     if (!postgresqlUrl || postgresqlUrl.trim().length === 0) {
       await prisma.company.update({

@@ -21,7 +21,7 @@ export function ReferralWidget({ referralCode, rewardClaimed, successfulReferral
       : `/register?ref=${referralCode}`
 
   const whatsappText = encodeURIComponent(
-    `🚀 I'm using Open-Invoice to manage my business invoices. Join with my referral code *${referralCode}* and I get 1 month Pro free!\n\nSign up here: ${referralLink}`
+    `🚀 Join Open-Invoice with my referral code *${referralCode}* and we both get 1 month of Pro features free!\n\nSign up here: ${referralLink}`
   )
 
   function handleCopy() {
@@ -54,7 +54,7 @@ export function ReferralWidget({ referralCode, rewardClaimed, successfulReferral
         <p className="text-xs text-muted-foreground">
           {rewardClaimed
             ? "You've already claimed your 1-month Pro reward. Keep sharing to help friends discover Open-Invoice!"
-            : "Share your unique link. When a friend signs up, you instantly get 1 month of Pro (₹299 value) — free."}
+            : "Share your unique link. When a friend signs up, you and your friend both get 1 month of Pro (₹299 value) — free."}
         </p>
       </CardHeader>
 

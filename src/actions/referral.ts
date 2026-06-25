@@ -32,14 +32,14 @@ export async function ensureReferralCode(userId: string): Promise<string> {
 }
 
 /**
- * Called after a new user registers with a referral code.
- * Awards the referrer 1 month of Pro (immediately, no admin approval).
+ * Called after a new user registers or logs in with a referral code.
+ * Awards both the referrer (one-time) and the referred user 1 month of Pro.
  */
 export async function applyReferralReward(referralCode: string, newUserId: string): Promise<void> {
   try {
     // Find the referrer
     const referrer = await prisma.user.findUnique({
-      where: { referralCode },
+      where: { referralCode: referralCode.toUpperCase().trim() },
       include: { company: true },
     })
 
@@ -48,26 +48,34 @@ export async function applyReferralReward(referralCode: string, newUserId: strin
     // Prevent self-referral
     if (referrer.id === newUserId) return
 
-    // Only reward once per referrer (one-time referral reward)
-    if (referrer.referralRewardClaimed) return
+    // Find the referred user (new/logging-in user)
+    const referredUser = await prisma.user.findUnique({
+      where: { id: newUserId },
+      include: { company: true },
+    })
+    if (!referredUser || !referredUser.companyId) return
 
-    // Grant 1 month of Pro to referrer
+    // Prevent duplicate referrals (only one referral allowed per user)
+    const existingRedemption = await prisma.referralRedemption.findFirst({
+      where: { referredUserId: newUserId },
+    })
+    if (existingRedemption) return
+
     const proExpiry = new Date()
     proExpiry.setMonth(proExpiry.getMonth() + 1)
 
-    await prisma.$transaction([
-      // Mark the referrer's reward as claimed and set Pro
+    const updates: any[] = [
+      // Grant 1 month of Pro to the referred user
       prisma.user.update({
-        where: { id: referrer.id },
+        where: { id: referredUser.id },
         data: {
-          referralRewardClaimed: true,
           isPro: true,
           proExpiry,
         },
       }),
-      // Also upgrade their company tier to PRO
+      // Upgrade referred user's company tier to PRO
       prisma.company.update({
-        where: { id: referrer.companyId },
+        where: { id: referredUser.companyId },
         data: {
           subscriptionTier: "PRO",
           trialStartsAt: new Date(),
@@ -89,9 +97,35 @@ export async function applyReferralReward(referralCode: string, newUserId: strin
         where: { id: newUserId },
         data: { referredBy: referralCode },
       }),
-    ])
+    ]
+
+    // Only reward the referrer if they haven't claimed it yet (one-time reward)
+    if (!referrer.referralRewardClaimed) {
+      updates.push(
+        prisma.user.update({
+          where: { id: referrer.id },
+          data: {
+            referralRewardClaimed: true,
+            isPro: true,
+            proExpiry,
+          },
+        })
+      )
+      updates.push(
+        prisma.company.update({
+          where: { id: referrer.companyId },
+          data: {
+            subscriptionTier: "PRO",
+            trialStartsAt: new Date(),
+            trialEndsAt: proExpiry,
+          },
+        })
+      )
+    }
+
+    await prisma.$transaction(updates)
   } catch (error) {
-    // Non-fatal — referral reward failure should not block registration
+    // Non-fatal — referral reward failure should not block registration or login
     console.error("applyReferralReward error:", error)
   }
 }
@@ -137,8 +171,73 @@ export async function validateReferralCode(code: string) {
     where: { referralCode: code.toUpperCase().trim() },
     select: { id: true, name: true, referralRewardClaimed: true },
   })
-  if (!referrer) return null
-  // Code is valid only if referrer hasn't already claimed their reward
-  if (referrer.referralRewardClaimed) return null
   return referrer
+}
+
+/**
+ * Submit a referral code for a Google SSO user.
+ * Validates the code, sets referredBy, and applies rewards.
+ */
+export async function submitGoogleReferralCode(code: string) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return { error: "Not authenticated" }
+    }
+
+    const userId = session.user.id
+    const referralCode = code.toUpperCase().trim()
+
+    // 1. Validate referral code
+    const referrer = await prisma.user.findFirst({
+      where: { referralCode },
+    })
+
+    if (!referrer) {
+      return { error: "Invalid referral code" }
+    }
+
+    if (referrer.id === userId) {
+      return { error: "You cannot refer yourself" }
+    }
+
+    // 2. Check if already has a referral redemption
+    const existing = await prisma.referralRedemption.findFirst({
+      where: { referredUserId: userId },
+    })
+    if (existing) {
+      return { error: "You have already redeemed a referral" }
+    }
+
+    // 3. Apply the reward
+    await applyReferralReward(referralCode, userId)
+
+    return { success: true }
+  } catch (error) {
+    console.error("submitGoogleReferralCode error:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
+
+/**
+ * Skip/dismiss the Google referral code prompt.
+ * Sets referredBy to "SKIPPED" so they aren't prompted again.
+ */
+export async function skipGoogleReferralCode() {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return { error: "Not authenticated" }
+    }
+
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { referredBy: "SKIPPED" },
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error("skipGoogleReferralCode error:", error)
+    return { error: "An unexpected error occurred" }
+  }
 }

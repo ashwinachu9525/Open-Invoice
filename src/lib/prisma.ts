@@ -61,7 +61,7 @@ export function createPostgresClient(databaseUrl: string, log: ("error" | "warn"
     connectionString: cleanUrl,
     ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
     // Serverless-friendly tuning: reduce max connections per instance and close idle connections aggressively
-    max: process.env.NODE_ENV === "production" ? 2 : 10,
+    max: 2,
     idleTimeoutMillis: 5000, 
     connectionTimeoutMillis: 5000,
   })

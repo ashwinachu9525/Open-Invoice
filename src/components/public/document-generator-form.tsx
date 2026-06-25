@@ -13,6 +13,7 @@ import { Plus, Trash2, Upload, GripVertical } from "lucide-react"
 import dynamic from "next/dynamic"
 import { UpsellModal } from "./upsell-modal"
 import { format } from "date-fns"
+import { toast } from "sonner"
 
 // Dynamically import the PDF previewer to avoid SSR issues
 const DocumentPreview = dynamic(() => import("./document-preview"), { ssr: false })
@@ -45,7 +46,7 @@ export function DocumentGeneratorForm({ defaultType = "invoice" }: { defaultType
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 2 * 1024 * 1024) {
-      alert("Logo must be less than 2MB")
+      toast.error("Logo must be less than 2MB")
       return
     }
     const reader = new FileReader()

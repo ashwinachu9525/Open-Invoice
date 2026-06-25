@@ -8,6 +8,17 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { generateApiKey, revokeApiKey } from "@/actions/api-key"
 import { toast } from "sonner"
 import { Key, Copy, Check, Trash, Plus, Terminal, AlertTriangle, Loader2 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface ApiKeyData {
   id: string
@@ -19,9 +30,10 @@ interface ApiKeyData {
 
 interface DeveloperKeysFormProps {
   initialKeys: ApiKeyData[]
+  isPro?: boolean
 }
 
-export function DeveloperKeysForm({ initialKeys }: DeveloperKeysFormProps) {
+export function DeveloperKeysForm({ initialKeys, isPro = false }: DeveloperKeysFormProps) {
   const [keys, setKeys] = useState<ApiKeyData[]>(initialKeys)
   const [newKeyName, setNewKeyName] = useState("")
   const [plainKey, setPlainKey] = useState<string | null>(null)
@@ -58,10 +70,6 @@ export function DeveloperKeysForm({ initialKeys }: DeveloperKeysFormProps) {
   }
 
   async function handleRevoke(id: string) {
-    if (!confirm("Are you sure you want to revoke this API key? External systems using it will lose access immediately.")) {
-      return
-    }
-
     setRevokingId(id)
     try {
       const res = await revokeApiKey(id)
@@ -188,18 +196,23 @@ const response = await fetch("https://api.openinvoice.dev/api/v1/invoices", {
               </label>
               <Input
                 id="key-name"
-                placeholder="e.g. Production Webhook Engine"
+                placeholder={isPro ? "e.g. Production Webhook Engine" : "Upgrade to Pro to enable key creation"}
                 value={newKeyName}
                 onChange={(e) => setNewKeyName(e.target.value)}
-                disabled={isGenerating}
+                disabled={isGenerating || !isPro}
                 className="glass border-white/10"
               />
             </div>
-            <Button type="submit" disabled={isGenerating} className="bg-indigo-600 hover:bg-indigo-700 h-9">
+            <Button type="submit" disabled={isGenerating || !isPro} className="bg-indigo-600 hover:bg-indigo-700 h-9">
               {isGenerating ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Plus className="w-4 h-4 mr-1" />}
               Generate Key
             </Button>
           </form>
+          {!isPro && (
+            <p className="text-xs text-indigo-400 font-semibold bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3">
+              🔒 API Credentials creation is exclusive to Pro plan users. Please upgrade to generate token for API access.
+            </p>
+          )}
 
           <div className="border-t border-white/5 pt-4">
             <h3 className="text-sm font-semibold text-slate-200 mb-3">Active Keys</h3>
@@ -220,19 +233,41 @@ const response = await fetch("https://api.openinvoice.dev/api/v1/invoices", {
                         <span>Created {new Date(key.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
-                      onClick={() => handleRevoke(key.id)}
-                      disabled={revokingId === key.id}
-                    >
-                      {revokingId === key.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash className="w-4 h-4" />
-                      )}
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger render={
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                          disabled={revokingId === key.id}
+                        >
+                          {revokingId === key.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash className="w-4 h-4" />
+                          )}
+                        </Button>
+                      } />
+                      <AlertDialogContent className="bg-slate-900 border-slate-800 text-slate-100">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-slate-100 font-semibold">Revoke API Key?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-slate-400">
+                            Are you sure you want to revoke this API key? External systems using it will lose access immediately.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="flex gap-2 justify-end">
+                          <AlertDialogCancel className="border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200">
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleRevoke(key.id)}
+                            className="bg-rose-600 hover:bg-rose-700 text-slate-100"
+                          >
+                            Revoke Key
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 ))}
               </div>

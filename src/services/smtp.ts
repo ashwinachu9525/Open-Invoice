@@ -427,3 +427,91 @@ export async function sendTrialReminderEmail(to: string, companyName: string, da
     `),
   })
 }
+
+/**
+ * Sends a team invitation email to the invitee.
+ * Uses the COMPANY's own SMTP settings (Settings → Email/SMTP) — same as invoice emails.
+ * Throws if company SMTP is not configured.
+ */
+export async function sendTeamInviteEmail(params: {
+  companyId: string
+  to: string
+  companyName: string
+  inviterName: string
+  role: string
+  inviteToken: string
+}) {
+  const transporter = await getEmailTransporter(params.companyId)
+  const settings = await prisma.emailSetting.findUnique({ where: { companyId: params.companyId } })
+
+  if (!transporter || !settings) {
+    throw new Error(
+      "Company SMTP is not configured. Go to Settings → Email / SMTP to set it up before inviting team members."
+    )
+  }
+
+  const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
+  const inviteUrl = `${appUrl}/invite?token=${params.inviteToken}`
+  const roleLabel = params.role === "ADMIN" ? "Admin (Full Access)" : "Staff (Invoices Only)"
+
+  const from = settings.fromEmail
+    ? `"${settings.fromName ?? params.companyName}" <${settings.fromEmail}>`
+    : settings.username
+
+  await transporter.sendMail({
+    from,
+    to: params.to,
+    subject: `You're invited to join ${params.companyName} on ${appName}`,
+    html: buildEmailLayout(`Join ${params.companyName}`, `
+      <p style="margin: 0 0 16px; line-height: 1.6;">
+        <strong>${params.inviterName}</strong> has invited you to join
+        <strong>${params.companyName}</strong> on ${appName} as
+        <strong>${roleLabel}</strong>.
+      </p>
+
+      <p style="margin: 0 0 32px; font-size: 14px; color: #6b7280; line-height: 1.6;">
+        Click the button below to accept your invitation. You'll be asked to sign in or
+        create a free account if you don't have one yet.
+      </p>
+
+      <div style="text-align: center; margin: 0 0 32px;">
+        <a href="${inviteUrl}"
+          style="background-color: #4f46e5; color: #ffffff; padding: 16px 40px; border-radius: 8px;
+                 text-decoration: none; font-weight: 700; display: inline-block; font-size: 16px;
+                 letter-spacing: 0.3px;">
+          Accept Invitation
+        </a>
+      </div>
+
+      <div style="background-color: #f9fafb; border-radius: 10px; padding: 20px; text-align: left; margin: 0 0 24px;">
+        <p style="margin: 0 0 8px; font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.8px;">Details</p>
+        <table style="width: 100%; font-size: 14px; color: #4b5563; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 6px 0; color: #9ca3af; width: 40%;">Company</td>
+            <td style="padding: 6px 0; font-weight: 500; color: #111827;">${params.companyName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #9ca3af;">Your Role</td>
+            <td style="padding: 6px 0; font-weight: 500; color: #111827;">${roleLabel}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #9ca3af;">Invited by</td>
+            <td style="padding: 6px 0; font-weight: 500; color: #111827;">${params.inviterName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #9ca3af;">Expires</td>
+            <td style="padding: 6px 0; font-weight: 500; color: #111827;">7 days from now</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="margin: 0; font-size: 13px; color: #9ca3af; line-height: 1.6;">
+        If you weren't expecting this invitation, you can safely ignore this email.<br/>
+        Or copy this link manually: <span style="color: #4f46e5;">${inviteUrl}</span>
+      </p>
+    `),
+  })
+}
+
+

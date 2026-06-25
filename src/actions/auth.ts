@@ -10,6 +10,27 @@ import { Role } from "@prisma/client"
 import { signIn } from "@/auth"
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetSuccessEmail } from "@/services/smtp"
 import { applyReferralReward, ensureReferralCode } from "@/actions/referral"
+import fs from "fs"
+import path from "path"
+
+function getSystemConfigSync() {
+  try {
+    const configPath = path.join(process.cwd(), "src/config/system-settings.json")
+    if (fs.existsSync(configPath)) {
+      const fileContent = fs.readFileSync(configPath, "utf-8")
+      return JSON.parse(fileContent)
+    }
+  } catch (err) {
+    console.error("Failed to read system-settings.json:", err)
+  }
+  return {
+    maintenanceMode: false,
+    registrationOpen: true,
+    systemLogLevel: "info",
+    requireEmailVerification: false
+  }
+}
+
 
 export async function registerUser(data: {
   name: string
@@ -19,6 +40,11 @@ export async function registerUser(data: {
   referralCode?: string
 }) {
   try {
+    const config = getSystemConfigSync()
+    if (!config.registrationOpen) {
+      return { error: "Registration is currently closed by the administrator." }
+    }
+
     const parsed = registerSchema.safeParse(data)
     if (!parsed.success) {
       return { error: parsed.error.issues[0]?.message ?? "Invalid data" }
@@ -38,6 +64,18 @@ export async function registerUser(data: {
     const hashedPassword = await argon2.hash(parsed.data.password)
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
 
+    // Validate the referral code if provided
+    let validReferralCode: string | undefined = undefined
+    if (parsed.data.referralCode) {
+      const referrer = await prisma.user.findUnique({
+        where: { referralCode: parsed.data.referralCode.toUpperCase().trim() },
+        select: { id: true },
+      })
+      if (referrer) {
+        validReferralCode = parsed.data.referralCode.toUpperCase().trim()
+      }
+    }
+
     const company = await prisma.company.create({
       data: { name: `${parsed.data.name}'s Business` },
     })
@@ -49,16 +87,12 @@ export async function registerUser(data: {
         password: hashedPassword,
         role: Role.BUSINESS_OWNER,
         companyId: company.id,
+        referredBy: validReferralCode,
       },
     })
 
     // Generate a unique referral code for the new user
     await ensureReferralCode(newUser.id)
-
-    // Apply referral reward if a valid referral code was provided
-    if (parsed.data.referralCode) {
-      await applyReferralReward(parsed.data.referralCode, newUser.id)
-    }
 
     await prisma.verificationToken.deleteMany({
       where: { identifier: parsed.data.email }
@@ -128,11 +162,36 @@ export async function loginUser(email: string, password: string, totpToken?: str
       return { error: "Please verify your email address before logging in.", requiresVerification: true }
     }
 
+    if (!user || !user.password) {
+      return { error: "Invalid email or password" }
+    }
+
+    // Verify password
+    const isPasswordValid = await argon2.verify(user.password, password)
+    if (!isPasswordValid) {
+      return { error: "Invalid email or password" }
+    }
+
     const payload: any = { email, password, redirect: false }
     if (totpToken) {
       payload.totpToken = totpToken
     }
     await signIn("credentials", payload)
+
+    // Trigger referral reward if the logging-in user was referred and hasn't been rewarded yet
+    if (user.referredBy) {
+      try {
+        const redemption = await prisma.referralRedemption.findFirst({
+          where: { referredUserId: user.id },
+        })
+        if (!redemption) {
+          await applyReferralReward(user.referredBy, user.id)
+        }
+      } catch (err) {
+        console.error("Failed to apply referral reward on login:", err)
+      }
+    }
+
     return { success: true, role: user?.role }
   } catch (error: any) {
     if (error?.message === "MFA_REQUIRED" || error?.cause?.err?.message === "MFA_REQUIRED") {

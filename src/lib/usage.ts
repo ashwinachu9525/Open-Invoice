@@ -4,7 +4,7 @@ import { prisma } from "./prisma"
 export const USAGE_LIMITS = {
   ANONYMOUS_DAILY: 3,
   FREE_USER_DAILY: 10,
-  FREE_CHAT_SESSIONS: 4,
+  FREE_CHAT_SESSIONS: 2,
 }
 
 export type UsageFeature = "document_generation" | "ai_chat"

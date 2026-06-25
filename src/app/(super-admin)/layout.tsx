@@ -1,6 +1,6 @@
 import { ReactNode } from "react"
 import Link from "next/link"
-import { Home, Users, Settings, Menu, Zap, Wrench } from "lucide-react"
+import { Home, Users, Settings, Menu, Zap, Wrench, Database, Upload } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
 import { SignOutButton } from "@/components/dashboard/sign-out-button"
 import { ThemeToggle } from "@/components/dashboard/theme-toggle"
@@ -11,6 +11,8 @@ const superAdminNavItems = [
   { href: "/admin", label: "Dashboard", icon: Home },
   { href: "/admin/users", label: "Manage Users", icon: Users },
   { href: "/admin/tools", label: "Admin Tools", icon: Wrench },
+  { href: "/admin/import", label: "Bulk Importer", icon: Upload },
+  { href: "/admin/sql", label: "SQL Console", icon: Database },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 
