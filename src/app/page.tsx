@@ -11,7 +11,10 @@ import {
   Calculator,
   Receipt,
   FileBox,
-  GlobeLock
+  GlobeLock,
+  MessageCircle,
+  Terminal,
+  Code2
 } from "lucide-react"
 
 import { IS_PAID_MODE } from "@/lib/app-mode"
@@ -30,9 +33,10 @@ export default async function HomePage() {
   }
 
   const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
+  const WHATSAPP_NO = process.env.NEXT_PUBLIC_WHATSAPP_NO || "7012406453"
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-indigo-500/30 overflow-x-hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-indigo-500/30 overflow-x-hidden relative">
       {/* Navigation */}
       <nav className="fixed top-0 w-full border-b border-white/5 bg-slate-950/80 backdrop-blur-xl z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -45,6 +49,7 @@ export default async function HomePage() {
           
           <div className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-300">
             <Link href="#features" className="hover:text-white transition-colors">Features</Link>
+            <Link href="#api" className="hover:text-white transition-colors">REST API</Link>
             <Link href="#free-tools" className="hover:text-white transition-colors">Free Tools</Link>
             <Link href="/terms" className="hover:text-white transition-colors">Policies</Link>
           </div>
@@ -81,7 +86,7 @@ export default async function HomePage() {
           </h1>
           
           <p className="text-lg lg:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Create precise GST invoices instantly using AI. Stop wrestling with clunky B2B ERPs. 
+            Create precise GST invoices instantly using AI. Dispatch via WhatsApp in 1-click. Stop wrestling with clunky B2B ERPs. 
             Enjoy free access to beautiful, self-hosted, and deeply secure invoicing tools.
           </p>
           
@@ -94,17 +99,18 @@ export default async function HomePage() {
               <ArrowRight className="w-5 h-5" />
             </Link>
             <Link 
-              href="#free-tools" 
+              href="#api" 
               className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white px-8 py-4 rounded-full font-semibold hover:bg-white/10 transition-all"
             >
-              Try Free Tools
+              <Terminal className="w-4 h-4 text-purple-400" />
+              Developer API
             </Link>
           </div>
 
           <div className="mt-12 pt-8 flex flex-wrap justify-center gap-8 text-sm text-slate-500 font-medium">
             <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Free Tier Available</div>
-            <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> No B2B Overcomplication</div>
-            <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Perfect for Freelancers</div>
+            <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Instant WhatsApp Delivery</div>
+            <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Programmatic REST API</div>
           </div>
         </div>
       </section>
@@ -159,6 +165,68 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* Developer REST API Section */}
+      <section id="api" className="py-24 bg-slate-900/50 border-b border-white/5 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-xs font-semibold text-purple-300 mb-6">
+                <Terminal className="w-3.5 h-3.5" /> Programmatic v1 REST API
+              </div>
+              <h2 className="text-3xl lg:text-5xl font-extrabold tracking-tight mb-6 leading-tight">
+                Automate Invoicing via <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-400">
+                  Secure REST Endpoints
+                </span>
+              </h2>
+              <p className="text-slate-400 text-lg mb-8 leading-relaxed">
+                Integrate Open Invoice directly into your custom SaaS checkout, billing pipelines, or internal tools. Create GST invoices, dispatch PDF quotations, and trigger WhatsApp delivery programmatically using API Key authentication.
+              </p>
+              <div className="flex flex-wrap items-center gap-4">
+                <Link
+                  href="/docs"
+                  className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-3.5 rounded-full transition-all hover:scale-105 shadow-lg shadow-purple-600/25 text-sm"
+                >
+                  Interactive Swagger Portal
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  href="/api/openapi.json"
+                  target="_blank"
+                  className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-slate-300 hover:text-white font-semibold px-6 py-3.5 rounded-full transition-all text-sm"
+                >
+                  <Code2 className="w-4 h-4 text-slate-400" />
+                  OpenAPI Spec (JSON)
+                </Link>
+              </div>
+            </div>
+
+            <div className="bg-slate-950 p-6 rounded-2xl border border-white/10 font-mono text-sm shadow-2xl relative overflow-hidden">
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10 text-slate-400 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-red-500/80 inline-block" />
+                  <span className="w-3 h-3 rounded-full bg-yellow-500/80 inline-block" />
+                  <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
+                  <span className="ml-2 text-slate-300">bash — cURL</span>
+                </div>
+                <span className="text-emerald-400 font-sans font-semibold text-xs">POST /api/v1/invoices</span>
+              </div>
+              <pre className="text-indigo-300 overflow-x-auto p-2 leading-relaxed text-xs sm:text-sm">
+{`curl -X POST "https://invoice.yourdomain.com/api/v1/invoices" \\
+  -H "Authorization: Bearer oinv_live_92f8a...7e1" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "customerEmail": "client@example.com",
+    "items": [{ "description": "SaaS Consultation", "amount": 1500 }],
+    "currency": "INR",
+    "sendViaWhatsapp": true
+  }'`}
+              </pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Grid */}
       <section id="features" className="py-24">
         <div className="max-w-7xl mx-auto px-6">
@@ -167,8 +235,8 @@ export default async function HomePage() {
             <p className="text-slate-400 text-lg">Everything you need to manage your business, without the bloated B2B menus.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-6">
-            <div className="bg-slate-900/50 p-8 rounded-2xl border border-white/5 flex gap-6 items-start">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="bg-slate-900/50 p-8 rounded-2xl border border-white/5 flex gap-6 items-start hover:border-blue-500/30 transition-all">
               <div className="w-12 h-12 shrink-0 bg-blue-500/10 rounded-xl flex items-center justify-center">
                 <Bot className="w-6 h-6 text-blue-400" />
               </div>
@@ -180,38 +248,62 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <div className="bg-slate-900/50 p-8 rounded-2xl border border-white/5 flex gap-6 items-start">
-              <div className="w-12 h-12 shrink-0 bg-purple-500/10 rounded-xl flex items-center justify-center">
-                <GlobeLock className="w-6 h-6 text-purple-400" />
+            <div className="bg-slate-900/50 p-8 rounded-2xl border border-white/5 flex gap-6 items-start hover:border-emerald-500/30 transition-all">
+              <div className="w-12 h-12 shrink-0 bg-emerald-500/10 rounded-xl flex items-center justify-center">
+                <MessageCircle className="w-6 h-6 text-emerald-400" />
               </div>
               <div>
-                <h3 className="text-xl font-semibold mb-2 leading-snug">Your Data, Our Priority: Privacy and Security Guaranteed</h3>
+                <h3 className="text-xl font-semibold mb-2">1-Click WhatsApp Dispatch</h3>
                 <p className="text-slate-400 leading-relaxed text-sm">
-                  Your financial data is protected by WebAuthn Passkeys and strict tenant isolation. Your data stays yours.
+                  Send GST invoices and payment receipts directly to your client's WhatsApp number instantly without manual attachment download.
                 </p>
               </div>
             </div>
 
-            <div className="bg-slate-900/50 p-8 rounded-2xl border border-white/5 flex gap-6 items-start">
+            <div className="bg-slate-900/50 p-8 rounded-2xl border border-white/5 flex gap-6 items-start hover:border-purple-500/30 transition-all">
+              <div className="w-12 h-12 shrink-0 bg-purple-500/10 rounded-xl flex items-center justify-center">
+                <Terminal className="w-6 h-6 text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold mb-2">Developer REST API</h3>
+                <p className="text-slate-400 leading-relaxed text-sm">
+                  Full API access to generate invoices programmatically, query customer statements, and integrate with your existing checkout.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/50 p-8 rounded-2xl border border-white/5 flex gap-6 items-start hover:border-pink-500/30 transition-all">
+              <div className="w-12 h-12 shrink-0 bg-pink-500/10 rounded-xl flex items-center justify-center">
+                <GlobeLock className="w-6 h-6 text-pink-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold mb-2 leading-snug">WebAuthn Passkey Security</h3>
+                <p className="text-slate-400 leading-relaxed text-sm">
+                  Your financial data is protected by biometrics and strict tenant database isolation. Your ledger stays strictly yours.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/50 p-8 rounded-2xl border border-white/5 flex gap-6 items-start hover:border-orange-500/30 transition-all">
               <div className="w-12 h-12 shrink-0 bg-orange-500/10 rounded-xl flex items-center justify-center">
                 <FileText className="w-6 h-6 text-orange-400" />
               </div>
               <div>
                 <h3 className="text-xl font-semibold mb-2">Instant PDF Exports</h3>
                 <p className="text-slate-400 leading-relaxed text-sm">
-                  Generate pixel-perfect, highly customized PDFs directly from your browser.
+                  Generate pixel-perfect, highly customized PDFs with custom logos directly from your browser engine.
                 </p>
               </div>
             </div>
 
-            <div className="bg-slate-900/50 p-8 rounded-2xl border border-white/5 flex gap-6 items-start">
+            <div className="bg-slate-900/50 p-8 rounded-2xl border border-white/5 flex gap-6 items-start hover:border-teal-500/30 transition-all">
               <div className="w-12 h-12 shrink-0 bg-teal-500/10 rounded-xl flex items-center justify-center">
                 <ShieldCheck className="w-6 h-6 text-teal-400" />
               </div>
               <div>
                 <h3 className="text-xl font-semibold mb-2">GDPR & GST Compliant</h3>
                 <p className="text-slate-400 leading-relaxed text-sm">
-                  We handle the strict compliance rules so you can focus on running your actual business.
+                  We handle Indian GST breakdown (CGST/SGST/IGST) and tax reporting automatically so you can focus on work.
                 </p>
               </div>
             </div>
@@ -247,7 +339,7 @@ export default async function HomePage() {
                 <li><Link href="/free-invoice-software" className="hover:text-white transition-colors">Free Invoice Generator</Link></li>
                 <li><Link href="/free-quotation-software" className="hover:text-white transition-colors">Free Quotation Maker</Link></li>
                 <li><Link href="/free-estimate-software" className="hover:text-white transition-colors">Free Estimate Creator</Link></li>
-                <li><Link href="/login" className="hover:text-white transition-colors">Client Dashboard</Link></li>
+                <li><Link href="/docs" className="hover:text-white transition-colors">REST API Docs</Link></li>
               </ul>
             </div>
             
@@ -290,6 +382,20 @@ export default async function HomePage() {
           </div>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Chat Support Widget */}
+      {WHATSAPP_NO && (
+        <a
+          href={`https://wa.me/${WHATSAPP_NO}?text=Hi,%20I'm%20interested%20in%20Open%20Invoice!`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Chat with us on WhatsApp"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-3.5 rounded-full font-bold shadow-2xl shadow-emerald-500/30 transition-all hover:scale-105 active:scale-95 border border-emerald-400/40"
+        >
+          <MessageCircle className="w-5 h-5 fill-white text-emerald-500" />
+          <span className="hidden sm:inline">WhatsApp Sales & Support</span>
+        </a>
+      )}
     </div>
   )
 }

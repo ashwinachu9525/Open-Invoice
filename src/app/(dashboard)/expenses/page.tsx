@@ -27,13 +27,13 @@ export default async function ExpensesPage() {
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Expenses</h1>
           <p className="text-muted-foreground mt-1">Track your company expenses and receipts.</p>
         </div>
         <Link href="/expenses/new">
-          <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+          <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto">
             <Plus className="h-4 w-4" />
             Add Expense
           </Button>

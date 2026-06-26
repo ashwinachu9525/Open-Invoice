@@ -180,7 +180,7 @@ export function InvoiceFilterBar({
         </Button>
 
         {fyOpen && (
-          <div className="absolute left-0 top-full mt-1.5 z-50 w-52 glass border border-white/12 rounded-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="absolute right-0 md:left-0 md:right-auto top-full mt-1.5 z-50 w-52 glass border border-white/12 rounded-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-3 pt-2.5 pb-1">
               Select Financial Year
             </p>
@@ -224,7 +224,7 @@ export function InvoiceFilterBar({
         </Button>
 
         {rangeOpen && (
-          <div className="absolute left-0 top-full mt-1.5 z-50 glass border border-white/12 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 min-w-fit">
+          <div className="absolute right-0 md:left-0 md:right-auto top-full mt-1.5 z-50 glass border border-white/12 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 min-w-fit">
             {/* Header */}
             <div className="px-4 pt-3 pb-2 border-b border-white/8">
               <p className="text-xs font-semibold text-foreground">Select Date Range</p>

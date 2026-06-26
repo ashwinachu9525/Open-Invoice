@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
 import { Sparkles, Send, Plus, MessageSquare, Trash2, CheckCircle2, Download, Edit } from "lucide-react"
 import { getChatSessions, getChatSession, createChatSession, addMessageToSession, deleteChatSession, appendToLastAssistantMessage } from "@/actions/ai-chat"
 import { createInvoice, getNextInvoiceNumber } from "@/actions/invoice"
@@ -410,8 +411,8 @@ Please generate the structured JSON payload for this invoice immediately. Do not
                 <MessageSquare className="h-4 w-4 shrink-0" />
                 <span className="truncate">{s.title}</span>
               </div>
-              <button onClick={(e) => handleDeleteChat(s.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity">
-                <Trash2 className="h-3 w-3" />
+              <button onClick={(e) => handleDeleteChat(s.id, e)} className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity">
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
           ))}
@@ -425,9 +426,48 @@ Please generate the structured JSON payload for this invoice immediately. Do not
             <Sparkles className="h-5 w-5 text-blue-500" />
             <h2 className="font-semibold text-base md:text-lg">AI Invoice Assistant</h2>
           </div>
-          <Button onClick={handleNewChat} variant="ghost" size="sm" className="md:hidden h-8 px-2 text-xs">
-            <Plus className="h-3 w-3 mr-1" /> New
-          </Button>
+          <div className="flex items-center gap-2 md:hidden">
+            <Sheet>
+              <SheetTrigger render={
+                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs">
+                  <MessageSquare className="h-3.5 w-3.5 mr-1" /> History
+                </Button>
+              } />
+              <SheetContent side="left" className="w-64 glass border-white/10 p-4 flex flex-col gap-4 text-white">
+                <h3 className="font-semibold text-sm">Chat History</h3>
+                <SheetClose render={
+                  <Button onClick={handleNewChat} className="w-full justify-start gap-2" variant="outline">
+                    <Plus className="h-4 w-4" />
+                    New Chat
+                  </Button>
+                } />
+                <div className="flex-1 overflow-y-auto space-y-2">
+                  {sessions.map(s => (
+                    <div 
+                      key={s.id} 
+                      className={`group flex items-center justify-between p-2 rounded-md cursor-pointer text-sm transition-colors ${activeSessionId === s.id ? 'bg-primary/20 text-primary' : 'hover:bg-white/5 text-muted-foreground'}`}
+                    >
+                      <SheetClose render={
+                        <div 
+                          onClick={() => loadSession(s.id)}
+                          className="flex items-center gap-2 truncate flex-1"
+                        />
+                      }>
+                        <MessageSquare className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{s.title}</span>
+                      </SheetClose>
+                      <button onClick={(e) => handleDeleteChat(s.id, e)} className="p-1 hover:text-red-400 transition-opacity ml-2 shrink-0">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </SheetContent>
+            </Sheet>
+            <Button onClick={handleNewChat} variant="ghost" size="sm" className="h-8 px-2 text-xs">
+              <Plus className="h-3 w-3 mr-1" /> New
+            </Button>
+          </div>
         </div>
         
         <div className="flex-1 overflow-y-auto p-4 space-y-6">

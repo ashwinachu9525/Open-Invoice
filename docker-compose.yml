@@ -3,11 +3,14 @@ services:
     build: .
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-invoice_saas}
+      DATABASE_PROVIDER: ${DATABASE_PROVIDER:-postgresql}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/invoice_saas}
       AUTH_SECRET: ${AUTH_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      APP_MODE: ${APP_MODE:-paid}
     depends_on:
       db:
         condition: service_healthy

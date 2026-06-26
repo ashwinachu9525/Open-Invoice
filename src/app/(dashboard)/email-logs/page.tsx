@@ -33,9 +33,10 @@ export default async function EmailLogsPage() {
   })
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Email Logs</h2>
+    <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Email Logs</h1>
+        <p className="text-muted-foreground text-sm mt-1">View history of sent emails</p>
       </div>
 
       <div className="glass rounded-xl border border-white/10 overflow-hidden relative">

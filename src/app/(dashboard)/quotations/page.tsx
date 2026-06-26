@@ -49,13 +49,13 @@ export default async function QuotationsPage({ searchParams }: PageProps) {
           <Link href="/trash">
             <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8 gap-1.5 text-muted-foreground hover:text-red-400">
               <Trash2 className="h-4 w-4" />
-              Trash
+              <span className="hidden sm:inline">Trash</span>
             </Button>
           </Link>
           <Link href="/quotations/new">
             <Button size="sm" className="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-lg gap-1.5">
               <Plus className="h-4 w-4" />
-              New Quotation
+              <span className="hidden sm:inline">New Quotation</span>
             </Button>
           </Link>
         </div>

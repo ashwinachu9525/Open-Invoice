@@ -129,18 +129,18 @@ export default async function SuperAdminDashboard() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-6 lg:w-[850px]">
-          <TabsTrigger value="users"><Users className="w-4 h-4 mr-2"/> Users</TabsTrigger>
-          <TabsTrigger value="companies"><Building className="w-4 h-4 mr-2"/> Companies</TabsTrigger>
-          <TabsTrigger value="requests">
+        <TabsList className="flex w-full overflow-x-auto justify-start lg:grid lg:grid-cols-6 lg:w-[850px] p-1 bg-muted no-scrollbar scrollbar-none">
+          <TabsTrigger value="users" className="shrink-0"><Users className="w-4 h-4 mr-2"/> Users</TabsTrigger>
+          <TabsTrigger value="companies" className="shrink-0"><Building className="w-4 h-4 mr-2"/> Companies</TabsTrigger>
+          <TabsTrigger value="requests" className="shrink-0">
             <BadgeCheck className="w-4 h-4 mr-2"/> Pro Requests
             {pendingProRequests.length > 0 && (
               <span className="ml-2 bg-indigo-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{pendingProRequests.length}</span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="logs"><Activity className="w-4 h-4 mr-2"/> Audit Logs</TabsTrigger>
-          <TabsTrigger value="errors"><AlertTriangle className="w-4 h-4 mr-2"/> Errors</TabsTrigger>
-          <TabsTrigger value="feedback"><MessageSquare className="w-4 h-4 mr-2"/> Feedback</TabsTrigger>
+          <TabsTrigger value="logs" className="shrink-0"><Activity className="w-4 h-4 mr-2"/> Audit Logs</TabsTrigger>
+          <TabsTrigger value="errors" className="shrink-0"><AlertTriangle className="w-4 h-4 mr-2"/> Errors</TabsTrigger>
+          <TabsTrigger value="feedback" className="shrink-0"><MessageSquare className="w-4 h-4 mr-2"/> Feedback</TabsTrigger>
         </TabsList>
 
         {/* Tab: Users */}

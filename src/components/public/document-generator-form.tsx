@@ -195,7 +195,7 @@ export function DocumentGeneratorForm({ defaultType = "invoice" }: { defaultType
                 <button
                   type="button"
                   onClick={() => remove(index)}
-                  className="absolute -top-3 -right-3 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                  className="absolute -top-3 -right-3 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 rounded-full p-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all shadow-sm"
                   title="Remove Item"
                 >
                   <Trash2 className="w-4 h-4" />

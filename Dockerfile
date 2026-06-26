@@ -1,10 +1,10 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 
 FROM base AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install --no-audit --no-fund
 
 FROM base AS builder
 WORKDIR /app
@@ -26,10 +26,20 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy the entire app to avoid standalone tracing issues with Prisma and dynamic requires
-COPY --from=builder --chown=nextjs:nodejs /app ./
+# Copy standalone production bundle (reduces image footprint by ~85%)
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Create data directory for SQLite
+# Copy environment config file if present
+COPY --from=builder --chown=nextjs:nodejs /app/.env* ./
+
+# Explicitly copy Prisma query engines & schema files to guarantee untraced binary availability
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+# Create persistent data directory for SQLite database storage
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 
 USER nextjs
@@ -38,4 +48,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

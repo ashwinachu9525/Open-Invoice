@@ -14,11 +14,14 @@ export default async function CatalogPage() {
   const { items, error } = await getCatalogItems()
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Catalog</h2>
+    <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Catalog</h1>
+          <p className="text-muted-foreground text-sm mt-1">Manage your products and services</p>
+        </div>
         <Link href="/catalog/new">
-          <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)]">
+          <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)] w-full sm:w-auto">
             <Plus className="w-4 h-4" />
             Add Product / Service
           </Button>

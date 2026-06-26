@@ -647,3 +647,84 @@ export async function getSystemDiagnostics() {
   }
 }
 
+export async function inspectApiKeyAdmin(keyOrHint: string) {
+  const session = await auth()
+  if (session?.user?.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized" }
+  }
+  
+  if (!keyOrHint || keyOrHint.trim() === "") {
+    return { success: false, error: "API Key or hint is required" }
+  }
+
+  try {
+    let keyHash = ""
+    let keyRecord = null
+    const trimmed = keyOrHint.trim()
+
+    try {
+      const { hashToken } = await import("@/lib/crypto")
+      keyHash = hashToken(trimmed)
+      keyRecord = await prisma.apiKey.findUnique({
+        where: { keyHash },
+        include: { company: true }
+      })
+    } catch (e) {
+      // ignore
+    }
+
+    if (!keyRecord) {
+      keyRecord = await prisma.apiKey.findFirst({
+        where: {
+          OR: [
+            { keyHint: { contains: trimmed } },
+            { id: trimmed }
+          ]
+        },
+        include: { company: true }
+      })
+    }
+
+    if (!keyRecord) {
+      return { success: false, error: "API Key not found by key value, hint, or ID." }
+    }
+
+    return {
+      success: true,
+      data: {
+        id: keyRecord.id,
+        name: keyRecord.name,
+        keyHint: keyRecord.keyHint,
+        companyName: keyRecord.company.name,
+        companyId: keyRecord.companyId,
+        isActive: keyRecord.isActive,
+        createdAt: keyRecord.createdAt.toISOString(),
+        expiresAt: keyRecord.expiresAt ? keyRecord.expiresAt.toISOString() : null
+      }
+    }
+  } catch (error: any) {
+    return { success: false, error: error.message || "Failed to inspect API key." }
+  }
+}
+
+export async function toggleApiKeyActiveAdmin(keyId: string) {
+  const session = await auth()
+  if (session?.user?.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized" }
+  }
+  try {
+    const existing = await prisma.apiKey.findUnique({ where: { id: keyId } })
+    if (!existing) return { success: false, error: "API Key not found" }
+    
+    await prisma.apiKey.update({
+      where: { id: keyId },
+      data: { isActive: !existing.isActive }
+    })
+    
+    return { success: true, message: `API Key is now ${!existing.isActive ? "active" : "inactive"}.` }
+  } catch (error: any) {
+    return { success: false, error: error.message || "Failed to update API Key." }
+  }
+}
+
+

@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { verifyLlmKey, getReferralRedemptions, revokeReferralRedemption } from "@/actions/admin-tools"
-import { Wrench, CheckCircle2, XCircle, Loader2, Gift, Trash2 } from "lucide-react"
+import { verifyLlmKey, getReferralRedemptions, revokeReferralRedemption, inspectApiKeyAdmin, toggleApiKeyActiveAdmin } from "@/actions/admin-tools"
+import { Wrench, CheckCircle2, XCircle, Loader2, Gift, Trash2, Key, Shield, Calendar } from "lucide-react"
 import { toast } from "sonner"
 import {
   AlertDialog,
@@ -76,6 +76,50 @@ export default function AdminToolsPage() {
       toast.error(err.message || "An error occurred while revoking.")
     } finally {
       setRevokingId(null)
+    }
+  }
+
+  // API Key Inspector handlers
+  const [inspectQuery, setInspectQuery] = useState("")
+  const [isInspecting, setIsInspecting] = useState(false)
+  const [keyDetails, setKeyDetails] = useState<any | null>(null)
+  const [togglingActive, setTogglingActive] = useState(false)
+
+  async function handleInspect(e: React.FormEvent) {
+    e.preventDefault()
+    if (!inspectQuery.trim()) return
+    setIsInspecting(true)
+    setKeyDetails(null)
+    try {
+      const res = await inspectApiKeyAdmin(inspectQuery)
+      if (res.success && res.data) {
+        setKeyDetails(res.data)
+        toast.success("API Key found")
+      } else {
+        toast.error(res.error || "API Key not found")
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An error occurred during inspection")
+    } finally {
+      setIsInspecting(false)
+    }
+  }
+
+  async function handleToggleActive() {
+    if (!keyDetails) return
+    setTogglingActive(true)
+    try {
+      const res = await toggleApiKeyActiveAdmin(keyDetails.id)
+      if (res.success) {
+        toast.success(res.message)
+        setKeyDetails((prev: any) => ({ ...prev, isActive: !prev.isActive }))
+      } else {
+        toast.error(res.error || "Failed to update key status")
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update key status")
+    } finally {
+      setTogglingActive(false)
     }
   }
 
@@ -250,6 +294,110 @@ export default function AdminToolsPage() {
           </Card>
         </div>
       </div>
+
+      {/* API Key Inspector & Manager */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="w-5 h-5 text-indigo-400" />
+            API Key Inspector &amp; Manager
+          </CardTitle>
+          <CardDescription>
+            Inspect details, company association, and active status of any API Key in the system by its value, hint, or ID.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <form onSubmit={handleInspect} className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1">
+              <Input
+                placeholder="Enter full API key, key hint (e.g. live_...), or ID..."
+                value={inspectQuery}
+                onChange={(e) => setInspectQuery(e.target.value)}
+                required
+                className="bg-slate-900 border-white/10"
+              />
+            </div>
+            <Button type="submit" disabled={isInspecting || !inspectQuery.trim()} className="sm:w-48 bg-indigo-600 hover:bg-indigo-500">
+              {isInspecting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Inspecting...
+                </>
+              ) : (
+                "Inspect API Key"
+              )}
+            </Button>
+          </form>
+
+          {keyDetails && (
+            <div className="border border-white/10 rounded-xl p-6 bg-slate-950/40 backdrop-blur-md grid gap-6 md:grid-cols-2">
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Key Information</Label>
+                  <div className="mt-1.5 flex flex-col gap-1">
+                    <div className="font-semibold text-slate-100 text-base">{keyDetails.name}</div>
+                    <div className="text-slate-400 font-mono text-sm">Hint: {keyDetails.keyHint}</div>
+                    <div className="text-xs text-slate-500 font-mono mt-0.5">ID: {keyDetails.id}</div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 items-center">
+                  <div>
+                    <Label className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Status</Label>
+                    <div className="mt-1">
+                      {keyDetails.isActive ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 flex flex-col justify-between">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Company</Label>
+                    <div className="text-sm font-semibold text-slate-200 mt-1">{keyDetails.companyName}</div>
+                    <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">{keyDetails.companyId}</div>
+                  </div>
+                  <div>
+                    <Label className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Dates</Label>
+                    <div className="text-xs text-slate-300 mt-1 flex flex-col gap-1">
+                      <span className="flex items-center gap-1.5"><Calendar className="w-3 h-3 text-slate-500" /> Created: {new Date(keyDetails.createdAt).toLocaleDateString()}</span>
+                      <span className="flex items-center gap-1.5"><Calendar className="w-3 h-3 text-slate-500" /> Expires: {keyDetails.expiresAt ? new Date(keyDetails.expiresAt).toLocaleDateString() : "Never"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/5 flex justify-end">
+                  <Button
+                    type="button"
+                    onClick={handleToggleActive}
+                    disabled={togglingActive}
+                    variant={keyDetails.isActive ? "destructive" : "default"}
+                    className={keyDetails.isActive ? "bg-rose-600/10 border border-rose-600/20 text-rose-400 hover:bg-rose-600/20" : "bg-emerald-600/10 border border-emerald-600/20 text-emerald-400 hover:bg-emerald-600/20"}
+                  >
+                    {togglingActive ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...
+                      </>
+                    ) : keyDetails.isActive ? (
+                      "Deactivate API Key"
+                    ) : (
+                      "Activate API Key"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
