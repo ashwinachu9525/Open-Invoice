@@ -717,15 +717,41 @@ model SystemConfig {
 }
 
 model Webhook {
-  id        String   @id @default(cuid())
+  id        String       @id @default(cuid())
   companyId String
   url       String
-  events    String   @default("invoice.created,invoice.paid")
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  events    String       @default("invoice.created,invoice.paid")
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  logs      WebhookLog[]
 
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   @@index([companyId])
+}
+
+model WebhookLog {
+  id           String   @id @default(cuid())
+  webhookId    String
+  event        String
+  url          String
+  statusCode   Int?
+  requestBody  String
+  responseBody String?
+  success      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  webhook      Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  @@index([webhookId])
+}
+
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  from      String   @default("USD")
+  to        String   @default("INR")
+  rate      Float
+  updatedAt DateTime @updatedAt
+
+  @@unique([from, to])
 }
 
 

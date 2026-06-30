@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { getTenantDb } from "@/lib/tenant-db"
 import { inngest } from "@/lib/inngest/client"
+import { generateReceiptPdf } from "@/services/pdf"
+import { sendInvoiceEmail } from "@/services/smtp"
 
 const paymentSchema = z.object({
   invoiceId: z.string(),
@@ -91,6 +93,34 @@ export async function recordPayment(data: unknown) {
         })
       } catch (err) {
         console.error("Failed to trigger webhook dispatch job for invoice.paid:", err)
+      }
+
+      if (invoice.customer.email) {
+        try {
+          const receiptPdfBuffer = await generateReceiptPdf(invoice.id)
+          await sendInvoiceEmail({
+            companyId: company.id,
+            to: invoice.customer.email,
+            subject: `Payment Receipt: Invoice ${invoice.invoiceNumber}`,
+            html: `
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+                <h2 style="color: #10b981; margin-top: 0;">Payment Received!</h2>
+                <p>Dear ${invoice.customer.name},</p>
+                <p>Thank you for your payment. We have successfully processed your payment of <strong>₹${parsed.data.amount}</strong> for Invoice <strong>${invoice.invoiceNumber}</strong>.</p>
+                <p>The invoice is now fully paid. Please find your payment receipt attached as a PDF.</p>
+                <p style="margin-top: 24px; font-size: 14px; color: #6b7280;">Best regards,<br/>${company.name}</p>
+              </div>
+            `,
+            attachments: [
+              {
+                filename: `Receipt-${invoice.invoiceNumber}.pdf`,
+                content: receiptPdfBuffer
+              }
+            ]
+          })
+        } catch (emailErr) {
+          console.error("Failed to auto-send receipt email:", emailErr)
+        }
       }
     }
 

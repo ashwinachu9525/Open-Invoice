@@ -107,3 +107,28 @@ export async function generateQuotationPdf(quotationId: string, companyId?: stri
 
   return buffer
 }
+
+import { ReceiptPDFDocument } from "@/pdf/receipt-document"
+
+export async function generateReceiptPdf(invoiceId: string, companyId?: string): Promise<Buffer> {
+  const db = companyId ? await getTenantDb(companyId) : prisma
+  const invoice = await db.invoice.findUnique({
+    where: { id: invoiceId },
+    include: {
+      payments: {
+        orderBy: { createdAt: "desc" }
+      },
+      customer: true,
+      company: true
+    },
+  })
+
+  if (!invoice) throw new Error("Invoice not found")
+
+  const buffer = await renderToBuffer(
+    ReceiptPDFDocument({ invoice: invoice as any })
+  )
+
+  return buffer
+}
+

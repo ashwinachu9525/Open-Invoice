@@ -13,6 +13,7 @@ import { SendWhatsappButton } from "@/components/invoices/send-whatsapp-button"
 import { RecurringInvoiceModal } from "@/components/invoices/recurring-invoice-modal"
 import { WhatsAppShareButton } from "@/components/invoices/whatsapp-share-button"
 import { Download, Building2, User, FileText, AlertTriangle, Info, TrendingDown } from "lucide-react"
+import { ComplianceButtons } from "@/components/invoices/compliance-buttons"
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   DRAFT:          { label: "Draft",          class: "bg-gray-500/20 text-gray-400 border-gray-500/30" },
@@ -66,6 +67,19 @@ export default async function InvoiceDetailPage({
               Download PDF
             </Button>
           </Link>
+          {invoice.status === "PAID" && (
+            <Link href={`/api/invoices/${invoice.id}/receipt`} target="_blank">
+              <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8 gap-1.5 text-emerald-400 border-emerald-500/20">
+                <Download className="h-4 w-4" />
+                Receipt PDF
+              </Button>
+            </Link>
+          )}
+          <ComplianceButtons 
+            invoiceId={invoice.id} 
+            showEInvoice={!!invoice.company.gstNumber} 
+            showEWayBill={!!invoice.company.gstNumber && invoice.finalAmount >= 50000} 
+          />
           {invoice.status !== "PAID" && (
             <Link href={`/invoices/${invoice.id}/edit`}>
               <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8 gap-1.5">

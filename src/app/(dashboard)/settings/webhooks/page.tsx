@@ -7,13 +7,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { getWebhooks, createWebhook, deleteWebhook, toggleWebhook } from "@/actions/webhook"
+import { getWebhookLogs, retryWebhookLog } from "@/actions/webhook-logs"
 import { getCompany } from "@/actions/company"
 import { toast } from "sonner"
-import { Trash2, Link as LinkIcon, ShieldAlert, Loader2, Copy, Check } from "lucide-react"
+import { Trash2, Link as LinkIcon, ShieldAlert, Loader2, Copy, Check, Info, RefreshCw } from "lucide-react"
 
 export default function WebhooksPage() {
   const [webhooks, setWebhooks] = useState<any[]>([])
+  const [logs, setLogs] = useState<any[]>([])
   const [companyId, setCompanyId] = useState<string>("")
   const [url, setUrl] = useState("")
   const [createdEvent, setCreatedEvent] = useState(true)
@@ -21,6 +24,19 @@ export default function WebhooksPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [copied, setCopied] = useState(false)
+  
+  // Log Inspection Modal State
+  const [selectedLog, setSelectedLog] = useState<any>(null)
+  const [retryingLogId, setRetryingLogId] = useState<string | null>(null)
+
+  async function loadLogs() {
+    try {
+      const logsList = await getWebhookLogs()
+      setLogs(logsList)
+    } catch {
+      toast.error("Failed to load delivery logs")
+    }
+  }
 
   useEffect(() => {
     async function fetchData() {
@@ -31,6 +47,7 @@ export default function WebhooksPage() {
         ])
         setWebhooks(hooksList)
         if (comp) setCompanyId(comp.id)
+        await loadLogs()
       } catch (err) {
         toast.error("Failed to load settings")
       } finally {
@@ -110,6 +127,24 @@ export default function WebhooksPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  async function handleRetry(logId: string) {
+    setRetryingLogId(logId)
+    try {
+      const res = await retryWebhookLog(logId)
+      if (res.success) {
+        toast.success("Webhook retried successfully")
+        setSelectedLog(null)
+        await loadLogs()
+      } else {
+        toast.error(res.error || "Failed to retry webhook")
+      }
+    } catch {
+      toast.error("An error occurred during webhook retry")
+    } finally {
+      setRetryingLogId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-[300px] w-full items-center justify-center">
@@ -126,7 +161,7 @@ export default function WebhooksPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Left Column: Form & Guide */}
+        {/* Left Column: Form & Configs */}
         <div className="md:col-span-2 space-y-6">
           {/* Register Card */}
           <Card>
@@ -236,6 +271,72 @@ export default function WebhooksPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Webhook Delivery Logs Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Webhook Delivery Logs</CardTitle>
+                <CardDescription>History of recent webhook delivery attempts.</CardDescription>
+              </div>
+              <Button variant="ghost" size="icon" onClick={loadLogs}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {logs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No delivery logs recorded yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-muted-foreground text-left">
+                        <th className="pb-2 font-semibold">Event</th>
+                        <th className="pb-2 font-semibold">URL</th>
+                        <th className="pb-2 font-semibold">Status</th>
+                        <th className="pb-2 font-semibold">Time</th>
+                        <th className="pb-2 font-semibold text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {logs.map((log) => (
+                        <tr key={log.id} className="hover:bg-muted/30">
+                          <td className="py-2.5 font-mono text-xs">{log.event}</td>
+                          <td className="py-2.5 max-w-[200px] truncate">{log.url}</td>
+                          <td className="py-2.5">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                                log.success
+                                  ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                  : "bg-red-500/10 text-red-500 border border-red-500/20"
+                              }`}
+                            >
+                              {log.statusCode || "ERR"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 text-xs text-muted-foreground">
+                            {new Date(log.createdAt).toLocaleTimeString()}
+                          </td>
+                          <td className="py-2.5 text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setSelectedLog(log)}
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            >
+                              <Info className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right Column: Webhook Secret & Security Info */}
@@ -290,6 +391,76 @@ export default function WebhooksPage() {
           </Card>
         </div>
       </div>
+
+      {/* Delivery Log Inspection Modal */}
+      {selectedLog && (
+        <Dialog open={!!selectedLog} onOpenChange={(open) => { if (!open) setSelectedLog(null) }}>
+          <DialogContent className="max-w-2xl bg-slate-900 border-slate-800 text-slate-100">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold">Delivery Log Details</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                Inspect details of the webhook delivery event.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4 max-h-[450px] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-400 uppercase">Event Name</span>
+                  <span className="font-mono text-slate-200">{selectedLog.event}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-400 uppercase">Target URL</span>
+                  <span className="truncate block text-slate-200">{selectedLog.url}</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-400 uppercase">Status Code</span>
+                  <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${selectedLog.success ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}`}>
+                    {selectedLog.statusCode || "FAILED"}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-400 uppercase">Timestamp</span>
+                  <span className="text-slate-200">{new Date(selectedLog.createdAt).toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <span className="block text-xs font-semibold text-slate-400 uppercase">Payload Body (Sent)</span>
+                <pre className="text-xs bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-slate-300 overflow-x-auto max-h-[160px] overflow-y-auto font-mono">
+                  {selectedLog.requestBody ? JSON.stringify(JSON.parse(selectedLog.requestBody), null, 2) : ""}
+                </pre>
+              </div>
+
+              <div className="space-y-1">
+                <span className="block text-xs font-semibold text-slate-400 uppercase">Response Body (Received)</span>
+                <pre className="text-xs bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-slate-300 overflow-x-auto max-h-[120px] overflow-y-auto">
+                  {selectedLog.responseBody || <span className="text-slate-500 italic">No response payload returned</span>}
+                </pre>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setSelectedLog(null)} disabled={!!retryingLogId}>
+                Close
+              </Button>
+              <Button
+                onClick={() => handleRetry(selectedLog.id)}
+                disabled={!!retryingLogId}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {retryingLogId ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Retrying...
+                  </>
+                ) : (
+                  "Retry Delivery Now"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

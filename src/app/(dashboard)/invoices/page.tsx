@@ -9,6 +9,11 @@ import { Plus, Sparkles, FileText, TrendingUp, Clock, CheckCircle2, AlertCircle,
 import { InvoiceFilterBar } from "@/components/invoices/invoice-filter-bar"
 import { InvoiceListClient } from "@/components/invoices/invoice-list-client"
 import { Suspense } from "react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CalendarClock } from "lucide-react"
+import { RecurringSchedulesList } from "@/components/invoices/recurring-schedules-list"
+import { requireCompany } from "@/lib/auth-helpers"
+import { getTenantDb } from "@/lib/tenant-db"
 
 
 const statusConfig: Record<string, { label: string; class: string }> = {
@@ -36,12 +41,33 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
   const currentPage = Number(page) || 1
   const limit = 10
 
-  const { invoices, totalPages, totalInvoices, stats } = await getInvoices({ 
-    dateFrom: from, 
-    dateTo: to,
-    search,
-    page: currentPage,
-    limit,
+  const [invoicesData, authData] = await Promise.all([
+    getInvoices({ 
+      dateFrom: from, 
+      dateTo: to,
+      search,
+      page: currentPage,
+      limit,
+    }),
+    requireCompany()
+  ])
+
+  const { invoices, totalPages, totalInvoices, stats } = invoicesData
+  const { company } = authData
+  const prisma = await getTenantDb(company.id)
+
+  const recurringSchedules = await prisma.recurringSchedule.findMany({
+    where: {
+      invoice: { companyId: company.id }
+    },
+    include: {
+      invoice: {
+        include: {
+          customer: true
+        }
+      }
+    },
+    orderBy: { nextRunAt: "asc" }
   })
 
   const { totalAmount, paidCount, pendingCount, overdueCount } = stats
@@ -137,53 +163,77 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
       </div>
 
       {/* ── Invoice Table ── */}
-      <Card className="glass glass-card border-white/10">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center justify-between">
-            {fy
-              ? `Invoices — ${fy.replace("-", "–")}`
-              : from || to
-              ? `Invoices — ${from ?? "…"} to ${to ?? "…"}`
-              : "All Invoices"}
-            <span className="text-xs text-muted-foreground font-normal">{totalInvoices} total</span>
-          </CardTitle>
-        </CardHeader>
-        <Separator className="bg-white/8" />
-        <CardContent className="p-0">
-          {invoices.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/5 border border-white/10">
-                <FileText className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <div className="text-center">
-                <p className="font-medium">No invoices found</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {from || to || fy
-                    ? "Try a different date range or clear the filter."
-                    : "Create your first invoice to get started."}
-                </p>
-              </div>
-              {!from && !to && !fy && (
-                <Link href="/invoices/new">
-                  <Button className="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white gap-1.5">
-                    <Plus className="h-4 w-4" />
-                    Create Invoice
-                  </Button>
-                </Link>
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList className="w-[360px] mb-4 bg-white/5 border border-white/10">
+          <TabsTrigger value="all" className="gap-1.5 flex-1"><FileText className="h-4 w-4" /> All Invoices</TabsTrigger>
+          <TabsTrigger value="recurring" className="gap-1.5 flex-1"><CalendarClock className="h-4 w-4" /> Recurring Schedules</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="mt-0">
+          <Card className="glass glass-card border-white/10">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                {fy
+                  ? `Invoices — ${fy.replace("-", "–")}`
+                  : from || to
+                  ? `Invoices — ${from ?? "…"} to ${to ?? "…"}`
+                  : "All Invoices"}
+                <span className="text-xs text-muted-foreground font-normal">{totalInvoices} total</span>
+              </CardTitle>
+            </CardHeader>
+            <Separator className="bg-white/8" />
+            <CardContent className="p-0">
+              {invoices.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-4">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/5 border border-white/10">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-medium">No invoices found</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {from || to || fy
+                        ? "Try a different date range or clear the filter."
+                        : "Create your first invoice to get started."}
+                    </p>
+                  </div>
+                  {!from && !to && !fy && (
+                    <Link href="/invoices/new">
+                      <Button className="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white gap-1.5">
+                        <Plus className="h-4 w-4" />
+                        Create Invoice
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <InvoiceListClient 
+                  invoices={invoices} 
+                  currentPage={currentPage} 
+                  limit={limit} 
+                  totalPages={totalPages} 
+                  totalInvoices={totalInvoices} 
+                  searchParamsProps={Object.fromEntries(Object.entries({ from, to, fy, search }).filter(([_, v]) => v)) as Record<string, string>}
+                />
               )}
-            </div>
-          ) : (
-            <InvoiceListClient 
-              invoices={invoices} 
-              currentPage={currentPage} 
-              limit={limit} 
-              totalPages={totalPages} 
-              totalInvoices={totalInvoices} 
-              searchParamsProps={Object.fromEntries(Object.entries({ from, to, fy, search }).filter(([_, v]) => v)) as Record<string, string>}
-            />
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="recurring" className="mt-0">
+          <Card className="glass glass-card border-white/10">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                Active Schedules
+                <span className="text-xs text-muted-foreground font-normal">{recurringSchedules.length} total</span>
+              </CardTitle>
+            </CardHeader>
+            <Separator className="bg-white/8" />
+            <CardContent className="p-4">
+              <RecurringSchedulesList initialSchedules={recurringSchedules} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

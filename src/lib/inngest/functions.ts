@@ -396,6 +396,10 @@ export const dispatchWebhook = inngest.createFunction(
         .update(bodyString)
         .digest("hex")
 
+      let statusCode: number | null = null
+      let responseBody: string | null = null
+      let success = false
+
       try {
         const response = await fetch(hook.url, {
           method: "POST",
@@ -406,14 +410,71 @@ export const dispatchWebhook = inngest.createFunction(
           },
           body: bodyString,
         })
-        dispatched.push({ url: hook.url, status: response.status })
+        statusCode = response.status
+        success = response.ok
+        try {
+          responseBody = await response.text()
+        } catch {}
+        dispatched.push({ url: hook.url, status: statusCode, success })
       } catch (err: any) {
         console.error(`Failed to dispatch webhook to ${hook.url}:`, err)
-        dispatched.push({ url: hook.url, error: err.message || "Fetch failed" })
+        responseBody = err.message || "Fetch failed"
+        dispatched.push({ url: hook.url, error: responseBody, success: false })
+      }
+
+      try {
+        await prisma.webhookLog.create({
+          data: {
+            webhookId: hook.id,
+            event: webhookEvent,
+            url: hook.url,
+            statusCode,
+            requestBody: bodyString,
+            responseBody,
+            success,
+          }
+        })
+      } catch (logErr) {
+        console.error("Failed to write webhook log:", logErr)
       }
     }
 
     return { dispatchedCount: dispatched.length, details: dispatched }
+  }
+)
+
+export const syncExchangeRates = inngest.createFunction(
+  { id: "sync-exchange-rates", triggers: [{ cron: "0 1 * * *" }] },
+  async () => {
+    try {
+      const response = await fetch("https://open.er-api.com/v6/latest/INR")
+      if (!response.ok) {
+        throw new Error(`Failed to fetch rates: ${response.statusText}`)
+      }
+      const data = await response.json()
+      const rates = data.rates
+      if (!rates) throw new Error("No rates returned in API response")
+
+      const targetCurrencies = ["USD", "EUR", "GBP", "AED", "SGD", "AUD", "CAD"]
+      const updated = []
+
+      for (const cur of targetCurrencies) {
+        const rateInInr = rates[cur] ? 1 / rates[cur] : null
+        if (rateInInr) {
+          const record = await prisma.exchangeRate.upsert({
+            where: { from_to: { from: cur, to: "INR" } },
+            update: { rate: rateInInr },
+            create: { from: cur, to: "INR", rate: rateInInr }
+          })
+          updated.push({ currency: cur, rate: rateInInr })
+        }
+      }
+
+      return { success: true, updated }
+    } catch (err: any) {
+      console.error("Exchange rate sync failed:", err)
+      return { success: false, error: err.message || "Failed to sync exchange rates" }
+    }
   }
 )
 
@@ -424,4 +485,5 @@ export const inngestFunctions = [
   cleanupDeletedAccounts,
   checkTrialReminders,
   dispatchWebhook,
+  syncExchangeRates,
 ]
