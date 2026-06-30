@@ -10,27 +10,7 @@ import { Role } from "@prisma/client"
 import { signIn } from "@/auth"
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetSuccessEmail } from "@/services/smtp"
 import { applyReferralReward, ensureReferralCode } from "@/actions/referral"
-import fs from "fs"
-import path from "path"
-
-function getSystemConfigSync() {
-  try {
-    const configPath = path.join(process.cwd(), "src/config/system-settings.json")
-    if (fs.existsSync(configPath)) {
-      const fileContent = fs.readFileSync(configPath, "utf-8")
-      return JSON.parse(fileContent)
-    }
-  } catch (err) {
-    console.error("Failed to read system-settings.json:", err)
-  }
-  return {
-    maintenanceMode: false,
-    registrationOpen: true,
-    systemLogLevel: "info",
-    requireEmailVerification: false
-  }
-}
-
+import { getSystemConfig } from "@/lib/system-config"
 
 export async function registerUser(data: {
   name: string
@@ -40,7 +20,7 @@ export async function registerUser(data: {
   referralCode?: string
 }) {
   try {
-    const config = getSystemConfigSync()
+    const config = await getSystemConfig()
     if (!config.registrationOpen) {
       return { error: "Registration is currently closed by the administrator." }
     }

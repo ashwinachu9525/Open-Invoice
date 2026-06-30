@@ -24,6 +24,8 @@ export interface TaxBreakdown {
   vatAmount: number
   tdsPercentage: number
   tdsAmount: number
+  tcsRate?: number
+  tcsAmount?: number
   finalAmount: number
   isInterState: boolean
   items: LineItemResult[]
@@ -75,6 +77,7 @@ export function calculateInvoiceTax(params: {
   sellerState?: string | null
   buyerState?: string | null
   tdsPercentage?: number
+  tcsRate?: number
   taxJurisdiction?: string
 }): TaxBreakdown {
   const items = params.items.map(calculateLineItem)
@@ -109,7 +112,11 @@ export function calculateInvoiceTax(params: {
 
   const tdsPercentage = params.tdsPercentage ?? 0
   const tdsAmount = round2(taxableAmount * (tdsPercentage / 100))
-  const finalAmount = round2(taxableAmount + totalTax - tdsAmount)
+  
+  const tcsRate = params.tcsRate ?? 0
+  const tcsAmount = round2((taxableAmount + totalTax) * (tcsRate / 100))
+  
+  const finalAmount = round2(taxableAmount + totalTax + tcsAmount - tdsAmount)
 
   return {
     subTotal,
@@ -122,6 +129,8 @@ export function calculateInvoiceTax(params: {
     vatAmount,
     tdsPercentage,
     tdsAmount,
+    tcsRate,
+    tcsAmount,
     finalAmount,
     isInterState: interState,
     items,

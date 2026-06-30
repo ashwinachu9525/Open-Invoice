@@ -10,26 +10,7 @@ import * as argon2 from "argon2"
 import { Role } from "@prisma/client"
 import { authConfig } from "@/auth.config"
 import { sendWelcomeEmail } from "@/services/smtp"
-import fs from "fs"
-import path from "path"
-
-function getSystemConfigSync() {
-  try {
-    const configPath = path.join(process.cwd(), "src/config/system-settings.json")
-    if (fs.existsSync(configPath)) {
-      const fileContent = fs.readFileSync(configPath, "utf-8")
-      return JSON.parse(fileContent)
-    }
-  } catch (err) {
-    console.error("Failed to read system-settings.json:", err)
-  }
-  return {
-    maintenanceMode: false,
-    registrationOpen: true,
-    systemLogLevel: "info",
-    requireEmailVerification: false
-  }
-}
+import { getSystemConfig } from "@/lib/system-config"
 
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -96,7 +77,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!isValid) return null
 
-        const config = getSystemConfigSync()
+        const config = await getSystemConfig()
         if (config.requireEmailVerification && !user.emailVerified) {
           throw new Error("Please verify your email address before logging in.")
         }
@@ -152,7 +133,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         } else {
           // New OAuth user: block if registration is closed
-          const config = getSystemConfigSync()
+          const config = await getSystemConfig()
           if (!config.registrationOpen) {
             throw new Error("Registration is currently closed by the administrator.")
           }

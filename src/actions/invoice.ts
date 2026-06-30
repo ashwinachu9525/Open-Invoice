@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { getTenantDb } from "@/lib/tenant-db"
 import { invoiceSchema } from "@/validations/invoice"
+import { inngest } from "@/lib/inngest/client"
 import { calculateInvoiceTax } from "@/services/tax-engine"
 import { createAuditLog } from "@/services/audit"
 import { requireCompany } from "@/lib/auth-helpers"
@@ -41,6 +42,7 @@ export async function createInvoice(data: unknown) {
       sellerState: company.state,
       buyerState: customer.state,
       tdsPercentage: parsed.data.tdsPercentage,
+      tcsRate: parsed.data.tcsRate,
     })
 
     const invoice = await prisma.$transaction(async (tx: any) => {
@@ -72,6 +74,8 @@ export async function createInvoice(data: unknown) {
           igstAmount: tax.igstAmount,
           tdsPercentage: tax.tdsPercentage,
           tdsAmount: tax.tdsAmount,
+          tcsRate: tax.tcsRate ?? 0,
+          tcsAmount: tax.tcsAmount ?? 0,
           finalAmount: tax.finalAmount,
           balanceDue: tax.finalAmount,
           items: {
@@ -103,6 +107,28 @@ export async function createInvoice(data: unknown) {
       entity: "Invoice",
       entityId: invoice.id,
     })
+
+    try {
+      await inngest.send({
+        name: "webhook.dispatch",
+        data: {
+          companyId: company.id,
+          webhookEvent: "invoice.created",
+          payload: {
+            id: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            finalAmount: invoice.finalAmount,
+            currency: invoice.currency,
+            date: invoice.date,
+            dueDate: invoice.dueDate,
+            status: invoice.status,
+            customerId: invoice.customerId
+          }
+        }
+      })
+    } catch (err) {
+      console.error("Failed to trigger webhook dispatch job:", err)
+    }
 
     // Invalidate invoice list cache
     await invalidateCachePattern(`invoices:${company.id}:*`)
@@ -142,6 +168,7 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
       sellerState: company.state,
       buyerState: customer.state,
       tdsPercentage: parsed.data.tdsPercentage,
+      tcsRate: parsed.data.tcsRate,
     })
 
     await prisma.$transaction(async (tx: any) => {
@@ -176,6 +203,8 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
           igstAmount: tax.igstAmount,
           tdsPercentage: tax.tdsPercentage,
           tdsAmount: tax.tdsAmount,
+          tcsRate: tax.tcsRate ?? 0,
+          tcsAmount: tax.tcsAmount ?? 0,
           finalAmount: tax.finalAmount,
           balanceDue: Math.max(0, tax.finalAmount - existing.amountPaid),
           status: existing.amountPaid > 0 && tax.finalAmount <= existing.amountPaid ? "PAID" : existing.status,
@@ -623,6 +652,28 @@ export async function cloneInvoice(id: string) {
       entityId: newInvoice.id,
       details: { clonedFrom: invoice.id }
     })
+
+    try {
+      await inngest.send({
+        name: "webhook.dispatch",
+        data: {
+          companyId: company.id,
+          webhookEvent: "invoice.created",
+          payload: {
+            id: newInvoice.id,
+            invoiceNumber: newInvoice.invoiceNumber,
+            finalAmount: newInvoice.finalAmount,
+            currency: newInvoice.currency,
+            date: newInvoice.date,
+            dueDate: newInvoice.dueDate,
+            status: newInvoice.status,
+            customerId: newInvoice.customerId
+          }
+        }
+      })
+    } catch (err) {
+      console.error("Failed to trigger webhook dispatch job:", err)
+    }
 
     revalidatePath("/invoices")
     revalidatePath("/dashboard")

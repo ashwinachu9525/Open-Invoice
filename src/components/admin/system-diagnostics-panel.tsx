@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { updateSystemConfig } from "@/actions/admin-tools"
+import { updateSystemConfig, exportDatabaseBackup } from "@/actions/admin-tools"
 import { toast } from "sonner"
 import { Loader2, Cpu, HardDrive, ShieldAlert, CheckCircle, RefreshCcw, Lock } from "lucide-react"
 
@@ -52,6 +52,36 @@ export function SystemDiagnosticsPanel({ initialConfig, diagnostics }: SystemDia
   const [config, setConfig] = useState(initialConfig)
   const [password, setPassword] = useState("")
   const [saving, setSaving] = useState(false)
+  const [backingUp, setBackingUp] = useState(false)
+
+  async function handleBackupDownload() {
+    if (!password) {
+      toast.error("Please enter the SQL Admin password.")
+      return
+    }
+    setBackingUp(true)
+    try {
+      const res = await exportDatabaseBackup(password)
+      if (res.success && res.backup) {
+        const blob = new Blob([res.backup], { type: "application/json" })
+        const urlObj = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = urlObj
+        a.download = `open_invoice_backup_${new Date().toISOString().slice(0, 10)}.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(urlObj)
+        toast.success("Backup downloaded successfully!")
+      } else {
+        toast.error(res.error || "Failed to generate backup.")
+      }
+    } catch {
+      toast.error("An error occurred during backup generation.")
+    } finally {
+      setBackingUp(false)
+    }
+  }
 
   // Format uptime seconds into human-readable string
   function formatUptime(seconds: number) {
@@ -295,6 +325,32 @@ export function SystemDiagnosticsPanel({ initialConfig, diagnostics }: SystemDia
                 <span className="font-mono text-slate-200 font-semibold">{diagnostics.stats.emailLogs}</span>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <Lock className="w-5 h-5 text-indigo-400" /> Database Backup & Export
+            </CardTitle>
+            <CardDescription className="text-slate-400">
+              Download a complete JSON backup of all tables. Requires SQL Admin Password verification.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={handleBackupDownload}
+              disabled={backingUp || !password}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold"
+            >
+              {backingUp ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating Backup...
+                </>
+              ) : (
+                "Export Database as JSON"
+              )}
+            </Button>
           </CardContent>
         </Card>
       </div>

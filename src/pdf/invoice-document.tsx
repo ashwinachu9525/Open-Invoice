@@ -69,6 +69,8 @@ interface InvoicePDFProps {
     igstAmount: number
     tdsPercentage: number
     tdsAmount: number
+    tcsRate?: number | null
+    tcsAmount?: number | null
     finalAmount: number
     status: string
     bankName?: string | null
@@ -106,6 +108,8 @@ interface InvoicePDFProps {
       phone?: string | null
       logo?: string | null
       invoiceTemplate?: string | null
+      msmeNumber?: string | null
+      msmeType?: string | null
     }
   }
   qrCodeDataUrl?: string
@@ -133,6 +137,7 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
             <Text style={{ fontSize: 14, fontWeight: "bold" }}>{invoice.company.name}</Text>
             {invoice.company.gstNumber && <Text>GSTIN: {invoice.company.gstNumber}</Text>}
             {invoice.company.panNumber && <Text>PAN: {invoice.company.panNumber}</Text>}
+            {invoice.company.msmeNumber && <Text>MSME: {invoice.company.msmeNumber} ({invoice.company.msmeType})</Text>}
             {invoice.company.address && <Text>{invoice.company.address}</Text>}
             {invoice.company.email && <Text>{invoice.company.email}</Text>}
             {invoice.company.phone && <Text>Phone: {invoice.company.phone}</Text>}
@@ -210,6 +215,12 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
             <View style={styles.totalRow}>
               <Text>TDS ({invoice.tdsPercentage}%)</Text>
               <Text>-{formatPdfINR(invoice.tdsAmount)}</Text>
+            </View>
+          )}
+          {invoice.tcsAmount && invoice.tcsAmount > 0 && (
+            <View style={styles.totalRow}>
+              <Text>TCS ({invoice.tcsRate}%)</Text>
+              <Text>+{formatPdfINR(invoice.tcsAmount)}</Text>
             </View>
           )}
           <View style={[styles.totalRow, { marginTop: 8 }]}>

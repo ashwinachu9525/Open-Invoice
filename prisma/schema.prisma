@@ -147,6 +147,11 @@ model Company {
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
+  msmeNumber      String?
+  msmeType        String?
+  tcsRate         Float?    @default(0)
+  webhooks        Webhook[]
+
   users          User[]
   customers      Customer[]
   invoices       Invoice[]
@@ -251,6 +256,8 @@ model Invoice {
   vatAmount     Float   @default(0)
   tdsPercentage Float   @default(0)
   tdsAmount     Float   @default(0)
+  tcsRate       Float   @default(0)
+  tcsAmount      Float   @default(0)
   finalAmount   Float
   amountPaid    Float   @default(0)
   balanceDue    Float   @default(0)
@@ -555,6 +562,8 @@ model Quotation {
   vatAmount     Float   @default(0)
   tdsPercentage Float   @default(0)
   tdsAmount     Float   @default(0)
+  tcsRate       Float   @default(0)
+  tcsAmount      Float   @default(0)
   finalAmount   Float
   pdfUrl        String?
 
@@ -697,3 +706,26 @@ model ReferralRedemption {
   @@index([referrerId])
   @@index([referralCode])
 }
+
+model SystemConfig {
+  id                       Int      @id @default(1)
+  maintenanceMode          Boolean  @default(false)
+  registrationOpen         Boolean  @default(true)
+  systemLogLevel           String   @default("info")
+  requireEmailVerification Boolean  @default(false)
+  updatedAt                DateTime @updatedAt
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  companyId String
+  url       String
+  events    String   @default("invoice.created,invoice.paid")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@index([companyId])
+}
+
+

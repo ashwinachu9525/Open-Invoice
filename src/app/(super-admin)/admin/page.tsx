@@ -3,9 +3,10 @@ import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, Building, FileText, Activity, AlertTriangle, MessageSquare, BadgeCheck } from "lucide-react"
+import { Users, Building, FileText, Activity, AlertTriangle, MessageSquare, BadgeCheck, TrendingUp } from "lucide-react"
 import { AdminCompanyActions } from "@/components/admin/admin-company-actions"
 import { ProRequestActions } from "@/components/admin/pro-request-actions"
+import { AdminAnalyticsCharts } from "@/components/admin/admin-analytics-charts"
 
 export default async function SuperAdminDashboard() {
   const session = await auth()
@@ -81,6 +82,55 @@ export default async function SuperAdminDashboard() {
     })
   ])
 
+  const [userGrowthRaw, companyGrowthRaw, invoiceGrowthRaw] = await Promise.all([
+    prisma.user.findMany({ select: { createdAt: true } }),
+    prisma.company.findMany({ select: { createdAt: true } }),
+    prisma.invoice.findMany({ select: { date: true, finalAmount: true } })
+  ])
+
+  const formatMonth = (date: Date) => {
+    return date.toLocaleString("en-US", { month: "short", year: "2-digit" })
+  }
+
+  const userMonthlyMap: Record<string, number> = {}
+  const companyMonthlyMap: Record<string, number> = {}
+  const invoiceMonthlyMap: Record<string, number> = {}
+
+  const monthsList: string[] = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date()
+    d.setMonth(d.getMonth() - i)
+    monthsList.push(formatMonth(d))
+  }
+
+  monthsList.forEach(m => {
+    userMonthlyMap[m] = 0
+    companyMonthlyMap[m] = 0
+    invoiceMonthlyMap[m] = 0
+  })
+
+  userGrowthRaw.forEach(u => {
+    const m = formatMonth(u.createdAt)
+    if (m in userMonthlyMap) userMonthlyMap[m]++
+  })
+
+  companyGrowthRaw.forEach(c => {
+    const m = formatMonth(c.createdAt)
+    if (m in companyMonthlyMap) companyMonthlyMap[m]++
+  })
+
+  invoiceGrowthRaw.forEach(inv => {
+    const m = formatMonth(inv.date)
+    if (m in invoiceMonthlyMap) invoiceMonthlyMap[m] += inv.finalAmount
+  })
+
+  const analyticsData = monthsList.map(month => ({
+    month,
+    users: userMonthlyMap[month],
+    companies: companyMonthlyMap[month],
+    revenue: Math.round(invoiceMonthlyMap[month])
+  }))
+
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto pb-10">
       <div>
@@ -129,7 +179,7 @@ export default async function SuperAdminDashboard() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="flex w-full overflow-x-auto justify-start lg:grid lg:grid-cols-6 lg:w-[850px] p-1 bg-muted no-scrollbar scrollbar-none">
+        <TabsList className="flex w-full overflow-x-auto justify-start lg:grid lg:grid-cols-7 lg:w-[1000px] p-1 bg-muted no-scrollbar scrollbar-none">
           <TabsTrigger value="users" className="shrink-0"><Users className="w-4 h-4 mr-2"/> Users</TabsTrigger>
           <TabsTrigger value="companies" className="shrink-0"><Building className="w-4 h-4 mr-2"/> Companies</TabsTrigger>
           <TabsTrigger value="requests" className="shrink-0">
@@ -141,6 +191,7 @@ export default async function SuperAdminDashboard() {
           <TabsTrigger value="logs" className="shrink-0"><Activity className="w-4 h-4 mr-2"/> Audit Logs</TabsTrigger>
           <TabsTrigger value="errors" className="shrink-0"><AlertTriangle className="w-4 h-4 mr-2"/> Errors</TabsTrigger>
           <TabsTrigger value="feedback" className="shrink-0"><MessageSquare className="w-4 h-4 mr-2"/> Feedback</TabsTrigger>
+          <TabsTrigger value="analytics" className="shrink-0"><TrendingUp className="w-4 h-4 mr-2"/> Analytics</TabsTrigger>
         </TabsList>
 
         {/* Tab: Users */}
@@ -497,6 +548,10 @@ export default async function SuperAdminDashboard() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-6">
+          <AdminAnalyticsCharts data={analyticsData} />
         </TabsContent>
 
       </Tabs>

@@ -69,6 +69,8 @@ interface QuotationPDFProps {
     igstAmount: number
     tdsPercentage: number
     tdsAmount: number
+    tcsRate?: number | null
+    tcsAmount?: number | null
     finalAmount: number
     status: string
     bankName?: string | null
@@ -106,6 +108,8 @@ interface QuotationPDFProps {
       phone?: string | null
       logo?: string | null
       quotationTemplate?: string | null
+      msmeNumber?: string | null
+      msmeType?: string | null
     }
   }
   qrCodeDataUrl?: string
@@ -133,6 +137,7 @@ export function QuotationDocument({ quotation, qrCodeDataUrl }: QuotationPDFProp
             <Text style={{ fontSize: 14, fontWeight: "bold" }}>{quotation.company.name}</Text>
             {quotation.company.gstNumber && <Text>GSTIN: {quotation.company.gstNumber}</Text>}
             {quotation.company.panNumber && <Text>PAN: {quotation.company.panNumber}</Text>}
+            {quotation.company.msmeNumber && <Text>MSME: {quotation.company.msmeNumber} ({quotation.company.msmeType})</Text>}
             {quotation.company.address && <Text>{quotation.company.address}</Text>}
             {quotation.company.email && <Text>{quotation.company.email}</Text>}
             {quotation.company.phone && <Text>Phone: {quotation.company.phone}</Text>}
@@ -210,6 +215,12 @@ export function QuotationDocument({ quotation, qrCodeDataUrl }: QuotationPDFProp
             <View style={styles.totalRow}>
               <Text>TDS ({quotation.tdsPercentage}%)</Text>
               <Text>-{formatPdfINR(quotation.tdsAmount)}</Text>
+            </View>
+          )}
+          {quotation.tcsAmount && quotation.tcsAmount > 0 && (
+            <View style={styles.totalRow}>
+              <Text>TCS ({quotation.tcsRate}%)</Text>
+              <Text>+{formatPdfINR(quotation.tcsAmount)}</Text>
             </View>
           )}
           <View style={[styles.totalRow, { marginTop: 8 }]}>

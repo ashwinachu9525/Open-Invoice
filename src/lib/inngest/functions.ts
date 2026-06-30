@@ -362,10 +362,66 @@ export const checkTrialReminders = inngest.createFunction(
   }
 )
 
+import crypto from "crypto"
+
+export const dispatchWebhook = inngest.createFunction(
+  { id: "dispatch-webhook", triggers: [{ event: "webhook.dispatch" }] },
+  async ({ event }: { event: any }) => {
+    const { companyId, webhookEvent, payload } = event.data
+
+    const webhooks = await prisma.webhook.findMany({
+      where: {
+        companyId,
+        isActive: true,
+      },
+    })
+
+    const dispatched = []
+
+    for (const hook of webhooks) {
+      const eventsList = hook.events.split(",").map((e) => e.trim())
+      if (!eventsList.includes(webhookEvent)) {
+        continue
+      }
+
+      const bodyString = JSON.stringify({
+        id: crypto.randomUUID(),
+        event: webhookEvent,
+        timestamp: new Date().toISOString(),
+        data: payload,
+      })
+
+      const signature = crypto
+        .createHmac("sha256", companyId)
+        .update(bodyString)
+        .digest("hex")
+
+      try {
+        const response = await fetch(hook.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-signature": signature,
+            "x-webhook-event": webhookEvent,
+          },
+          body: bodyString,
+        })
+        dispatched.push({ url: hook.url, status: response.status })
+      } catch (err: any) {
+        console.error(`Failed to dispatch webhook to ${hook.url}:`, err)
+        dispatched.push({ url: hook.url, error: err.message || "Fetch failed" })
+      }
+    }
+
+    return { dispatchedCount: dispatched.length, details: dispatched }
+  }
+)
+
 export const inngestFunctions = [
   processRecurringInvoices,
   markOverdueInvoices,
   sendPaymentReminders,
   cleanupDeletedAccounts,
   checkTrialReminders,
+  dispatchWebhook,
 ]

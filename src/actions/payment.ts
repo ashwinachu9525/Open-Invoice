@@ -6,6 +6,7 @@ import { InvoiceStatus, PaymentMethod } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { getTenantDb } from "@/lib/tenant-db"
+import { inngest } from "@/lib/inngest/client"
 
 const paymentSchema = z.object({
   invoiceId: z.string(),
@@ -69,6 +70,29 @@ export async function recordPayment(data: unknown) {
     })
 
     revalidatePath(`/invoices/${invoice.id}`)
+
+    if (status === InvoiceStatus.PAID) {
+      try {
+        await inngest.send({
+          name: "webhook.dispatch",
+          data: {
+            companyId: company.id,
+            webhookEvent: "invoice.paid",
+            payload: {
+              id: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              finalAmount: invoice.finalAmount,
+              amountPaid: newAmountPaid,
+              balanceDue,
+              status,
+              paidAt: new Date().toISOString()
+            }
+          }
+        })
+      } catch (err) {
+        console.error("Failed to trigger webhook dispatch job for invoice.paid:", err)
+      }
+    }
 
     import("@/lib/push").then(({ sendPushNotification }) => {
       sendPushNotification(session.user.id, {

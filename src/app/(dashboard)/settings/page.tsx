@@ -179,6 +179,20 @@ export default async function SettingsPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Webhooks Configuration</CardTitle>
+          <CardDescription>
+            Configure HTTP endpoints to receive event notifications for invoices.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <a href="/settings/webhooks" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+            Manage Webhooks
+          </a>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>AI Settings</CardTitle>
           <CardDescription>
             Configure your AI providers (Gemini, OpenAI, Nvidia) and API keys.

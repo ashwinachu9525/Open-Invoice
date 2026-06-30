@@ -27,6 +27,7 @@ export async function createQuotation(data: unknown) {
       sellerState: company.state,
       buyerState: customer.state,
       tdsPercentage: parsed.data.tdsPercentage,
+      tcsRate: parsed.data.tcsRate,
     })
 
     const quotation = await prisma.$transaction(async (tx: any) => {
@@ -52,6 +53,8 @@ export async function createQuotation(data: unknown) {
           igstAmount: tax.igstAmount,
           tdsPercentage: tax.tdsPercentage,
           tdsAmount: tax.tdsAmount,
+          tcsRate: tax.tcsRate ?? 0,
+          tcsAmount: tax.tcsAmount ?? 0,
           finalAmount: tax.finalAmount,
           items: {
             create: tax.items.map((item) => ({
@@ -117,6 +120,7 @@ export async function updateQuotation(id: string, data: unknown) {
       sellerState: company.state,
       buyerState: customer.state,
       tdsPercentage: parsed.data.tdsPercentage,
+      tcsRate: parsed.data.tcsRate,
     })
 
     await prisma.$transaction(async (tx: any) => {
@@ -145,6 +149,8 @@ export async function updateQuotation(id: string, data: unknown) {
           igstAmount: tax.igstAmount,
           tdsPercentage: tax.tdsPercentage,
           tdsAmount: tax.tdsAmount,
+          tcsRate: tax.tcsRate ?? 0,
+          tcsAmount: tax.tcsAmount ?? 0,
           finalAmount: tax.finalAmount,
           items: {
             create: tax.items.map((item) => ({

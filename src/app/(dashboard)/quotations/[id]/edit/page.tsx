@@ -44,6 +44,7 @@ export default async function EditQuotationPage({ params }: EditQuotationPagePro
     currency: quotation.currency,
     exchangeRate: quotation.exchangeRate,
     tdsPercentage: quotation.tdsPercentage,
+    tcsRate: quotation.tcsRate || 0,
     notes: quotation.notes || undefined,
     terms: quotation.terms || undefined,
     themeColor: quotation.themeColor || "#1e40af",

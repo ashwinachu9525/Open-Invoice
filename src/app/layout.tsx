@@ -8,8 +8,7 @@ import Script from "next/script"
 import "./globals.css"
 import { auth } from "@/auth"
 import { headers } from "next/headers"
-import fs from "fs"
-import path from "path"
+import { getSystemConfig } from "@/lib/system-config"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -77,24 +76,6 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 }
 
-function getSystemConfigSync() {
-  try {
-    const configPath = path.join(process.cwd(), "src/config/system-settings.json")
-    if (fs.existsSync(configPath)) {
-      const fileContent = fs.readFileSync(configPath, "utf-8")
-      return JSON.parse(fileContent)
-    }
-  } catch (err) {
-    console.error("Failed to read system-settings.json:", err)
-  }
-  return {
-    maintenanceMode: false,
-    registrationOpen: true,
-    systemLogLevel: "info",
-    requireEmailVerification: false
-  }
-}
-
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -102,7 +83,7 @@ export default async function RootLayout({
 }>) {
   const session = await auth()
   const pathname = (await headers()).get("x-pathname") || ""
-  const config = getSystemConfigSync()
+  const config = await getSystemConfig()
 
   const isMaintenance = config.maintenanceMode
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN"

@@ -2,7 +2,8 @@
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { getSystemConfig as getDbSystemConfig } from "@/lib/system-config"
 import fs from "fs"
 import path from "path"
 import os from "os"
@@ -553,21 +554,7 @@ export async function getSystemConfig() {
   if (session?.user?.role !== "SUPER_ADMIN") {
     throw new Error("Unauthorized")
   }
-  try {
-    const configPath = path.join(process.cwd(), "src/config/system-settings.json")
-    if (fs.existsSync(configPath)) {
-      const fileContent = fs.readFileSync(configPath, "utf-8")
-      return JSON.parse(fileContent)
-    }
-  } catch (err) {
-    console.error("Failed to read system-settings.json:", err)
-  }
-  return {
-    maintenanceMode: false,
-    registrationOpen: true,
-    systemLogLevel: "info",
-    requireEmailVerification: false
-  }
+  return await getDbSystemConfig()
 }
 
 export async function updateSystemConfig(config: any, passwordSecret: string) {
@@ -580,8 +567,24 @@ export async function updateSystemConfig(config: any, passwordSecret: string) {
     return { success: false, error: "Incorrect Admin Secret Password" }
   }
   try {
-    const configPath = path.join(process.cwd(), "src/config/system-settings.json")
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8")
+    await prisma.systemConfig.upsert({
+      where: { id: 1 },
+      update: {
+        maintenanceMode: !!config.maintenanceMode,
+        registrationOpen: !!config.registrationOpen,
+        systemLogLevel: String(config.systemLogLevel || "info"),
+        requireEmailVerification: !!config.requireEmailVerification,
+      },
+      create: {
+        id: 1,
+        maintenanceMode: !!config.maintenanceMode,
+        registrationOpen: !!config.registrationOpen,
+        systemLogLevel: String(config.systemLogLevel || "info"),
+        requireEmailVerification: !!config.requireEmailVerification,
+      },
+    })
+    revalidatePath("/admin/settings")
+    revalidateTag("system-config", "default")
     return { success: true, message: "System settings updated successfully." }
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to save system settings." }
@@ -726,5 +729,75 @@ export async function toggleApiKeyActiveAdmin(keyId: string) {
     return { success: false, error: error.message || "Failed to update API Key." }
   }
 }
+
+export async function exportDatabaseBackup(passwordSecret: string) {
+  const session = await auth()
+  if (session?.user?.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized" }
+  }
+  const adminPassword = process.env.ADMIN_SQL_PASSWORD
+  if (!adminPassword || passwordSecret !== adminPassword) {
+    return { success: false, error: "Incorrect Admin Secret Password" }
+  }
+
+  try {
+    const [
+      users,
+      companies,
+      customers,
+      invoices,
+      invoiceItems,
+      payments,
+      quotations,
+      quotationItems,
+      catalogs,
+      expenses,
+      auditLogs,
+      appErrors,
+      webhooks
+    ] = await Promise.all([
+      prisma.user.findMany(),
+      prisma.company.findMany(),
+      prisma.customer.findMany(),
+      prisma.invoice.findMany(),
+      prisma.invoiceItem.findMany(),
+      prisma.payment.findMany(),
+      prisma.quotation.findMany(),
+      prisma.quotationItem.findMany(),
+      prisma.productCatalog.findMany(),
+      prisma.expense.findMany(),
+      prisma.auditLog.findMany(),
+      prisma.appError.findMany(),
+      prisma.webhook.findMany()
+    ])
+
+    const backupData = {
+      version: "1.1.0",
+      timestamp: new Date().toISOString(),
+      databaseProvider: process.env.DATABASE_PROVIDER || "postgresql",
+      tables: {
+        users,
+        companies,
+        customers,
+        invoices,
+        invoiceItems,
+        payments,
+        quotations,
+        quotationItems,
+        catalogs,
+        expenses,
+        auditLogs,
+        appErrors,
+        webhooks
+      }
+    }
+
+    return { success: true, backup: JSON.stringify(backupData, null, 2) }
+  } catch (error: any) {
+    console.error("Backup failed:", error)
+    return { success: false, error: error.message || "Failed to generate database backup." }
+  }
+}
+
 
 

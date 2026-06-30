@@ -38,6 +38,9 @@ export function CompanyForm({ initialData }: { initialData: any }) {
       baseCurrency: initialData?.baseCurrency || "INR",
       whatsappProvider: initialData?.whatsappProvider || "",
       invoiceTemplate: initialData?.invoiceTemplate || "modern",
+      msmeNumber: initialData?.msmeNumber || "",
+      msmeType: initialData?.msmeType || "",
+      tcsRate: initialData?.tcsRate ?? 0,
     },
   })
 
@@ -142,6 +145,60 @@ export function CompanyForm({ initialData }: { initialData: any }) {
                 <FormLabel>CIN Number</FormLabel>
                 <FormControl>
                   <Input placeholder="U12345MH2023PTC123456" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="msmeNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>MSME Udyam Registration Number</FormLabel>
+                <FormControl>
+                  <Input placeholder="UDYAM-XX-00-0000000" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="msmeType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>MSME Category</FormLabel>
+                <FormControl>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+                    {...field}
+                  >
+                    <option value="">None / Not Registered</option>
+                    <option value="MICRO">Micro Enterprise</option>
+                    <option value="SMALL">Small Enterprise</option>
+                    <option value="MEDIUM">Medium Enterprise</option>
+                  </select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="tcsRate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Default TCS Rate (%)</FormLabel>
+                <FormControl>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    placeholder="0.0" 
+                    {...field} 
+                    value={field.value ?? ""}
+                    onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
