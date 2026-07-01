@@ -6,6 +6,7 @@ import { invoiceSchema, InvoiceFormValues } from "@/validations/invoice"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { toast } from "sonner"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { createInvoice, updateInvoice } from "@/actions/invoice"
@@ -35,9 +36,10 @@ interface InvoiceFormProps {
   invoiceId?: string
   catalogItems?: ProductCatalog[]
   pastInvoices?: any[]
+  company?: any
 }
 
-export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bankAccounts = [], initialData, invoiceId, catalogItems = [], pastInvoices = [] }: InvoiceFormProps) {
+export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bankAccounts = [], initialData, invoiceId, catalogItems = [], pastInvoices = [], company }: InvoiceFormProps) {
   const router = useRouter()
   const [isPending, setIsPending] = useState(false)
   const [isAiLoading, setIsAiLoading] = useState(false)
@@ -60,6 +62,10 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
       bankAccountNumber: "",
       bankIfscCode: "",
       bankAccountType: "",
+      paymentCollectionMethod: "OFFLINE",
+      vpaAddress: company?.vpaAddress || "",
+      razorpayOrderId: null,
+      razorpayPaymentLinkId: null,
     },
   })
 
@@ -216,8 +222,27 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
     }
 
     if ("invoiceId" in result && result.invoiceId) {
-      router.push(`/invoices/${result.invoiceId}`)
+      const createdId = result.invoiceId as string
+      if (data.paymentCollectionMethod === "ONLINE") {
+        const { createRazorpayInvoiceLink } = await import("@/actions/razorpay")
+        const linkRes = await createRazorpayInvoiceLink(createdId)
+        if (linkRes.error) {
+          toast.error(`Invoice created, but Razorpay link failed: ${linkRes.error}`)
+        } else {
+          toast.success("Invoice created & Razorpay Payment Link generated!")
+        }
+      }
+      router.push(`/invoices/${createdId}`)
     } else if (invoiceId && result.success) {
+      if (data.paymentCollectionMethod === "ONLINE") {
+        const { createRazorpayInvoiceLink } = await import("@/actions/razorpay")
+        const linkRes = await createRazorpayInvoiceLink(invoiceId as string)
+        if (linkRes.error) {
+          toast.error(`Invoice updated, but Razorpay link failed: ${linkRes.error}`)
+        } else {
+          toast.success("Invoice updated & Razorpay Payment Link updated!")
+        }
+      }
       router.push(`/invoices/${invoiceId}`)
     }
   }
@@ -796,6 +821,65 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
                 </FormItem>
               )}
             />
+          </div>
+        </div>
+
+        <Separator className="bg-white/8" />
+
+        {/* ── Section: Payment Collection ── */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Payment Collection</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="paymentCollectionMethod"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Collection Mode</FormLabel>
+                  <FormControl>
+                    <select
+                      className={selectClass}
+                      value={field.value || "OFFLINE"}
+                      onChange={(e) => {
+                        field.onChange(e.target.value)
+                        if (e.target.value === "UPI_QR") {
+                          if (!form.getValues("vpaAddress")) {
+                            form.setValue("vpaAddress", company?.vpaAddress || "")
+                          }
+                        }
+                      }}
+                    >
+                      <option value="OFFLINE">Just Invoice Creation (Offline)</option>
+                      <option value="ONLINE">Online Payment (Razorpay Link)</option>
+                      <option value="UPI_QR">Dynamic VPA UPI QR Code on PDF</option>
+                    </select>
+                  </FormControl>
+                  <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+
+            {watched.paymentCollectionMethod === "UPI_QR" && (
+              <FormField
+                control={form.control}
+                name="vpaAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">UPI VPA Address (e.g. name@upi) <span className="text-red-500">*</span></FormLabel>
+                    <FormControl>
+                      <Input
+                        className={inputClass}
+                        placeholder="e.g. ashwin@upi"
+                        required
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs text-red-400" />
+                  </FormItem>
+                )}
+              />
+            )}
           </div>
         </div>
 

@@ -171,6 +171,9 @@ model Company {
   customDbUrlEncrypted String?
   trialStartsAt     DateTime?
   trialEndsAt       DateTime?
+  vpaAddress        String?
+  razorpayKeyId     String?
+  razorpayKeySecret String?
   trialReminderSent DateTime?
   openWaEnabled     Boolean   @default(false)
   openWaUrl         String?
@@ -262,6 +265,10 @@ model Invoice {
   amountPaid    Float   @default(0)
   balanceDue    Float   @default(0)
   pdfUrl        String?
+  paymentCollectionMethod String @default("OFFLINE")
+  vpaAddress              String?
+  razorpayOrderId         String?
+  razorpayPaymentLinkId   String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

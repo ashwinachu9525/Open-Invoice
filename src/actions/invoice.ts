@@ -78,6 +78,10 @@ export async function createInvoice(data: unknown) {
           tcsAmount: tax.tcsAmount ?? 0,
           finalAmount: tax.finalAmount,
           balanceDue: tax.finalAmount,
+          paymentCollectionMethod: parsed.data.paymentCollectionMethod,
+          vpaAddress: parsed.data.vpaAddress,
+          razorpayOrderId: parsed.data.razorpayOrderId,
+          razorpayPaymentLinkId: parsed.data.razorpayPaymentLinkId,
           items: {
             create: tax.items.map((item) => ({
               description: item.description,
@@ -208,6 +212,10 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
           finalAmount: tax.finalAmount,
           balanceDue: Math.max(0, tax.finalAmount - existing.amountPaid),
           status: existing.amountPaid > 0 && tax.finalAmount <= existing.amountPaid ? "PAID" : existing.status,
+          paymentCollectionMethod: parsed.data.paymentCollectionMethod,
+          vpaAddress: parsed.data.vpaAddress,
+          razorpayOrderId: parsed.data.razorpayOrderId,
+          razorpayPaymentLinkId: parsed.data.razorpayPaymentLinkId,
           items: {
             create: tax.items.map((item) => ({
               description: item.description,

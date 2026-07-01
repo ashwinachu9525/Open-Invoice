@@ -30,6 +30,10 @@ export const invoiceSchema = z.object({
   tdsPercentage: z.number().min(0).max(100),
   tcsRate: z.number().min(0).max(100).optional().default(0),
   items: z.array(invoiceItemSchema).min(1, "At least one line item required"),
+  paymentCollectionMethod: z.string().optional().default("OFFLINE"),
+  vpaAddress: z.string().optional().nullable(),
+  razorpayOrderId: z.string().optional().nullable(),
+  razorpayPaymentLinkId: z.string().optional().nullable(),
 })
 
 export type InvoiceFormValues = z.infer<typeof invoiceSchema>

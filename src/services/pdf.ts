@@ -15,14 +15,20 @@ export async function generateInvoicePdf(invoiceId: string, companyId?: string):
 
   if (!invoice) throw new Error("Invoice not found")
 
-  const qrData = JSON.stringify({
-    inv: invoice.invoiceNumber,
-    amt: invoice.finalAmount,
-    gst: invoice.company.gstNumber,
-    date: invoice.date.toISOString().split("T")[0],
-  })
-
-  const qrCodeDataUrl = await QRCode.toDataURL(qrData, { width: 120, margin: 1 })
+  let qrCodeDataUrl = ""
+  if (invoice.paymentCollectionMethod === "UPI_QR" && invoice.vpaAddress) {
+    const payeeName = encodeURIComponent(invoice.company.name)
+    const upiString = `upi://pay?pa=${invoice.vpaAddress}&pn=${payeeName}&am=${invoice.finalAmount.toFixed(2)}&cu=INR&tn=Invoice-${invoice.invoiceNumber}`
+    qrCodeDataUrl = await QRCode.toDataURL(upiString, { width: 120, margin: 1 })
+  } else {
+    const qrData = JSON.stringify({
+      inv: invoice.invoiceNumber,
+      amt: invoice.finalAmount,
+      gst: invoice.company.gstNumber,
+      date: invoice.date.toISOString().split("T")[0],
+    })
+    qrCodeDataUrl = await QRCode.toDataURL(qrData, { width: 120, margin: 1 })
+  }
 
   const buffer = await renderToBuffer(
     InvoiceDocument({ invoice, qrCodeDataUrl })

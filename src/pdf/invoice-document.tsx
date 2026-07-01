@@ -73,6 +73,8 @@ interface InvoicePDFProps {
     tcsAmount?: number | null
     finalAmount: number
     status: string
+    paymentCollectionMethod?: string
+    vpaAddress?: string | null
     bankName?: string | null
     bankAccountName?: string | null
     bankAccountNumber?: string | null
@@ -264,7 +266,14 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
             This is an electronically generated document, no signature is required.
           </Text>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
-            {qrCodeDataUrl && <Image src={qrCodeDataUrl} style={{ width: 60, height: 60 }} />}
+            {qrCodeDataUrl && (
+              <View style={{ alignItems: "center" }}>
+                <Image src={qrCodeDataUrl} style={{ width: 60, height: 60 }} />
+                <Text style={{ fontSize: 6, color: "#6b7280", marginTop: 2, fontWeight: "bold" }}>
+                  {invoice.paymentCollectionMethod === "UPI_QR" ? "SCAN TO PAY (UPI)" : "VERIFY INVOICE"}
+                </Text>
+              </View>
+            )}
             <View style={{ alignItems: "flex-end" }}>
               <Text style={{ fontSize: 8, color: "#9ca3af", marginBottom: 2 }}>Powered by</Text>
               <Link src={process.env.NEXT_PUBLIC_APP_URL || "https://invoiceai.com"} style={{ fontSize: 12, color: themeColor, textDecoration: "none", fontWeight: "bold" }}>

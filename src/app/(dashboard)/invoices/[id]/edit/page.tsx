@@ -58,6 +58,10 @@ export default async function EditInvoicePage({ params }: EditInvoicePageProps) 
     bankAccountType: invoice.bankAccountType || "",
     themeColor: invoice.themeColor || "#6366f1",
     themeFont: invoice.themeFont || "inter",
+    paymentCollectionMethod: (invoice as any).paymentCollectionMethod || "OFFLINE",
+    vpaAddress: (invoice as any).vpaAddress || "",
+    razorpayOrderId: (invoice as any).razorpayOrderId || null,
+    razorpayPaymentLinkId: (invoice as any).razorpayPaymentLinkId || null,
     items: invoice.items.map((item: any) => ({
       description: item.description,
       hsnSac: item.hsnSac || "",
@@ -82,6 +86,7 @@ export default async function EditInvoicePage({ params }: EditInvoicePageProps) 
         initialData={initialData}
         invoiceId={invoice.id}
         catalogItems={catalog.items || []}
+        company={company}
       />
     </div>
   )

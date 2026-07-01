@@ -50,6 +50,7 @@ export default async function NewInvoicePage() {
         bankAccounts={bankAccounts}
         catalogItems={catalog.items || []}
         pastInvoices={pastInvoices}
+        company={company}
       />
     </div>
   )

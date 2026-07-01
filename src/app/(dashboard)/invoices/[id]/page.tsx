@@ -14,6 +14,8 @@ import { RecurringInvoiceModal } from "@/components/invoices/recurring-invoice-m
 import { WhatsAppShareButton } from "@/components/invoices/whatsapp-share-button"
 import { Download, Building2, User, FileText, AlertTriangle, Info, TrendingDown } from "lucide-react"
 import { ComplianceButtons } from "@/components/invoices/compliance-buttons"
+import QRCode from "qrcode"
+import { PayOnlineButton } from "@/components/invoices/pay-online-button"
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   DRAFT:          { label: "Draft",          class: "bg-gray-500/20 text-gray-400 border-gray-500/30" },
@@ -32,7 +34,18 @@ export default async function InvoiceDetailPage({
 }) {
   const { id } = await params
   const invoice = await getInvoice(id)
-  if (!invoice) notFound()
+  if (!invoice) return notFound()
+
+  let upiQrCodeDataUrl = ""
+  if ((invoice as any).paymentCollectionMethod === "UPI_QR" && (invoice as any).vpaAddress) {
+    try {
+      const payeeName = encodeURIComponent(invoice.company.name)
+      const upiString = `upi://pay?pa=${(invoice as any).vpaAddress}&pn=${payeeName}&am=${invoice.balanceDue.toFixed(2)}&cu=${invoice.currency}&tn=Invoice-${invoice.invoiceNumber}`
+      upiQrCodeDataUrl = await QRCode.toDataURL(upiString, { width: 180, margin: 1 })
+    } catch (qrErr) {
+      console.error("Failed to generate details page UPI QR:", qrErr)
+    }
+  }
 
   const isOverdue =
     invoice.status !== "PAID" &&
@@ -67,6 +80,20 @@ export default async function InvoiceDetailPage({
               Download PDF
             </Button>
           </Link>
+          {["SENT", "VIEWED", "PARTIALLY_PAID"].includes(invoice.status) && (invoice as any).paymentCollectionMethod === "ONLINE" && (
+            <PayOnlineButton
+              invoiceId={invoice.id}
+              amount={invoice.balanceDue}
+              invoiceNumber={invoice.invoiceNumber}
+              currency={invoice.currency}
+              companyName={invoice.company.name}
+              companyLogo={invoice.company.logo}
+              customerName={invoice.customer.name}
+              customerEmail={invoice.customer.email}
+              customerPhone={invoice.customer.phone}
+              razorpayKeyId={invoice.company.razorpayKeyId || process.env.RAZORPAY_KEY_ID || ""}
+            />
+          )}
           {invoice.status === "PAID" && (
             <Link href={`/api/invoices/${invoice.id}/receipt`} target="_blank">
               <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8 gap-1.5 text-emerald-400 border-emerald-500/20">
@@ -120,6 +147,22 @@ export default async function InvoiceDetailPage({
           />
         </div>
       </div>
+
+      {/* ── Payment QR Code Card ── */}
+      {(invoice as any).paymentCollectionMethod === "UPI_QR" && (invoice as any).vpaAddress && ["SENT", "VIEWED", "PARTIALLY_PAID"].includes(invoice.status) && upiQrCodeDataUrl && (
+        <div className="flex justify-start mb-6 animate-in fade-in duration-300">
+          <div className="glass border-white/10 p-5 rounded-2xl flex flex-col items-center gap-3 text-center bg-black/20 max-w-xs shadow-xl">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Scan to Pay (UPI)</p>
+            <div className="bg-white p-2.5 rounded-xl border border-white/10 shadow-inner">
+              <img src={upiQrCodeDataUrl} className="w-36 h-36" alt="UPI QR" />
+            </div>
+            <p className="text-[11px] text-slate-300 font-medium">Scan with GPay, PhonePe, Paytm, or BHIM</p>
+            <div className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1">
+              <p className="font-mono text-[10px] text-indigo-400 font-semibold">{(invoice as any).vpaAddress}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Overdue Alert ── */}
       {isOverdue && (
