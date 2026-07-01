@@ -25,7 +25,7 @@ export async function updateEmailSettings(data: unknown) {
     let passwordEncrypted: string | undefined
     if (parsed.data.password) {
       const { encrypt } = await import("@/lib/crypto")
-      passwordEncrypted = encrypt(parsed.data.password)
+      passwordEncrypted = encrypt(parsed.data.password, company.id)
     } else {
       const existing = await prisma.emailSetting.findUnique({
         where: { companyId: company.id },

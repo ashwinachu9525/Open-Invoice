@@ -52,7 +52,7 @@ export default async function InvoiceDetailPage({
     if (invoice.company.razorpayKeyId.includes(":")) {
       try {
         const { decrypt } = await import("@/lib/encryption")
-        razorpayKeyId = decrypt(invoice.company.razorpayKeyId)
+        razorpayKeyId = decrypt(invoice.company.razorpayKeyId, invoice.company.id)
       } catch {
         razorpayKeyId = invoice.company.razorpayKeyId
       }

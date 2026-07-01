@@ -153,7 +153,7 @@ export async function getTenantDb(companyId: string) {
     })
 
     if (company?.customDbUrlEncrypted) {
-      const decryptedUrl = decrypt(company.customDbUrlEncrypted)
+      const decryptedUrl = decrypt(company.customDbUrlEncrypted, companyId)
       if (decryptedUrl) {
         targetClient = getOrCreateCustomClient(companyId, decryptedUrl)
       }

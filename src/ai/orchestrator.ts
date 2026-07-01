@@ -46,16 +46,16 @@ export async function generateChat({
     try {
       if (provider === "gemini") {
         if (!settings.geminiKey) throw new Error("Gemini key not configured")
-        return await callGemini(messages, decrypt(settings.geminiKey))
+        return await callGemini(messages, decrypt(settings.geminiKey, settings.companyId))
       } else if (provider === "openai") {
         if (!settings.openaiKey) throw new Error("OpenAI key not configured")
-        return await callOpenAI(messages, decrypt(settings.openaiKey))
+        return await callOpenAI(messages, decrypt(settings.openaiKey, settings.companyId))
       } else if (provider === "nvidia") {
         if (!settings.nvidiaKey) throw new Error("Nvidia key not configured")
-        return await callNvidia(messages, decrypt(settings.nvidiaKey))
+        return await callNvidia(messages, decrypt(settings.nvidiaKey, settings.companyId))
       } else if (provider === "openrouter") {
         if (!settings.openrouterKey) throw new Error("Openrouter key not configured")
-        return await callOpenRouter(messages, decrypt(settings.openrouterKey))
+        return await callOpenRouter(messages, decrypt(settings.openrouterKey, settings.companyId))
       } else {
         console.warn(`Unknown AI provider: ${provider}`)
       }

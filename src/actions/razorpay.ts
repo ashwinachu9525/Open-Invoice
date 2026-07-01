@@ -24,7 +24,7 @@ export async function getRazorpayClient(companyId: string) {
   if (rawKeyId.includes(":")) {
     try {
       const { decrypt } = await import("@/lib/encryption")
-      keyId = decrypt(rawKeyId)
+      keyId = decrypt(rawKeyId, companyId)
     } catch (err) {
       console.error("Failed to decrypt Razorpay Key ID:", err)
     }
@@ -33,7 +33,7 @@ export async function getRazorpayClient(companyId: string) {
   if (rawKeySecret.includes(":")) {
     try {
       const { decrypt } = await import("@/lib/encryption")
-      keySecret = decrypt(rawKeySecret)
+      keySecret = decrypt(rawKeySecret, companyId)
     } catch (err) {
       console.error("Failed to decrypt Razorpay Key Secret:", err)
     }

@@ -77,7 +77,7 @@ export async function getCustomDbSettings() {
       return { url: null }
     }
 
-    const decrypted = decrypt(encryptedUrl)
+    const decrypted = decrypt(encryptedUrl, company.id)
     
     // Mask password and sensitive info in the connection string for UI exposure
     let maskedUrl = decrypted
@@ -192,7 +192,7 @@ export async function saveCustomDbSettings(postgresqlUrl: string | null) {
     }
 
     // 5. Encrypt and save to SaaS database
-    const encrypted = encrypt(trimmedUrl)
+    const encrypted = encrypt(trimmedUrl, company.id)
     await prisma.company.update({
       where: { id: company.id },
       data: { customDbUrlEncrypted: encrypted },

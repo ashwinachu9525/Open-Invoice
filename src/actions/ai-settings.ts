@@ -69,16 +69,16 @@ export async function saveAISettings(data: unknown) {
 
     // Only update keys if provided. Empty string removes it. undefined keeps existing.
     if (parsed.data.geminiKey !== undefined) {
-      updateData.geminiKey = parsed.data.geminiKey ? encrypt(parsed.data.geminiKey) : null
+      updateData.geminiKey = parsed.data.geminiKey ? encrypt(parsed.data.geminiKey, company.id) : null
     }
     if (parsed.data.openaiKey !== undefined) {
-      updateData.openaiKey = parsed.data.openaiKey ? encrypt(parsed.data.openaiKey) : null
+      updateData.openaiKey = parsed.data.openaiKey ? encrypt(parsed.data.openaiKey, company.id) : null
     }
     if (parsed.data.nvidiaKey !== undefined) {
-      updateData.nvidiaKey = parsed.data.nvidiaKey ? encrypt(parsed.data.nvidiaKey) : null
+      updateData.nvidiaKey = parsed.data.nvidiaKey ? encrypt(parsed.data.nvidiaKey, company.id) : null
     }
     if (parsed.data.openrouterKey !== undefined) {
-      updateData.openrouterKey = parsed.data.openrouterKey ? encrypt(parsed.data.openrouterKey) : null
+      updateData.openrouterKey = parsed.data.openrouterKey ? encrypt(parsed.data.openrouterKey, company.id) : null
     }
 
     if (currentSettings) {

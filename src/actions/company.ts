@@ -6,6 +6,7 @@ import { companySchema, CompanyFormValues } from "@/validations/company"
 import { requireCompany } from "@/lib/auth-helpers"
 import { createAuditLog } from "@/services/audit"
 import { revalidatePath } from "next/cache"
+import crypto from "crypto"
 
 export async function updateCompany(data: CompanyFormValues) {
   try {
@@ -30,12 +31,16 @@ export async function updateCompany(data: CompanyFormValues) {
     if (!user) return { error: "User not found" }
 
     const { encrypt } = await import("@/lib/encryption")
+    const companyId = user.companyId || crypto.randomUUID()
     const updateData: any = { ...parsed.data }
 
+    if (!user.companyId) {
+      updateData.id = companyId
+    }
+
     if (parsed.data.razorpayKeyId) {
-      // Only encrypt if it is a raw key and not already encrypted
       if (!parsed.data.razorpayKeyId.includes(":")) {
-        updateData.razorpayKeyId = encrypt(parsed.data.razorpayKeyId)
+        updateData.razorpayKeyId = encrypt(parsed.data.razorpayKeyId, companyId)
       }
     }
 
@@ -43,7 +48,7 @@ export async function updateCompany(data: CompanyFormValues) {
       if (parsed.data.razorpayKeySecret === "••••••••") {
         updateData.razorpayKeySecret = user.company?.razorpayKeySecret || null
       } else {
-        updateData.razorpayKeySecret = encrypt(parsed.data.razorpayKeySecret)
+        updateData.razorpayKeySecret = encrypt(parsed.data.razorpayKeySecret, companyId)
       }
     }
 
@@ -51,7 +56,7 @@ export async function updateCompany(data: CompanyFormValues) {
       if (parsed.data.razorpayWebhookSecret === "••••••••") {
         updateData.razorpayWebhookSecret = user.company?.razorpayWebhookSecret || null
       } else {
-        updateData.razorpayWebhookSecret = encrypt(parsed.data.razorpayWebhookSecret)
+        updateData.razorpayWebhookSecret = encrypt(parsed.data.razorpayWebhookSecret, companyId)
       }
     }
 
@@ -94,7 +99,7 @@ export async function getCompany() {
       const companyData = { ...user.company }
       if (companyData.razorpayKeyId) {
         try {
-          companyData.razorpayKeyId = decrypt(companyData.razorpayKeyId)
+          companyData.razorpayKeyId = decrypt(companyData.razorpayKeyId, user.company.id)
         } catch {
           // Skip if already in plaintext or invalid formatting
         }

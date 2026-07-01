@@ -19,7 +19,7 @@ export class MetaProvider implements WhatsAppProvider {
       select: { whatsappPhoneId: true, whatsappMetaToken: true },
     });
     const phoneId = company?.whatsappPhoneId;
-    const accessToken = company?.whatsappMetaToken ? decrypt(company.whatsappMetaToken) : undefined;
+    const accessToken = company?.whatsappMetaToken ? decrypt(company.whatsappMetaToken, companyId) : undefined;
     if (!phoneId || !accessToken) {
       return { success: false, error: "Meta WhatsApp credentials missing" };
     }
@@ -70,7 +70,7 @@ export class MetaProvider implements WhatsAppProvider {
       select: { whatsappPhoneId: true, whatsappMetaToken: true },
     });
     const phoneId = company?.whatsappPhoneId;
-    const accessToken = company?.whatsappMetaToken ? decrypt(company.whatsappMetaToken) : undefined;
+    const accessToken = company?.whatsappMetaToken ? decrypt(company.whatsappMetaToken, companyId) : undefined;
     if (!phoneId || !accessToken) {
       return { success: false, error: "Meta WhatsApp credentials missing" };
     }

@@ -190,7 +190,7 @@ export async function getEmailTransporter(companyId: string) {
   const settings = await prisma.emailSetting.findUnique({ where: { companyId } })
   if (!settings) return null
 
-  const password = decrypt(settings.passwordEncrypted)
+  const password = decrypt(settings.passwordEncrypted, companyId)
   return nodemailer.createTransport({
     host: settings.host,
     port: settings.port,

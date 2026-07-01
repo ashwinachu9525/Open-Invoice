@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     })
 
     const webhookSecret = company?.razorpayWebhookSecret
-      ? (await import("@/lib/encryption")).decrypt(company.razorpayWebhookSecret)
+      ? (await import("@/lib/encryption")).decrypt(company.razorpayWebhookSecret, companyId)
       : process.env.RAZORPAY_WEBHOOK_SECRET
 
     if (!webhookSecret) {
