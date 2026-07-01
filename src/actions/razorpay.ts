@@ -21,19 +21,31 @@ export async function getRazorpayClient(companyId: string) {
   let keyId = rawKeyId
   let keySecret = rawKeySecret
 
-  if (rawKeyId.includes(":")) {
+  if (rawKeyId && rawKeyId.includes(":")) {
     try {
-      const { decrypt } = await import("@/lib/encryption")
-      keyId = decrypt(rawKeyId, companyId)
+      const { decryptAndMigrate } = await import("@/lib/encryption")
+      keyId = await decryptAndMigrate(rawKeyId, companyId, async (newCipherText) => {
+        await db.company.update({
+          where: { id: companyId },
+          data: { razorpayKeyId: newCipherText }
+        })
+        console.log(`[Key Rotation] Automatically migrated razorpayKeyId for company: ${companyId}`)
+      })
     } catch (err) {
       console.error("Failed to decrypt Razorpay Key ID:", err)
     }
   }
 
-  if (rawKeySecret.includes(":")) {
+  if (rawKeySecret && rawKeySecret.includes(":")) {
     try {
-      const { decrypt } = await import("@/lib/encryption")
-      keySecret = decrypt(rawKeySecret, companyId)
+      const { decryptAndMigrate } = await import("@/lib/encryption")
+      keySecret = await decryptAndMigrate(rawKeySecret, companyId, async (newCipherText) => {
+        await db.company.update({
+          where: { id: companyId },
+          data: { razorpayKeySecret: newCipherText }
+        })
+        console.log(`[Key Rotation] Automatically migrated razorpayKeySecret for company: ${companyId}`)
+      })
     } catch (err) {
       console.error("Failed to decrypt Razorpay Key Secret:", err)
     }

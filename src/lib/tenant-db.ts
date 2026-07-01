@@ -1,7 +1,7 @@
 import "server-only"
 import { prisma, createPostgresClient } from "./prisma"
 import { PrismaClient } from "@prisma/client"
-import { decrypt } from "./encryption"
+import { decrypt, decryptAndMigrate } from "./encryption"
 
 interface CachedTenantClient {
   client: PrismaClient
@@ -153,7 +153,17 @@ export async function getTenantDb(companyId: string) {
     })
 
     if (company?.customDbUrlEncrypted) {
-      const decryptedUrl = decrypt(company.customDbUrlEncrypted, companyId)
+      const decryptedUrl = await decryptAndMigrate(
+        company.customDbUrlEncrypted,
+        companyId,
+        async (newCipherText) => {
+          await prisma.company.update({
+            where: { id: companyId },
+            data: { customDbUrlEncrypted: newCipherText }
+          })
+          console.log(`[Key Rotation] Automatically migrated database connection URL for company: ${companyId}`)
+        }
+      )
       if (decryptedUrl) {
         targetClient = getOrCreateCustomClient(companyId, decryptedUrl)
       }
