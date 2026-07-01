@@ -56,6 +56,7 @@ const styles = StyleSheet.create({
 
 interface InvoicePDFProps {
   invoice: {
+    id: string
     invoiceNumber: string
     date: Date
     dueDate: Date
@@ -75,6 +76,7 @@ interface InvoicePDFProps {
     status: string
     paymentCollectionMethod?: string
     vpaAddress?: string | null
+    razorpayPaymentLinkUrl?: string | null
     bankName?: string | null
     bankAccountName?: string | null
     bankAccountNumber?: string | null
@@ -258,6 +260,24 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
             {invoice.bankAccountNumber && <Text>Account Number: {invoice.bankAccountNumber}</Text>}
             {invoice.bankIfscCode && <Text>IFSC: {invoice.bankIfscCode}</Text>}
             {invoice.bankAccountType && <Text>Account Type: {invoice.bankAccountType}</Text>}
+          </View>
+        )}
+
+        {invoice.paymentCollectionMethod === "ONLINE" && (
+          <View style={styles.section}>
+            <Text style={styles.label}>PAYMENT DETAILS</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 2, fontSize: 9 }}>
+              <Text style={{ color: "#374151" }}>Pay Online: </Text>
+              <Link
+                src={invoice.razorpayPaymentLinkUrl || `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/invoices/${invoice.id}?pay=true`}
+                style={{ color: themeColor, fontWeight: "bold", textDecoration: "underline" }}
+              >
+                Click here to pay securely
+              </Link>
+            </View>
+            <Text style={{ fontSize: 7, color: "#9ca3af", marginTop: 2 }}>
+              Accepts UPI, Credit/Debit Cards, Netbanking & Wallets via Razorpay.
+            </Text>
           </View>
         )}
 

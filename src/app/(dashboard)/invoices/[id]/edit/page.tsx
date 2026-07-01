@@ -62,6 +62,7 @@ export default async function EditInvoicePage({ params }: EditInvoicePageProps) 
     vpaAddress: (invoice as any).vpaAddress || "",
     razorpayOrderId: (invoice as any).razorpayOrderId || null,
     razorpayPaymentLinkId: (invoice as any).razorpayPaymentLinkId || null,
+    razorpayPaymentLinkUrl: (invoice as any).razorpayPaymentLinkUrl || null,
     items: invoice.items.map((item: any) => ({
       description: item.description,
       hsnSac: item.hsnSac || "",

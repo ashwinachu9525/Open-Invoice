@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { verifyAndRecordRazorpayPayment } from "@/actions/razorpay"
 import { toast } from "sonner"
 import { CreditCard, Loader2 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 interface PayOnlineButtonProps {
   invoiceId: string
@@ -48,6 +48,18 @@ export function PayOnlineButton({
 }: PayOnlineButtonProps) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const shouldAutoPay = searchParams?.get("pay") === "true"
+    if (shouldAutoPay && razorpayKeyId && amount > 0) {
+      // Delay slightly to allow page elements to mount and avoid document body race conditions
+      const timer = setTimeout(() => {
+        handlePayment()
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, razorpayKeyId, amount])
 
   async function handlePayment() {
     if (!razorpayKeyId) {

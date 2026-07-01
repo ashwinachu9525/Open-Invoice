@@ -66,6 +66,7 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
       vpaAddress: company?.vpaAddress || "",
       razorpayOrderId: null,
       razorpayPaymentLinkId: null,
+      razorpayPaymentLinkUrl: null,
     },
   })
 

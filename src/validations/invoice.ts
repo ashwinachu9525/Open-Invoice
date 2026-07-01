@@ -34,6 +34,7 @@ export const invoiceSchema = z.object({
   vpaAddress: z.string().optional().nullable(),
   razorpayOrderId: z.string().optional().nullable(),
   razorpayPaymentLinkId: z.string().optional().nullable(),
+  razorpayPaymentLinkUrl: z.string().optional().nullable(),
 })
 
 export type InvoiceFormValues = z.infer<typeof invoiceSchema>

@@ -90,7 +90,8 @@ export async function createRazorpayInvoiceLink(invoiceId: string) {
     await db.invoice.update({
       where: { id: invoiceId },
       data: {
-        razorpayPaymentLinkId: paymentLink.id
+        razorpayPaymentLinkId: paymentLink.id,
+        razorpayPaymentLinkUrl: paymentLink.short_url
       }
     })
 

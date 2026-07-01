@@ -82,6 +82,7 @@ export async function createInvoice(data: unknown) {
           vpaAddress: parsed.data.vpaAddress,
           razorpayOrderId: parsed.data.razorpayOrderId,
           razorpayPaymentLinkId: parsed.data.razorpayPaymentLinkId,
+          razorpayPaymentLinkUrl: parsed.data.razorpayPaymentLinkUrl,
           items: {
             create: tax.items.map((item) => ({
               description: item.description,
@@ -216,6 +217,7 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
           vpaAddress: parsed.data.vpaAddress,
           razorpayOrderId: parsed.data.razorpayOrderId,
           razorpayPaymentLinkId: parsed.data.razorpayPaymentLinkId,
+          razorpayPaymentLinkUrl: parsed.data.razorpayPaymentLinkUrl,
           items: {
             create: tax.items.map((item) => ({
               description: item.description,
