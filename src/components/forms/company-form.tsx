@@ -41,6 +41,9 @@ export function CompanyForm({ initialData }: { initialData: any }) {
       msmeNumber: initialData?.msmeNumber || "",
       msmeType: initialData?.msmeType || "",
       tcsRate: initialData?.tcsRate ?? 0,
+      vpaAddress: initialData?.vpaAddress || "",
+      razorpayKeyId: initialData?.razorpayKeyId || "",
+      razorpayKeySecret: initialData?.razorpayKeySecret || "",
     },
   })
 
@@ -303,8 +306,56 @@ export function CompanyForm({ initialData }: { initialData: any }) {
           />
         </div>
 
+        <div className="border-t border-white/5 pt-6 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Payment Collection Settings</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Configure default payment destinations for your business invoices.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <FormField
+              control={form.control}
+              name="vpaAddress"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Default UPI VPA (UPI ID)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. business@upi" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="razorpayKeyId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Razorpay Key ID</FormLabel>
+                  <FormControl>
+                    <Input placeholder="rzp_test_..." {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="razorpayKeySecret"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Razorpay Key Secret</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="••••••••" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
         <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving..." : "Save Settings"}
+          {isPending ? "Saving..." : "Save Changes"}
         </Button>
       </form>
     </Form>

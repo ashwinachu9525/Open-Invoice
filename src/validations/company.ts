@@ -16,6 +16,9 @@ export const companySchema = z.object({
   msmeNumber: z.string().optional(),
   msmeType: z.string().optional(),
   tcsRate: z.number().optional(),
+  vpaAddress: z.string().optional().nullable(),
+  razorpayKeyId: z.string().optional().nullable(),
+  razorpayKeySecret: z.string().optional().nullable(),
 })
 
 export type CompanyFormValues = z.infer<typeof companySchema>
