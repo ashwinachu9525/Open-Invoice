@@ -50,14 +50,11 @@ const styles = StyleSheet.create({
   stamp: {
     borderWidth: 2,
     borderColor: "#10b981",
-    color: "#10b981",
-    padding: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
     borderRadius: 4,
-    textTransform: "uppercase",
-    fontWeight: "bold",
-    fontSize: 14,
-    alignSelf: "flex-start",
-    marginTop: 10,
+    marginTop: 8,
+    alignSelf: "flex-end",
   }
 })
 
@@ -74,7 +71,7 @@ interface ReceiptPDFProps {
       amount: number
       method: string
       notes?: string | null
-      createdAt: Date
+      date: Date
     }[]
     company: {
       name: string
@@ -102,7 +99,7 @@ export function ReceiptPDFDocument({ invoice }: ReceiptPDFProps) {
   const themeColor = "#10b981"
   const lastPayment = invoice.payments[0]
   const paymentMethod = lastPayment?.method || "RECORDED"
-  const paymentDate = lastPayment?.createdAt ? new Date(lastPayment.createdAt) : new Date()
+  const paymentDate = lastPayment?.date ? new Date(lastPayment.date) : new Date()
 
   // Words formatting
   let amountInWords = ""
@@ -117,7 +114,7 @@ export function ReceiptPDFDocument({ invoice }: ReceiptPDFProps) {
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <View>
+          <View style={{ width: "60%" }}>
             {invoice.company.logo ? (
               <Image src={invoice.company.logo} style={{ height: 40, marginBottom: 8 }} />
             ) : null}
@@ -126,12 +123,12 @@ export function ReceiptPDFDocument({ invoice }: ReceiptPDFProps) {
             {invoice.company.panNumber && <Text>PAN: {invoice.company.panNumber}</Text>}
             {invoice.company.address && <Text>{invoice.company.address}</Text>}
           </View>
-          <View style={{ alignItems: "flex-end" }}>
+          <View style={{ width: "40%", alignItems: "flex-end" }}>
             <Text style={styles.title}>PAYMENT RECEIPT</Text>
             <Text style={{ marginTop: 4 }}>Receipt Date: {paymentDate.toLocaleDateString("en-IN")}</Text>
             <Text>Invoice Ref: {invoice.invoiceNumber}</Text>
             <View style={styles.stamp}>
-              <Text>PAID</Text>
+              <Text style={{ color: "#10b981", fontWeight: "bold", fontSize: 12, letterSpacing: 1 }}>PAID</Text>
             </View>
           </View>
         </View>
@@ -156,27 +153,15 @@ export function ReceiptPDFDocument({ invoice }: ReceiptPDFProps) {
 
         {/* Invoice reference breakdown table */}
         <View style={styles.tableHeader}>
-          <View style={styles.col1}>
-            <Text style={{ color: "#374151" }}>Description</Text>
-          </View>
-          <View style={styles.col2}>
-            <Text style={{ color: "#374151" }}>Total Invoice Amount</Text>
-          </View>
-          <View style={styles.col3}>
-            <Text style={{ color: "#374151" }}>Amount Paid</Text>
-          </View>
+          <Text style={[styles.col1, { color: "#374151" }]}>Description</Text>
+          <Text style={[styles.col2, { color: "#374151" }]}>Total Invoice Amount</Text>
+          <Text style={[styles.col3, { color: "#374151" }]}>Amount Paid</Text>
         </View>
 
         <View style={styles.tableRow}>
-          <View style={styles.col1}>
-            <Text>Payment for Invoice {invoice.invoiceNumber}</Text>
-          </View>
-          <View style={styles.col2}>
-            <Text>{formatPdfINR(invoice.finalAmount)}</Text>
-          </View>
-          <View style={styles.col3}>
-            <Text>{formatPdfINR(invoice.amountPaid)}</Text>
-          </View>
+          <Text style={styles.col1}>Payment for Invoice {invoice.invoiceNumber}</Text>
+          <Text style={styles.col2}>{formatPdfINR(invoice.finalAmount)}</Text>
+          <Text style={styles.col3}>{formatPdfINR(invoice.amountPaid)}</Text>
         </View>
 
         {/* Totals */}

@@ -113,7 +113,12 @@ export function CatalogClient({ initialItems }: { initialItems: ProductCatalog[]
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                      {/* Edit functionality to be implemented as stretch goal, or just link to /catalog/[id]/edit */}
+                      <Link 
+                        href={`/catalog/${item.id}/edit`} 
+                        className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/20")}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Link>
                       <AlertDialog>
                         <AlertDialogTrigger className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20", isDeleting === item.id ? "pointer-events-none opacity-50" : "")}>
                           <Trash2 className="h-4 w-4" />

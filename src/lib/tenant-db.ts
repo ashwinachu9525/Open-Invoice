@@ -45,6 +45,9 @@ function scopeClientToCompany(client: any, companyId: string) {
             "InvoiceItem",
             "QuotationItem",
             "AIChatMessage",
+            "RecurringSchedule",
+            "WebhookLog",
+            "ExchangeRate",
           ]
 
           if (globalModels.includes(model)) {

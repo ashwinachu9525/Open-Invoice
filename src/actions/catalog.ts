@@ -110,3 +110,27 @@ export async function deleteCatalogItem(id: string) {
     return { error: "Failed to delete catalog item" }
   }
 }
+
+export async function getCatalogItem(id: string) {
+  const session = await auth()
+  if (!session?.user?.companyId) {
+    return { error: "Unauthorized" }
+  }
+
+  try {
+    const prisma = await getTenantDb(session.user.companyId)
+    const item = await prisma.productCatalog.findFirst({
+      where: { 
+        id,
+        companyId: session.user.companyId,
+        deletedAt: null
+      }
+    })
+    if (!item) return { error: "Item not found" }
+    return { item }
+  } catch (error) {
+    console.error(error)
+    return { error: "Failed to fetch catalog item" }
+  }
+}
+

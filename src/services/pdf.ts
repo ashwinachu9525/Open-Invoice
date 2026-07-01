@@ -116,7 +116,7 @@ export async function generateReceiptPdf(invoiceId: string, companyId?: string):
     where: { id: invoiceId },
     include: {
       payments: {
-        orderBy: { createdAt: "desc" }
+        orderBy: { date: "desc" }
       },
       customer: true,
       company: true

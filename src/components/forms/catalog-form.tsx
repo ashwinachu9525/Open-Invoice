@@ -6,7 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { createCatalogItem } from "@/actions/catalog"
+import { createCatalogItem, updateCatalogItem } from "@/actions/catalog"
+import { ProductCatalog } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -24,31 +25,37 @@ const catalogSchema = z.object({
 
 type CatalogFormValues = z.infer<typeof catalogSchema>
 
-export function CatalogForm() {
+interface CatalogFormProps {
+  initialData?: ProductCatalog
+}
+
+export function CatalogForm({ initialData }: CatalogFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<CatalogFormValues>({
     resolver: zodResolver(catalogSchema) as any,
     defaultValues: {
-      name: "",
-      description: "",
-      hsnSac: "",
-      unitPrice: 0,
-      taxPercentage: 18,
-      unit: "pcs",
+      name: initialData?.name ?? "",
+      description: initialData?.description ?? "",
+      hsnSac: initialData?.hsnSac ?? "",
+      unitPrice: initialData?.unitPrice ?? 0,
+      taxPercentage: initialData?.taxPercentage ?? 18,
+      unit: initialData?.unit ?? "pcs",
     },
   })
 
   async function onSubmit(data: CatalogFormValues) {
     setIsSubmitting(true)
-    const res = await createCatalogItem(data)
+    const res = initialData
+      ? await updateCatalogItem(initialData.id, data)
+      : await createCatalogItem(data)
     
     if (res.error) {
       toast.error(res.error)
       setIsSubmitting(false)
     } else {
-      toast.success("Item added to catalog")
+      toast.success(initialData ? "Item updated in catalog" : "Item added to catalog")
       router.push("/catalog")
     }
   }
