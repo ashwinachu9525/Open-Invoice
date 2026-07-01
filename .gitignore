@@ -50,3 +50,6 @@ next-env.d.ts
 /data/database.config.json
 
 certificates
+
+# scratch directory
+/scratch/
