@@ -96,7 +96,7 @@ export default async function InvoiceDetailPage({
               Download PDF
             </Button>
           </Link>
-          {["SENT", "VIEWED", "PARTIALLY_PAID"].includes(invoice.status) && (invoice as any).paymentCollectionMethod === "ONLINE" && (
+          {["DRAFT", "SENT", "VIEWED", "PARTIALLY_PAID"].includes(invoice.status) && (invoice as any).paymentCollectionMethod === "ONLINE" && (
             <PayOnlineButton
               invoiceId={invoice.id}
               amount={invoice.balanceDue}
