@@ -47,6 +47,22 @@ export default async function InvoiceDetailPage({
     }
   }
 
+  let razorpayKeyId = ""
+  if (invoice.company.razorpayKeyId) {
+    if (invoice.company.razorpayKeyId.includes(":")) {
+      try {
+        const { decrypt } = await import("@/lib/encryption")
+        razorpayKeyId = decrypt(invoice.company.razorpayKeyId)
+      } catch {
+        razorpayKeyId = invoice.company.razorpayKeyId
+      }
+    } else {
+      razorpayKeyId = invoice.company.razorpayKeyId
+    }
+  } else {
+    razorpayKeyId = process.env.RAZORPAY_KEY_ID || ""
+  }
+
   const isOverdue =
     invoice.status !== "PAID" &&
     invoice.status !== "CANCELLED" &&
@@ -91,7 +107,7 @@ export default async function InvoiceDetailPage({
               customerName={invoice.customer.name}
               customerEmail={invoice.customer.email}
               customerPhone={invoice.customer.phone}
-              razorpayKeyId={invoice.company.razorpayKeyId || process.env.RAZORPAY_KEY_ID || ""}
+              razorpayKeyId={razorpayKeyId}
             />
           )}
           {invoice.status === "PAID" && (

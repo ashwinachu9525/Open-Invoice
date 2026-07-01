@@ -11,11 +11,32 @@ export async function getRazorpayClient(companyId: string) {
     select: { razorpayKeyId: true, razorpayKeySecret: true }
   })
 
-  const keyId = company?.razorpayKeyId || process.env.RAZORPAY_KEY_ID
-  const keySecret = company?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET
+  const rawKeyId = company?.razorpayKeyId || process.env.RAZORPAY_KEY_ID
+  const rawKeySecret = company?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET
 
-  if (!keyId || !keySecret) {
+  if (!rawKeyId || !rawKeySecret) {
     return null
+  }
+
+  let keyId = rawKeyId
+  let keySecret = rawKeySecret
+
+  if (rawKeyId.includes(":")) {
+    try {
+      const { decrypt } = await import("@/lib/encryption")
+      keyId = decrypt(rawKeyId)
+    } catch (err) {
+      console.error("Failed to decrypt Razorpay Key ID:", err)
+    }
+  }
+
+  if (rawKeySecret.includes(":")) {
+    try {
+      const { decrypt } = await import("@/lib/encryption")
+      keySecret = decrypt(rawKeySecret)
+    } catch (err) {
+      console.error("Failed to decrypt Razorpay Key Secret:", err)
+    }
   }
 
   return new Razorpay({

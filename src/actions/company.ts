@@ -29,16 +29,34 @@ export async function updateCompany(data: CompanyFormValues) {
 
     if (!user) return { error: "User not found" }
 
+    const { encrypt } = await import("@/lib/encryption")
+    const updateData: any = { ...parsed.data }
+
+    if (parsed.data.razorpayKeyId) {
+      // Only encrypt if it is a raw key and not already encrypted
+      if (!parsed.data.razorpayKeyId.includes(":")) {
+        updateData.razorpayKeyId = encrypt(parsed.data.razorpayKeyId)
+      }
+    }
+
+    if (parsed.data.razorpayKeySecret) {
+      if (parsed.data.razorpayKeySecret === "••••••••") {
+        updateData.razorpayKeySecret = user.company?.razorpayKeySecret || null
+      } else {
+        updateData.razorpayKeySecret = encrypt(parsed.data.razorpayKeySecret)
+      }
+    }
+
     if (user.companyId) {
       // Update existing company
       await prisma.company.update({
         where: { id: user.companyId },
-        data: parsed.data
+        data: updateData
       })
     } else {
       // Create new company and link to user
       const newCompany = await prisma.company.create({
-        data: parsed.data
+        data: updateData
       })
       await prisma.user.update({
         where: { id: user.id },
@@ -63,7 +81,23 @@ export async function getCompany() {
       include: { company: true }
     })
 
-    return user?.company || null
+    if (user?.company) {
+      const { decrypt } = await import("@/lib/encryption")
+      const companyData = { ...user.company }
+      if (companyData.razorpayKeyId) {
+        try {
+          companyData.razorpayKeyId = decrypt(companyData.razorpayKeyId)
+        } catch {
+          // Skip if already in plaintext or invalid formatting
+        }
+      }
+      if (companyData.razorpayKeySecret) {
+        companyData.razorpayKeySecret = "••••••••"
+      }
+      return companyData
+    }
+
+    return null
   } catch (error) {
     console.error("Failed to fetch company:", error)
     return null
