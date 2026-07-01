@@ -22,7 +22,11 @@ function createSqliteClient(log: ("error" | "warn")[]): PrismaClient {
   return new PrismaClient({ adapter, log })
 }
 
-export function createPostgresClient(databaseUrl: string, log: ("error" | "warn")[]): PrismaClient {
+export function createPostgresClient(
+  databaseUrl: string,
+  log: ("error" | "warn")[],
+  defaultMaxConnections = 2
+): PrismaClient {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PrismaPg } = require("@prisma/adapter-pg") as typeof import("@prisma/adapter-pg")
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -57,11 +61,13 @@ export function createPostgresClient(databaseUrl: string, log: ("error" | "warn"
     databaseUrl.includes("neon.tech") ||
     databaseUrl.includes("aiven.io")
 
+  const envPoolSize = process.env.DATABASE_POOL_SIZE || process.env.DATABASE_MAX_CONNECTIONS
+  const maxConnections = envPoolSize ? parseInt(envPoolSize, 10) : defaultMaxConnections
+
   const pool = new Pool({
     connectionString: cleanUrl,
     ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
-    // Serverless-friendly tuning: reduce max connections per instance and close idle connections aggressively
-    max: 2,
+    max: maxConnections,
     idleTimeoutMillis: 5000, 
     connectionTimeoutMillis: 5000,
   })
@@ -95,7 +101,7 @@ function createPrismaClient(): PrismaClient {
     throw new Error("DATABASE_URL is not configured. Set DATABASE_URL in your environment variables.")
   }
 
-  return createPostgresClient(databaseUrl, log)
+  return createPostgresClient(databaseUrl, log, 10)
 }
 
 const currentProvider = getActiveProvider()
