@@ -18,7 +18,8 @@ import { Separator } from "@/components/ui/separator"
 import { createCustomer, updateCustomer } from "@/actions/customer"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { AlertCircle, Building2, User, MapPin, Receipt } from "lucide-react"
+import { AlertCircle, Building2, User, MapPin, Receipt, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 const INDIAN_STATES = [
   "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
@@ -40,6 +41,46 @@ export function CustomerForm({ mode = "create", customerId, defaultValues }: Cus
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
+  const [isGstinLoading, setIsGstinLoading] = useState(false)
+
+  async function handleGstinLookup() {
+    const gstinVal = form.getValues("gstin")
+    if (!gstinVal || gstinVal.length !== 15) return
+
+    setIsGstinLoading(true)
+    try {
+      const { lookupGstin } = await import("@/actions/gstin")
+      const result = await lookupGstin(gstinVal)
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.success && result.legalName) {
+        form.setValue("companyName", result.legalName)
+        if (result.pan) {
+          form.setValue("pan", result.pan)
+        } else {
+          form.setValue("pan", gstinVal.substring(2, 12))
+        }
+        if (result.address) {
+          form.setValue("address", result.address)
+        }
+        if (result.state) {
+          const matchedState = INDIAN_STATES.find(
+            s => s.toLowerCase() === result.state?.toLowerCase()
+          )
+          if (matchedState) {
+            form.setValue("state", matchedState)
+          } else {
+            form.setValue("state", result.state)
+          }
+        }
+        toast.success("Customer details autofilled from GSTIN portal!")
+      }
+    } catch {
+      toast.error("Failed to lookup GSTIN details")
+    } finally {
+      setIsGstinLoading(false)
+    }
+  }
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
@@ -150,7 +191,28 @@ export function CustomerForm({ mode = "create", customerId, defaultValues }: Cus
               name="gstin"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm font-medium">GSTIN</FormLabel>
+                  <FormLabel className="text-sm font-medium flex items-center justify-between">
+                    <span>GSTIN</span>
+                    {field.value && field.value.length === 15 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isGstinLoading}
+                        onClick={handleGstinLookup}
+                        className="h-6 text-[10px] text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 px-2 gap-1"
+                      >
+                        {isGstinLoading ? (
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Autofilling...
+                          </>
+                        ) : (
+                          "🔍 Verify & Autofill"
+                        )}
+                      </Button>
+                    )}
+                  </FormLabel>
                   <FormControl>
                     <Input
                       className={inputClass}
