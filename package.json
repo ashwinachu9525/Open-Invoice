@@ -113,6 +113,7 @@
     "@opentelemetry/auto-instrumentations-node": "0.77.0",
     "@opentelemetry/exporter-trace-otlp-http": "0.219.0",
     "@opentelemetry/resources": "2.8.0",
-    "@opentelemetry/sdk-trace-base": "2.8.0"
+    "@opentelemetry/sdk-trace-base": "2.8.0",
+    "nodemailer": "$nodemailer"
   }
 }
