@@ -11,6 +11,44 @@ export async function lookupGstin(gstin: string) {
       return { error: "GSTIN must be exactly 15 characters long" }
     }
 
+    const gstClientId = process.env.GST_CLIENT_ID
+    const gstClientSecret = process.env.GST_CLIENT_SECRET
+
+    if (gstClientId && gstClientSecret) {
+      try {
+        const txnId = `TXN${Date.now()}${Math.floor(Math.random() * 1000)}`
+        const response = await fetch(`https://commonapi.gst.gov.in/v1.0/tp?action=TP&gstin=${cleanGstin}`, {
+          headers: {
+            "client-id": gstClientId,
+            "client-secret": gstClientSecret,
+            "ip-usr": "127.0.0.1",
+            "txn": txnId,
+            "Content-Type": "application/json"
+          }
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data.data) {
+            const biz = data.data
+            return {
+              success: true,
+              legalName: biz.lgnm || biz.tradeNam || "",
+              tradeName: biz.tradeNam || biz.lgnm || "",
+              status: biz.sts || "Active",
+              taxpayerType: biz.dty || "Regular",
+              address: biz.pradr?.addr?.detail || biz.pradr?.adr || "",
+              state: biz.pradr?.addr?.stcd || "",
+              pincode: biz.pradr?.addr?.pncd || "",
+              pan: cleanGstin.substring(2, 12)
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Direct Govt API search failed, falling back:", err)
+      }
+    }
+
     const sandboxKey = process.env.SANDBOX_API_KEY
     const sandboxSecret = process.env.SANDBOX_API_SECRET
     
