@@ -40,11 +40,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   tableRow: { flexDirection: "row", padding: 6, borderBottomWidth: 1, borderBottomColor: "#e5e7eb" },
-  col1: { width: "60%" },
-  col2: { width: "20%", textAlign: "right" },
-  col3: { width: "20%", textAlign: "right" },
+  col1: { width: "50%" },
+  col2: { width: "25%", textAlign: "right" },
+  col3: { width: "25%", textAlign: "right" },
   totals: { marginTop: 16, alignItems: "flex-end" },
-  totalRow: { flexDirection: "row", width: 200, justifyContent: "space-between", paddingVertical: 2 },
+  totalRow: { flexDirection: "row", width: 230, justifyContent: "space-between", paddingVertical: 2 },
   grandTotal: { fontSize: 14, fontWeight: "bold", color: "#10b981" },
   footer: { position: "absolute", bottom: 40, left: 40, right: 40 },
   stamp: {
@@ -154,7 +154,7 @@ export function ReceiptPDFDocument({ invoice }: ReceiptPDFProps) {
         {/* Invoice reference breakdown table */}
         <View style={styles.tableHeader}>
           <Text style={[styles.col1, { color: "#374151" }]}>Description</Text>
-          <Text style={[styles.col2, { color: "#374151" }]}>Total Invoice Amount</Text>
+          <Text style={[styles.col2, { color: "#374151" }]}>Total Amount</Text>
           <Text style={[styles.col3, { color: "#374151" }]}>Amount Paid</Text>
         </View>
 
