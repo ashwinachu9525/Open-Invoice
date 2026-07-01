@@ -44,6 +44,7 @@ export function CompanyForm({ initialData }: { initialData: any }) {
       vpaAddress: initialData?.vpaAddress || "",
       razorpayKeyId: initialData?.razorpayKeyId || "",
       razorpayKeySecret: initialData?.razorpayKeySecret || "",
+      razorpayWebhookSecret: initialData?.razorpayWebhookSecret || "",
     },
   })
 
@@ -311,7 +312,7 @@ export function CompanyForm({ initialData }: { initialData: any }) {
             <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Payment Collection Settings</h3>
             <p className="text-xs text-muted-foreground mt-0.5">Configure default payment destinations for your business invoices.</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <FormField
               control={form.control}
               name="vpaAddress"
@@ -344,6 +345,19 @@ export function CompanyForm({ initialData }: { initialData: any }) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Razorpay Key Secret</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="••••••••" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="razorpayWebhookSecret"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Razorpay Webhook Secret</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="••••••••" {...field} value={field.value ?? ""} />
                   </FormControl>

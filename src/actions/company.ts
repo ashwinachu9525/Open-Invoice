@@ -47,6 +47,14 @@ export async function updateCompany(data: CompanyFormValues) {
       }
     }
 
+    if (parsed.data.razorpayWebhookSecret) {
+      if (parsed.data.razorpayWebhookSecret === "••••••••") {
+        updateData.razorpayWebhookSecret = user.company?.razorpayWebhookSecret || null
+      } else {
+        updateData.razorpayWebhookSecret = encrypt(parsed.data.razorpayWebhookSecret)
+      }
+    }
+
     if (user.companyId) {
       // Update existing company
       await prisma.company.update({
@@ -93,6 +101,9 @@ export async function getCompany() {
       }
       if (companyData.razorpayKeySecret) {
         companyData.razorpayKeySecret = "••••••••"
+      }
+      if (companyData.razorpayWebhookSecret) {
+        companyData.razorpayWebhookSecret = "••••••••"
       }
       return companyData
     }
