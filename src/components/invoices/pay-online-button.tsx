@@ -112,14 +112,20 @@ export function PayOnlineButton({
       theme: {
         color: "#6366f1",
       },
+      modal: {
+        ondismiss: function () {
+          toast.warning("Payment cancelled by user")
+          setLoading(false)
+        }
+      }
     }
 
     const rzp = new (window as any).Razorpay(options)
     rzp.on("payment.failed", function (resp: any) {
       toast.error(`Payment failed: ${resp.error.description}`)
+      setLoading(false)
     })
     rzp.open()
-    setLoading(false)
   }
 
   return (
