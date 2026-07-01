@@ -143,6 +143,7 @@ model Company {
   baseCurrency   String?   @default("INR")
   invoiceTemplate String?  @default("modern")
   subscriptionTier SubscriptionTier @default(FREE)
+  customDomain   String?   @unique
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?

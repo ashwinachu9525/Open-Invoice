@@ -13,6 +13,7 @@ import { generateInvoicePdf } from "@/services/pdf"
 import { sendInvoiceEmail } from "@/services/smtp"
 import { getOrSetCache, invalidateCachePattern } from "@/lib/redis"
 import { sendWhatsAppMessage, sendWhatsAppDocument } from "@/actions/integrations"
+import { getCompanyNow } from "@/lib/date-utils"
 
 export async function createInvoice(data: unknown) {
   try {
@@ -593,7 +594,8 @@ export async function getNextInvoiceNumber() {
   try {
     const { company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     const count = await prisma.invoice.count({ where: { companyId: company.id } })
-    const year = new Date().getFullYear()
+    const now = await getCompanyNow(prisma, company.baseCurrency)
+    const year = now.getFullYear()
     const prefix = company.invoicePrefix || "INV"
     return `${prefix}-${year}-${String(count + 1).padStart(4, "0")}`
   } catch {
@@ -613,14 +615,17 @@ export async function cloneInvoice(id: string) {
     if (!invoice) return { error: "Invoice not found" }
     
     const newInvoiceNumber = await getNextInvoiceNumber()
+    const now = await getCompanyNow(prisma, company.baseCurrency)
+    const newDueDate = new Date(now)
+    newDueDate.setDate(newDueDate.getDate() + 30)
     
     const newInvoice = await prisma.invoice.create({
       data: {
         companyId: company.id,
         customerId: invoice.customerId,
         invoiceNumber: newInvoiceNumber,
-        date: new Date(),
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // +30 days
+        date: now,
+        dueDate: newDueDate,
         currency: invoice.currency,
         exchangeRate: invoice.exchangeRate,
         notes: invoice.notes,

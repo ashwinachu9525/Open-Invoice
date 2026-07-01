@@ -4,6 +4,7 @@ import { requireCompany } from "@/lib/auth-helpers"
 import { RecurringFrequency, ScheduleStatus } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { getTenantDb } from "@/lib/tenant-db"
+import { getCompanyNow } from "@/lib/date-utils"
 
 export async function createRecurringSchedule(
   invoiceId: string,
@@ -18,7 +19,8 @@ export async function createRecurringSchedule(
     })
     if (!invoice) return { error: "Invoice not found" }
 
-    const nextRunAt = new Date()
+    const now = await getCompanyNow(prisma, company.baseCurrency)
+    const nextRunAt = new Date(now)
     nextRunAt.setMonth(nextRunAt.getMonth() + 1)
 
     await prisma.recurringSchedule.upsert({

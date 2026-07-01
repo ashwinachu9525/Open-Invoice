@@ -45,6 +45,7 @@ export function CompanyForm({ initialData }: { initialData: any }) {
       razorpayKeyId: initialData?.razorpayKeyId || "",
       razorpayKeySecret: initialData?.razorpayKeySecret || "",
       razorpayWebhookSecret: initialData?.razorpayWebhookSecret || "",
+      customDomain: initialData?.customDomain || "",
     },
   })
 
@@ -368,7 +369,50 @@ export function CompanyForm({ initialData }: { initialData: any }) {
           </div>
         </div>
 
-        <Button type="submit" disabled={isPending}>
+        {/* Custom Domain Settings Section */}
+        <div className="border-t border-white/5 pt-6 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Custom Domain Configuration</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Host public invoices and billing links on your own custom domain (Growth and Enterprise plans only).</p>
+          </div>
+          <FormField
+            control={form.control}
+            name="customDomain"
+            render={({ field }) => {
+              const isTierEligible = initialData?.subscriptionTier === "PRO" || initialData?.subscriptionTier === "ENTERPRISE"
+              return (
+                <FormItem className="max-w-md">
+                  <FormLabel>Your Custom Domain</FormLabel>
+                  <FormControl>
+                    <div className="relative flex items-center">
+                      <Input 
+                        placeholder={isTierEligible ? "e.g. billing.yourcompany.com" : "Upgrade to Pro to configure custom domains"} 
+                        disabled={!isTierEligible}
+                        {...field}
+                        value={field.value ?? ""} 
+                        className={!isTierEligible ? "pr-24 cursor-not-allowed opacity-60" : ""}
+                      />
+                      {!isTierEligible && (
+                        <span className="absolute right-3 text-[10px] text-amber-500 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 pointer-events-none">
+                          Pro Only
+                        </span>
+                      )}
+                    </div>
+                  </FormControl>
+                  <FormDescription>
+                    {isTierEligible 
+                      ? "Point your custom domain's DNS CNAME record to cname.open-invoice.com, then enter the domain here." 
+                      : "Custom domains are available on Growth (PRO) and Enterprise plans."
+                    }
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )
+            }}
+          />
+        </div>
+
+        <Button type="submit" disabled={isPending} className="mt-4">
           {isPending ? "Saving..." : "Save Changes"}
         </Button>
       </form>

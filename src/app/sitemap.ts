@@ -3,6 +3,11 @@ import { MetadataRoute } from 'next'
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://open-invoice.com'
 
+  const toolRoutes = [
+    { url: `${baseUrl}/gst-calculator`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.9 },
+    { url: `${baseUrl}/hsn-sac`,        lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.9 },
+  ]
+
   const routes = [
     '',
     '/invoice-generator',
@@ -28,5 +33,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: route === '' ? 1.0 : 0.8,
   }))
 
-  return [...routes]
+  return [...toolRoutes, ...routes]
 }

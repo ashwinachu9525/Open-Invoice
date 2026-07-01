@@ -20,6 +20,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <a href="/invoice-generator" className="text-muted-foreground hover:text-foreground transition-colors">Invoice</a>
             <a href="/quotation-generator" className="text-muted-foreground hover:text-foreground transition-colors">Quotation</a>
             <a href="/estimate-generator" className="text-muted-foreground hover:text-foreground transition-colors">Estimate</a>
+            <a href="/hsn-sac" className="text-muted-foreground hover:text-foreground transition-colors">HSN/SAC</a>
+            <a href="/gst-calculator" className="text-muted-foreground hover:text-foreground transition-colors">GST Calc</a>
           </nav>
           <div className="flex items-center gap-4">
             <a href="/login" className="text-sm font-medium hover:underline text-muted-foreground hover:text-foreground">Login</a>
@@ -31,8 +33,14 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         {children}
       </main>
       <footer className="border-t border-white/10 py-8 bg-muted/20">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} InvoiceAI. Free tools for freelancers and small businesses.</p>
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground space-y-2">
+          <div className="flex flex-wrap justify-center gap-x-5 gap-y-1">
+            <a href="/invoice-generator" className="hover:text-foreground transition-colors">Free Invoice Generator</a>
+            <a href="/gst-calculator" className="hover:text-foreground transition-colors">GST Calculator</a>
+            <a href="/hsn-sac" className="hover:text-foreground transition-colors">HSN/SAC Codes</a>
+            <a href="/quotation-generator" className="hover:text-foreground transition-colors">Quotation Generator</a>
+          </div>
+          <p>© {new Date().getFullYear()} Open-Invoice. Free tools for freelancers and small businesses.</p>
         </div>
       </footer>
     </div>

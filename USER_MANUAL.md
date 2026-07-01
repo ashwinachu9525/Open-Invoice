@@ -12,6 +12,7 @@ Welcome to **Open-Invoice**, your enterprise-grade, AI-powered B2B invoicing and
 5. [Expenses & Reports](#5-expenses--reports)
 6. [Team Management](#6-team-management)
 7. [Advanced Features (AI & Email)](#7-advanced-features)
+8. [Custom Domain Setup](#8-custom-domain-setup)
 
 ---
 
@@ -152,3 +153,54 @@ Send invoices directly from your own email address.
 1. Go to **Settings** -> **Email / SMTP Settings**.
 2. Enter your SMTP host, port, username, and password. (Your password is encrypted with AES-256 before being stored).
 3. Once configured, you can click **Send Email** directly from any invoice to dispatch the PDF to your customer without downloading it first. You can track sent emails in the **Email Logs** tab.
+
+---
+
+## 8. Custom Domain Setup
+
+### What is Custom Domain Support?
+Custom domain support allows Growth (PRO) and Enterprise clients to publish public-facing invoice and quotation billing links under their own branded domain (e.g. `billing.yourcompany.com`) rather than the platform's default domain.
+
+### Step-by-Step Configuration
+
+#### Step 1: Configure your DNS Records
+First, configure your custom domain with your DNS provider (Cloudflare, GoDaddy, Namecheap, AWS Route 53, etc.):
+1. Add a new **CNAME** record.
+2. Set the **Host/Name** to your preferred subdomain (e.g., `billing` or `invoices`).
+3. Point the **Target/Value** to: `cname.open-invoice.com`.
+4. (Optional) If using Cloudflare, make sure the proxy setting is set to **DNS Only** (Grey Cloud) to allow Caddy/Let's Encrypt SSL challenges to pass directly to your servers.
+
+#### Step 2: Add Domain in Settings
+1. Navigate to **Settings** in the Open-Invoice dashboard.
+2. Scroll to the **Custom Domain Configuration** card.
+3. Enter your domain name exactly as configured (e.g., `billing.yourcompany.com`).
+4. Click **Save Changes**.
+
+---
+
+### How to Check and Test Your Custom Domain Setup
+
+To verify that your custom domain is configured and working as expected:
+
+#### 1. Verify DNS Propagation
+Run a lookup in your terminal to verify that the CNAME records have propagated:
+```bash
+nslookup billing.yourcompany.com
+```
+You should see it resolving/pointing to `cname.open-invoice.com` (or your platform's server IP).
+
+#### 2. Test Dynamic SSL Handshake
+Once DNS points to your server, attempt to open your custom domain in a web browser using HTTPS:
+`https://billing.yourcompany.com`
+
+- **First Visit Hook**: On the first visit, your reverse proxy (e.g. Caddy) will send an automated request to the backend validation endpoint `/api/public/verify-domain?domain=billing.yourcompany.com` to check authorization.
+- If allowed, it requests a Let's Encrypt SSL certificate. This takes **2 to 3 seconds** on the very first load. Subsequent loads will be instant.
+
+#### 3. Test Billing Page Rewriting
+Open an invoice billing link using your custom domain:
+`https://billing.yourcompany.com/p/invoice/[id]`
+
+- The page should load your standard client-facing invoice preview showing all line items, totals, and branding.
+- **Security Validation Check**: Verify that the browser's address bar remains exactly as `https://billing.yourcompany.com/p/invoice/[id]`, showing that the internal Next.js rewrite is working securely.
+- **Tenant Scope Check**: Attempting to load an invoice ID belonging to another company using your domain will yield a **404 Not Found** page.
+

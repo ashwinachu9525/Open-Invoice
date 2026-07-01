@@ -24,8 +24,34 @@ function applyRateLimit(ip: string, maxRequests: number, windowMs: number): bool
   return true // Allowed
 }
 
-export default auth((request) => {
+export default auth(async (request) => {
   const path = request.nextUrl.pathname
+  const hostname = request.headers.get("host") || ""
+
+  // Resolve platform domain status
+  const platformHostnames = ["open-invoice.com", "app.open-invoice.com"]
+  const isPlatformDomain = platformHostnames.some(d => hostname.startsWith(d)) || hostname === "localhost:3000"
+
+  // Only rewrite if it's not a platform domain and not a static resource / core api
+  const isStaticFile = path.includes(".") || path.startsWith("/_next/") || path.startsWith("/api/")
+
+  if (!isPlatformDomain && !isStaticFile) {
+    try {
+      const origin = request.nextUrl.origin
+      const res = await fetch(`${origin}/api/public/verify-domain?domain=${hostname.toLowerCase()}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.allowed && data.companyId) {
+          const url = request.nextUrl.clone()
+          url.pathname = `/_custom/${data.companyId}${path}`
+          return NextResponse.rewrite(url)
+        }
+      }
+    } catch (err) {
+      console.error("Middleware domain rewrite error:", err)
+    }
+  }
+
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set("x-pathname", path)
   
@@ -61,6 +87,7 @@ export const config = {
     "/ai/:path*",
     "/login",
     "/register",
+    "/p/:path*", // Include public billing routes for matching
     "/api/feedback/:path*",
     "/api/public/:path*",
   ],

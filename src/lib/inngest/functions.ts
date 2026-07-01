@@ -30,13 +30,14 @@ function getNextRunDate(frequency: RecurringFrequency, from: Date): Date {
   return next
 }
 
+import { getCompanyNow } from "@/lib/date-utils"
+
 export const processRecurringInvoices = inngest.createFunction(
   { id: "process-recurring-invoices", triggers: [{ cron: "0 * * * *" }] },
   async () => {
     const schedules = await prisma.recurringSchedule.findMany({
       where: {
         status: ScheduleStatus.ACTIVE,
-        nextRunAt: { lte: new Date() },
       },
       include: {
         invoice: { include: { items: true, customer: true, company: { include: { users: true } } } },
@@ -45,16 +46,27 @@ export const processRecurringInvoices = inngest.createFunction(
 
     for (const schedule of schedules) {
       const source = schedule.invoice
+      const company = source.company
+      const now = await getCompanyNow(prisma, company.baseCurrency)
+
+      if (schedule.nextRunAt > now) {
+        continue
+      }
+
       const count = await prisma.invoice.count({ where: { companyId: source.companyId } })
-      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(count + 1).padStart(4, "0")}`
+      const prefix = company.invoicePrefix || "INV"
+      const invoiceNumber = `${prefix}-${now.getFullYear()}-${String(count + 1).padStart(4, "0")}`
+
+      const dueDate = new Date(now)
+      dueDate.setDate(dueDate.getDate() + 30)
 
       const newInvoice = await prisma.invoice.create({
         data: {
           companyId: source.companyId,
           customerId: source.customerId,
           invoiceNumber,
-          date: new Date(),
-          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          date: now,
+          dueDate,
           currency: source.currency,
           notes: source.notes,
           terms: source.terms,

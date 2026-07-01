@@ -68,29 +68,124 @@ export async function generateChat({
   throw new Error("All configured AI providers failed to generate a response.")
 }
 
-async function callGemini(messages: ChatMessage[], apiKey: string): Promise<string> {
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" })
+/**
+ * Streaming variant — yields text chunks as they arrive.
+ * Falls back to a single-chunk yield from the buffered generateChat if streaming
+ * is not supported by the selected provider.
+ */
+export async function generateChatStream({
+  companyId,
+  messages,
+  onChunk,
+}: {
+  companyId: string
+  messages: ChatMessage[]
+  onChunk: (chunk: string) => void
+}): Promise<void> {
+  const settings = await prisma.aISettings.findUnique({
+    where: { companyId },
+  })
 
-  // Gemini expects history in a specific format
-  const geminiHistory = messages.map(m => ({
-    role: m.role === "assistant" ? "model" : m.role === "system" ? "user" : "user", // Map system to user for Gemini if it doesn't support system
-    parts: [{ text: m.content }]
-  }))
+  if (!settings) throw new Error("AI settings not configured for this company")
 
-  // Actually, Gemini supports `systemInstruction` but it's simpler to just map system -> user or include it in the first prompt
-  // But let's build the prompt carefully
-  let promptText = ""
-  for (const m of messages) {
-    if (m.role === "system") promptText += `System: ${m.content}\n\n`
-    else if (m.role === "user") promptText += `User: ${m.content}\n\n`
-    else promptText += `Assistant: ${m.content}\n\n`
+  const fallbackOrder = settings.fallbackOrder.split(",").map((s) => s.trim())
+  if (fallbackOrder.length === 0) throw new Error("No AI providers configured")
+
+  for (const provider of fallbackOrder) {
+    try {
+      if (provider === "gemini" && settings.geminiKey) {
+        await streamGemini(messages, decrypt(settings.geminiKey, settings.companyId), onChunk)
+        return
+      } else if (provider === "openai" && settings.openaiKey) {
+        await streamOpenAI(messages, decrypt(settings.openaiKey, settings.companyId), onChunk)
+        return
+      } else if (provider === "nvidia" && settings.nvidiaKey) {
+        await streamOpenAICompat(
+          messages,
+          decrypt(settings.nvidiaKey, settings.companyId),
+          "https://integrate.api.nvidia.com/v1",
+          "meta/llama-3.1-70b-instruct",
+          onChunk
+        )
+        return
+      } else if (provider === "openrouter" && settings.openrouterKey) {
+        await streamOpenAICompat(
+          messages,
+          decrypt(settings.openrouterKey, settings.companyId),
+          "https://openrouter.ai/api/v1",
+          "meta-llama/llama-3.1-8b-instruct:free",
+          onChunk,
+          {
+            "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+            "X-Title": "Open Invoice",
+          }
+        )
+        return
+      }
+    } catch (error) {
+      console.warn(`[stream] Provider ${provider} failed:`, error instanceof Error ? error.message : String(error))
+    }
   }
 
-  const result = await model.generateContent(promptText)
+  // Final fallback: buffered generation → single chunk
+  const result = await generateChat({ companyId, messages })
+  onChunk(result)
+}
+
+// ── Provider implementations ──────────────────────────────────────────────
+
+async function callGemini(messages: ChatMessage[], apiKey: string): Promise<string> {
+  const genAI = new GoogleGenerativeAI(apiKey)
+
+  // Extract system message
+  const systemMsg = messages.find(m => m.role === "system")?.content ?? ""
+  const chatMessages = messages.filter(m => m.role !== "system")
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    systemInstruction: systemMsg || undefined,
+  })
+
+  // Build Gemini history (all but last message)
+  const history = chatMessages.slice(0, -1).map(m => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }))
+
+  const lastMessage = chatMessages[chatMessages.length - 1]?.content ?? ""
+
+  const chat = model.startChat({ history })
+  const result = await chat.sendMessage(lastMessage)
   const responseText = result.response.text()
   if (!responseText) throw new Error("Empty response from Gemini")
   return responseText
+}
+
+async function streamGemini(messages: ChatMessage[], apiKey: string, onChunk: (c: string) => void): Promise<void> {
+  const genAI = new GoogleGenerativeAI(apiKey)
+
+  const systemMsg = messages.find(m => m.role === "system")?.content ?? ""
+  const chatMessages = messages.filter(m => m.role !== "system")
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    systemInstruction: systemMsg || undefined,
+  })
+
+  const history = chatMessages.slice(0, -1).map(m => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }))
+
+  const lastMessage = chatMessages[chatMessages.length - 1]?.content ?? ""
+
+  const chat = model.startChat({ history })
+  const result = await chat.sendMessageStream(lastMessage)
+
+  for await (const chunk of result.stream) {
+    const text = chunk.text()
+    if (text) onChunk(text)
+  }
 }
 
 async function callOpenAI(messages: ChatMessage[], apiKey: string): Promise<string> {
@@ -102,6 +197,19 @@ async function callOpenAI(messages: ChatMessage[], apiKey: string): Promise<stri
   const responseText = response.choices[0]?.message?.content
   if (!responseText) throw new Error("Empty response from OpenAI")
   return responseText
+}
+
+async function streamOpenAI(messages: ChatMessage[], apiKey: string, onChunk: (c: string) => void): Promise<void> {
+  const openai = new OpenAI({ apiKey })
+  const stream = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: messages as any,
+    stream: true,
+  })
+  for await (const chunk of stream) {
+    const text = chunk.choices[0]?.delta?.content
+    if (text) onChunk(text)
+  }
 }
 
 async function callNvidia(messages: ChatMessage[], apiKey: string): Promise<string> {
@@ -124,14 +232,34 @@ async function callOpenRouter(messages: ChatMessage[], apiKey: string): Promise<
     apiKey,
     defaultHeaders: {
       "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      "X-Title": "Invoice Generator",
+      "X-Title": "Open Invoice",
     }
   })
   const response = await openai.chat.completions.create({
-    model: "openrouter/free", // Or standard free models if preferred, maybe we can use claude-3.5-sonnet as a good default for OpenRouter
+    model: "meta-llama/llama-3.1-8b-instruct:free",
     messages: messages as any,
   })
   const responseText = response.choices[0]?.message?.content
   if (!responseText) throw new Error("Empty response from OpenRouter")
   return responseText
+}
+
+async function streamOpenAICompat(
+  messages: ChatMessage[],
+  apiKey: string,
+  baseURL: string,
+  model: string,
+  onChunk: (c: string) => void,
+  extraHeaders?: Record<string, string>
+): Promise<void> {
+  const openai = new OpenAI({ baseURL, apiKey, defaultHeaders: extraHeaders })
+  const stream = await openai.chat.completions.create({
+    model,
+    messages: messages as any,
+    stream: true,
+  })
+  for await (const chunk of stream) {
+    const text = chunk.choices[0]?.delta?.content
+    if (text) onChunk(text)
+  }
 }

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { SheetClose } from "@/components/ui/sheet"
 import { useSession } from "next-auth/react"
 
-import { FileText, Home, Users, Settings, BarChart3, Sparkles, Package, Mail, Receipt, HelpCircle } from "lucide-react"
+import { FileText, Home, Users, Settings, BarChart3, Sparkles, Package, Mail, Receipt, HelpCircle, ArrowUpDown } from "lucide-react"
 
 export const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home, tourId: "tour-dashboard" },
@@ -16,6 +16,7 @@ export const navItems = [
   { href: "/catalog", label: "Catalog", icon: Package },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/expenses", label: "Expenses", icon: Receipt },
+  { href: "/import-export", label: "Import / Export", icon: ArrowUpDown },
   { href: "/email-logs", label: "Email Logs", icon: Mail },
   { href: "/ai", label: "AI Tools", icon: Sparkles, tourId: "tour-ai-tools" },
   { href: "/help", label: "Help Center", icon: HelpCircle },

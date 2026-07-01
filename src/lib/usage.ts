@@ -86,13 +86,18 @@ async function checkIsPro(identifier: string, isAnonymous: boolean): Promise<boo
     return true
   }
 
-  if (!user.isPro) return false
-
-  if (user.proExpiry && user.proExpiry < new Date()) {
-    return false // Pro expired
+  if (user.company?.subscriptionTier === "PRO" || user.company?.subscriptionTier === "ENTERPRISE") {
+    return true
   }
 
-  return true
+  if (user.isPro) {
+    if (user.proExpiry && user.proExpiry < new Date()) {
+      return false // Pro expired
+    }
+    return true
+  }
+
+  return false
 }
 
 async function checkDocumentLimit(

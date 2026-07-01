@@ -20,6 +20,13 @@ export const companySchema = z.object({
   razorpayKeyId: z.string().optional().nullable(),
   razorpayKeySecret: z.string().optional().nullable(),
   razorpayWebhookSecret: z.string().optional().nullable(),
+  customDomain: z.string()
+    .transform(val => val?.trim().toLowerCase())
+    .refine(val => !val || /^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?$/.test(val), {
+      message: "Invalid domain format (e.g. billing.acme.com)"
+    })
+    .optional()
+    .nullable(),
 })
 
 export type CompanyFormValues = z.infer<typeof companySchema>

@@ -140,3 +140,21 @@ export async function appendToLastAssistantMessage(sessionId: string, appendText
     return null
   }
 }
+
+export async function renameChatSession(id: string, title: string) {
+  try {
+    const { session, company } = await requireCompany()
+
+    await prisma.aIChatSession.updateMany({
+      where: { id, companyId: company.id, userId: session.user.id },
+      data: { title: title.slice(0, 80) },
+    })
+
+    revalidatePath("/ai")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to rename chat session:", error)
+    return { error: "Failed to rename" }
+  }
+}
+

@@ -130,6 +130,123 @@ const HELP_TOPICS: HelpTopic[] = [
       "Save changes. The AI Assist buttons across the app will now be active."
     ],
     tips: [],
+  },
+  {
+    id: "setup_custom_domain",
+    category: "settings",
+    title: "Setting up Custom Domain Support",
+    summary: "Host billing links and public invoices under your own branded domain (e.g. billing.yourcompany.com).",
+    steps: [
+      "Point your custom subdomain's DNS CNAME record to cname.open-invoice.com (turn off Cloudflare proxies).",
+      "Go to Settings in the Open-Invoice dashboard.",
+      "Scroll to the 'Custom Domain Configuration' section.",
+      "Enter your custom domain exactly (e.g. billing.acme.com) and click 'Save Changes'.",
+      "Open https://billing.yourcompany.com/p/invoice/[id] to trigger the Let's Encrypt SSL setup and test routing."
+    ],
+    tips: [
+      "Custom domains are exclusive to Growth (PRO) and Enterprise tier companies.",
+      "Double check that CNAME lookup returns cname.open-invoice.com before entering it in Settings."
+    ],
+  },
+  {
+    id: "setup_smtp",
+    category: "settings",
+    title: "Configuring Custom SMTP for Email Dispatch",
+    summary: "Send invoices, receipts, and payment reminders directly from your own professional business email address.",
+    steps: [
+      "Navigate to Settings -> Email / SMTP Settings.",
+      "Enter your mail server SMTP Host (e.g., smtp.gmail.com) and Port (typically 465 for SSL or 587 for TLS).",
+      "Input your SMTP username and password (for Gmail, generate an 'App Password').",
+      "Enter the 'From Email' and 'From Name' (e.g., billing@yourcompany.com).",
+      "Click 'Test Connection' to verify settings, then save the profile."
+    ],
+    tips: [
+      "All SMTP credentials and passwords are encrypted using secure AES-256 before being stored in the database.",
+      "You can monitor all dispatched emails and delivery status codes in the 'Email Logs' dashboard tab."
+    ],
+  },
+  {
+    id: "setup_whatsapp",
+    category: "settings",
+    title: "Setting up WhatsApp Billing Notifications",
+    summary: "Deliver invoices and automated payment reminders to client phone numbers via WhatsApp.",
+    steps: [
+      "Navigate to Settings -> Integrations.",
+      "Select your WhatsApp provider: 'OpenWA' (community proxy) or 'Official Meta Cloud API'.",
+      "For OpenWA, enter your server endpoint URL and secret connection token.",
+      "For Meta Cloud API, enter your Phone Number ID and Meta System User Token.",
+      "Save changes and send a test message to verify the connectivity."
+    ],
+    tips: [
+      "Ensure customer phone numbers include the correct country code (e.g. +91) for successful delivery.",
+      "WhatsApp notifications automatically attach custom invoice URLs and final payment totals."
+    ],
+  },
+  {
+    id: "bulk_import_export",
+    category: "getting_started",
+    title: "Bulk Data Import & Export Workflows",
+    summary: "Import catalogs and customers from CSV files, and export data in CSV, JSON, or XML formats.",
+    steps: [
+      "Navigate to the 'Import / Export' section from the sidebar.",
+      "To import: Download the CSV Template, populate your columns, drop the file in the upload zone, and verify row status.",
+      "To export: Select your data type (Catalog, Customers, or Invoices).",
+      "For Invoices: Select format (CSV, JSON, or UBL 2.1 XML) and date ranges.",
+      "Click Export to download your backup bundle."
+    ],
+    tips: [
+      "CSV header matching is case-insensitive and ignores spaces (e.g. 'Unit Price' maps to 'unitPrice').",
+      "XML exports are fully compliant with the global UBL 2.1 standards for easy accounting software integration."
+    ],
+  },
+  {
+    id: "byodb_custom_db",
+    category: "settings",
+    title: "Bring Your Own Database (BYODB)",
+    summary: "Connect a custom PostgreSQL database to host your company's transactional records.",
+    steps: [
+      "Go to Settings -> Database Configuration.",
+      "Select 'PostgreSQL' as your database engine.",
+      "Enter your custom connection string (e.g. postgresql://user:pass@host:port/db).",
+      "Click 'Verify Connection' to test latency and availability.",
+      "Save Changes. The client will migrate data and swap connections on-the-fly without downtime."
+    ],
+    tips: [
+      "The custom database connection pool size is capped at max 2 connections per tenant to prevent database port exhaustion.",
+      "BYODB database connection strings are encrypted in-transit and at-rest, and support automatic key rotation cycles."
+    ],
+  },
+  {
+    id: "legacy_invoice_ocr",
+    category: "invoices",
+    title: "AI OCR Legacy Invoice Import",
+    summary: "Extract and convert paper invoices or billing sheets into active invoices using AI vision OCR.",
+    steps: [
+      "Go to 'Import / Export' -> 'Legacy Invoice Upload'.",
+      "Upload an image (JPG, PNG, WebP) or PDF file, or a compliant XML / JSON data file.",
+      "Wait for the AI vision parser to extract the buyer name, billing totals, and line item tables.",
+      "Review the parsed fields in the interactive draft table and correct any discrepancies.",
+      "Click 'Create Invoice from Draft' to compile the parsed parameters into a live invoice."
+    ],
+    tips: [
+      "AI vision uses Gemini 2.5 Flash for high-speed, structural table extraction and currency conversion checks."
+    ],
+  },
+  {
+    id: "setup_webhooks",
+    category: "settings",
+    title: "Configuring Webhooks for External Events",
+    summary: "Receive instant HTTP POST callbacks on your server when invoices are created or paid.",
+    steps: [
+      "Go to Settings -> Webhooks.",
+      "Click 'Add Webhook Endpoint'.",
+      "Enter your target HTTP Endpoint URL.",
+      "Select the triggers you want to listen to (e.g., invoice.created, invoice.paid).",
+      "Click Save to activate. Your target endpoint will now receive payload payloads on invoice updates."
+    ],
+    tips: [
+      "Webhook logs capture HTTP status codes, request bodies, and error logs for local developer testing."
+    ],
   }
 ];
 

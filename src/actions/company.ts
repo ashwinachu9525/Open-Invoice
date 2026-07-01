@@ -80,6 +80,9 @@ export async function updateCompany(data: CompanyFormValues) {
     return { success: true }
   } catch (error) {
     console.error("Failed to update company:", error)
+    if (error instanceof Error && (error.message.includes("Unique constraint failed") || (error as any).code === "P2002")) {
+      return { error: "This custom domain is already registered by another company." }
+    }
     return { error: "Failed to update company" }
   }
 }
