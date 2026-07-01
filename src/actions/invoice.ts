@@ -248,6 +248,8 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
     // Invalidate cache
     await invalidateCachePattern(`invoice:${company.id}:${invoiceId}`)
     await invalidateCachePattern(`invoices:${company.id}:*`)
+    const { invalidateInvoicePdfCache } = await import("@/services/pdf")
+    await invalidateInvoicePdfCache(invoiceId)
 
     revalidatePath(`/invoices/${invoiceId}`)
     revalidatePath("/invoices")
@@ -511,6 +513,8 @@ export async function updateInvoiceStatus(
     // Invalidate cache
     await invalidateCachePattern(`invoice:${company.id}:${id}`)
     await invalidateCachePattern(`invoices:${company.id}:*`)
+    const { invalidateInvoicePdfCache } = await import("@/services/pdf")
+    await invalidateInvoicePdfCache(id)
 
     revalidatePath(`/invoices/${id}`)
     revalidatePath("/invoices")
@@ -540,6 +544,8 @@ export async function deleteInvoice(id: string) {
     // Invalidate cache
     await invalidateCachePattern(`invoice:${company.id}:${id}`)
     await invalidateCachePattern(`invoices:${company.id}:*`)
+    const { invalidateInvoicePdfCache } = await import("@/services/pdf")
+    await invalidateInvoicePdfCache(id)
 
     revalidatePath("/invoices")
     revalidatePath("/dashboard")
@@ -572,6 +578,9 @@ export async function deleteInvoiceByNumber(invoiceNumber: string) {
       entity: "Invoice",
       entityId: invoice.id,
     })
+
+    const { invalidateInvoicePdfCache } = await import("@/services/pdf")
+    await invalidateInvoicePdfCache(invoice.id)
 
     revalidatePath("/invoices")
     revalidatePath("/dashboard")

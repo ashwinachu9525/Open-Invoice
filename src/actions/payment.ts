@@ -132,6 +132,9 @@ export async function recordPayment(data: unknown) {
       })
     })
 
+    const { invalidateInvoicePdfCache } = await import("@/services/pdf")
+    await invalidateInvoicePdfCache(invoice.id)
+
     return { success: true }
   } catch {
     return { error: "Failed to record payment" }

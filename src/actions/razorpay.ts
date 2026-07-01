@@ -107,6 +107,9 @@ export async function createRazorpayInvoiceLink(invoiceId: string) {
       }
     })
 
+    const { invalidateInvoicePdfCache } = await import("@/services/pdf")
+    await invalidateInvoicePdfCache(invoiceId)
+
     return { success: true, shortUrl: paymentLink.short_url }
   } catch (error: any) {
     console.error("Razorpay link creation error:", error)

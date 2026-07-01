@@ -5,8 +5,21 @@ import { StatementDocument } from "@/pdf/statement-document"
 import { uploadFile } from "@/services/storage"
 import { prisma } from "@/lib/prisma"
 import { getTenantDb } from "@/lib/tenant-db"
+import { redis } from "@/lib/redis"
 
 export async function generateInvoicePdf(invoiceId: string, companyId?: string): Promise<Buffer> {
+  const cacheKey = `invoice:pdf:${invoiceId}`
+  if (redis) {
+    try {
+      const cachedBase64 = await redis.get(cacheKey)
+      if (cachedBase64) {
+        console.log(`⚡️ [PDF CACHE HIT] ${cacheKey}`)
+        return Buffer.from(cachedBase64, "base64")
+      }
+    } catch (err) {
+      console.warn("[Redis] Failed to load PDF from cache:", err)
+    }
+  }
   const db = companyId ? await getTenantDb(companyId) : prisma
   const invoice = await db.invoice.findUnique({
     where: { id: invoiceId },
@@ -43,7 +56,28 @@ export async function generateInvoicePdf(invoiceId: string, companyId?: string):
     })
   }
 
+  if (redis) {
+    try {
+      await redis.setex(cacheKey, 86400, buffer.toString("base64"))
+      console.log(`💾 [PDF CACHE SET] ${cacheKey}`)
+    } catch (err) {
+      console.warn("[Redis] Failed to cache PDF:", err)
+    }
+  }
+
   return buffer
+}
+
+export async function invalidateInvoicePdfCache(invoiceId: string) {
+  try {
+    if (redis) {
+      const cacheKey = `invoice:pdf:${invoiceId}`
+      await redis.del(cacheKey)
+      console.log(`🧹 [PDF CACHE INVALIDATED] ${cacheKey}`)
+    }
+  } catch (err) {
+    console.warn("[Redis] Failed to invalidate PDF cache:", err)
+  }
 }
 
 export async function generateStatementPdf(customerId: string, companyId?: string): Promise<Buffer> {
