@@ -7,6 +7,7 @@ import { requireCompany } from "@/lib/auth-helpers"
 import { createAuditLog } from "@/services/audit"
 import { revalidatePath } from "next/cache"
 import crypto from "crypto"
+import { invalidateCompanyPdfCache } from "@/services/pdf"
 
 export async function updateCompany(data: CompanyFormValues) {
   try {
@@ -33,6 +34,11 @@ export async function updateCompany(data: CompanyFormValues) {
     const { encrypt } = await import("@/lib/encryption")
     const companyId = user.companyId || crypto.randomUUID()
     const updateData: any = { ...parsed.data }
+    
+    // Fix: empty string for customDomain will cause Prisma unique constraint failure
+    if (updateData.customDomain === "") {
+      updateData.customDomain = null
+    }
 
     if (!user.companyId) {
       updateData.id = companyId
@@ -67,9 +73,24 @@ export async function updateCompany(data: CompanyFormValues) {
         data: updateData
       })
     } else {
+      // Generate unique slug for company
+      let baseSlug = (updateData.name || 'company').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+      if (!baseSlug) baseSlug = 'company'
+      let slug = baseSlug
+      let counter = 1
+      while (true) {
+        const existing = await prisma.company.findUnique({ where: { slug } })
+        if (!existing) break
+        slug = `${baseSlug}-${counter}`
+        counter++
+      }
+      
       // Create new company and link to user
       const newCompany = await prisma.company.create({
-        data: updateData
+        data: {
+          ...updateData,
+          slug
+        }
       })
       await prisma.user.update({
         where: { id: user.id },
@@ -145,5 +166,111 @@ export async function updateInvoicePrefix(prefix: string) {
     return { success: true }
   } catch {
     return { error: "Failed to update prefix" }
+  }
+}
+export async function updateInvoiceSettings(data: { invoicePrefix?: string, invoiceTemplate?: string, removeWatermark?: boolean, autoFreezeMonths?: number | null }) {
+  try {
+    const { session, company } = await requireCompany()
+    
+    await prisma.company.update({
+      where: { id: company.id },
+      data: { 
+        invoicePrefix: data.invoicePrefix || "INV",
+        invoiceTemplate: data.invoiceTemplate,
+        removeWatermark: data.removeWatermark,
+        autoFreezeMonths: data.autoFreezeMonths,
+      },
+    })
+
+    await createAuditLog({
+      companyId: company.id,
+      userId: session.user.id,
+      action: "UPDATE",
+      entity: "Company",
+      entityId: company.id,
+      details: { action: "Updated invoice settings" }
+    })
+
+    await invalidateCompanyPdfCache(company.id)
+
+    revalidatePath("/settings")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to update invoice settings:", error)
+    return { error: "Failed to update settings" }
+  }
+}
+export async function updateCompanyLogo(logoKey: string) {
+  try {
+    const { session, company } = await requireCompany()
+
+    // Delete old logo from S3 if it exists
+    if (company.logo) {
+      try {
+        const { deleteFile } = await import("@/services/storage")
+        await deleteFile(company.logo)
+      } catch (err) {
+        console.warn("Failed to delete old logo from S3:", err)
+      }
+    }
+
+    await prisma.company.update({
+      where: { id: company.id },
+      data: { logo: logoKey },
+    })
+
+    await createAuditLog({
+      companyId: company.id,
+      userId: session.user.id,
+      action: "UPDATE",
+      entity: "Company",
+      entityId: company.id,
+      details: { field: "logo", value: logoKey }
+    })
+
+    await invalidateCompanyPdfCache(company.id)
+
+    revalidatePath("/settings")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to update company logo:", error)
+    return { error: "Failed to update company logo" }
+  }
+}
+
+export async function removeCompanyLogo() {
+  try {
+    const { session, company } = await requireCompany()
+
+    if (company.logo) {
+      try {
+        const { deleteFile } = await import("@/services/storage")
+        await deleteFile(company.logo)
+      } catch (err) {
+        console.warn("Failed to delete logo from S3:", err)
+      }
+    }
+
+    await prisma.company.update({
+      where: { id: company.id },
+      data: { logo: null },
+    })
+
+    await createAuditLog({
+      companyId: company.id,
+      userId: session.user.id,
+      action: "UPDATE",
+      entity: "Company",
+      entityId: company.id,
+      details: { field: "logo", value: null }
+    })
+
+    await invalidateCompanyPdfCache(company.id)
+
+    revalidatePath("/settings")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to remove company logo:", error)
+    return { error: "Failed to remove company logo" }
   }
 }

@@ -144,18 +144,17 @@ export function QuotationForm({ customers, defaultQuotationNumber, sellerState, 
           </Alert>
         )}
 
-        {/* ── Section: Quotation Details ── */}
-        <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quotation Details</p>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* ── Section: Quotation Details (2-Column Layout) ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Left Column: Quote To & Config */}
+          <div className="space-y-4 p-5 glass rounded-xl border-white/10 bg-white/5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">Quote To</h3>
             <FormField
               control={form.control}
               name="customerId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm font-medium">
-                    Customer <span className="text-red-400">*</span>
-                  </FormLabel>
+                  <FormLabel className="text-sm font-medium">Customer <span className="text-red-400">*</span></FormLabel>
                   <FormControl>
                     <select className={selectClass} {...field}>
                       <option value="">Select customer</option>
@@ -168,57 +167,60 @@ export function QuotationForm({ customers, defaultQuotationNumber, sellerState, 
                 </FormItem>
               )}
             />
+          </div>
+
+          {/* Right Column: Quotation Meta */}
+          <div className="space-y-4 p-5 glass rounded-xl border-white/10 bg-white/5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">Quotation Meta</h3>
             <FormField
               control={form.control}
               name="quotationNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm font-medium">
-                    Quotation # <span className="text-red-400">*</span>
-                  </FormLabel>
+                  <FormLabel className="text-sm font-medium">Quotation # <span className="text-red-400">*</span></FormLabel>
                   <FormControl><Input className={inputClass} {...field} /></FormControl>
                   <FormMessage className="text-xs text-red-400" />
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-medium">
-                    Date <span className="text-red-400">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      className={inputClass}
-                      value={field.value instanceof Date ? field.value.toISOString().split("T")[0] : field.value}
-                      onChange={(e) => field.onChange(new Date(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-xs text-red-400" />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="expiryDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-medium">Due Date</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      className={inputClass}
-                      value={field.value instanceof Date ? field.value.toISOString().split("T")[0] : field.value}
-                      onChange={(e) => field.onChange(new Date(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-xs text-red-400" />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4 pt-2">
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Date <span className="text-red-400">*</span></FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className={inputClass}
+                        value={field.value instanceof Date ? field.value.toISOString().split("T")[0] : field.value}
+                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs text-red-400" />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="expiryDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Due Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className={inputClass}
+                        value={field.value instanceof Date ? field.value.toISOString().split("T")[0] : field.value}
+                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs text-red-400" />
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
         </div>
 

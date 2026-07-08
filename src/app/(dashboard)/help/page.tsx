@@ -247,6 +247,183 @@ const HELP_TOPICS: HelpTopic[] = [
     tips: [
       "Webhook logs capture HTTP status codes, request bodies, and error logs for local developer testing."
     ],
+  },
+  {
+    id: "universal_ai_generation",
+    category: "getting_started",
+    title: "Using AI to Generate Any Record",
+    summary: "Leverage our powerful AI Assistant to instantly generate Expenses, Quotations, Customers, Catalog Items, and Certificates via simple conversational chat.",
+    steps: [
+      "Click the '✨ AI Generate' button from the top navigation of any supported dashboard page (Invoices, Expenses, Quotations, Customers, Catalog, or Certificates).",
+      "Type a natural language request, for example: 'Record a travel expense for $500 on May 10th'.",
+      "The AI will process your request and return a beautifully formatted interactive preview card containing the extracted details.",
+      "Review the parsed information in the preview card to ensure accuracy.",
+      "Click 'Generate Now' on the preview card to instantly save the record to your database and unlock quick actions like downloading a PDF or editing."
+    ],
+    tips: [
+      "You can ask the AI to generate multiple different types of records in a single continuous chat session.",
+      "If the AI misses a detail, simply reply with a correction (e.g. 'Actually, make the amount $600') and it will generate a new preview."
+    ],
+  },
+  {
+    id: "managing_expenses",
+    category: "getting_started",
+    title: "Tracking Company Expenses",
+    summary: "Record, categorize, and track all your outgoings and business receipts in one place.",
+    steps: [
+      "Navigate to the 'Expenses' tab from the left sidebar.",
+      "Click 'Add Expense' to manually enter a new expense, or use '✨ AI Generate' to create one from text.",
+      "Enter the expense date, total amount, category, and a description of what the expense was for.",
+      "Save the expense. You can edit or delete expenses at any time from the main Expenses dashboard."
+    ],
+    tips: [
+      "Categorizing your expenses accurately helps generate cleaner financial reports.",
+      "Use the AI Generate feature to quickly log expenses by typing out the details from a physical receipt."
+    ],
+  },
+  {
+    id: "creating_quotations",
+    category: "invoices",
+    title: "Creating and Managing Quotations",
+    summary: "Generate professional estimates and quotations to send to prospective clients before issuing an invoice.",
+    steps: [
+      "Go to the 'Quotations' page and click 'New Quotation'.",
+      "Select an existing customer or create a new one.",
+      "Add line items, adjust quantities, set prices, and apply any relevant tax or discount rates.",
+      "Set an expiration date for the quotation.",
+      "Save the quotation to generate a PDF estimate that you can send to your client."
+    ],
+    tips: [
+      "Once a quotation is accepted by the client, you can quickly convert its details into a final Invoice.",
+      "You can filter quotations by 'Accepted', 'Pending', or 'Rejected' statuses to keep track of your sales pipeline."
+    ],
+  },
+  {
+    id: "test_certificates",
+    category: "invoices",
+    title: "Issuing Test Certificates",
+    summary: "Create and manage product test certificates and quality reports for your manufactured goods.",
+    steps: [
+      "Navigate to the 'Certificates' tab.",
+      "Click 'New Certificate' or use the AI Generator.",
+      "Select the customer the certificate is being issued to.",
+      "Provide the Product Name, Batch Number, and Date of Testing.",
+      "Detail the specific tested parameters and any concluding remarks.",
+      "Save to generate a finalized PDF certificate."
+    ],
+    tips: [
+      "Test Certificates use the same branding and theme color configurations as your invoices."
+    ],
+  },
+  {
+    id: "pdf_customization",
+    category: "settings",
+    title: "Customizing PDF Themes and Branding",
+    summary: "Personalize the look and feel of your generated PDFs by adding your logo, signature, and brand colors.",
+    steps: [
+      "Go to the Settings page and locate the 'Company Profile' section.",
+      "Upload your company logo and a digital signature image.",
+      "Scroll down to select a primary 'Theme Color' for your documents.",
+      "Fill out all necessary company address, tax identification, and contact information.",
+      "When you generate an Invoice, Quotation, or Certificate, your branding will automatically be applied to the PDF."
+    ],
+    tips: [
+      "You can override the default theme color on a per-invoice basis when creating a new invoice.",
+      "Ensure your logo has a transparent background (PNG format) for the cleanest look on the PDF header."
+    ],
+  },
+  {
+    id: "soft_delete_trash",
+    category: "getting_started",
+    title: "Recovering Deleted Items (Trash)",
+    summary: "Accidentally deleted an invoice or quotation? You can restore it from the Trash bin within 30 days.",
+    steps: [
+      "Navigate to the 'Trash' page from the sidebar (or the Trash button on the Quotations/Invoices pages).",
+      "Locate the deleted item in the recycle bin.",
+      "Click 'Restore' to move it back to your active records.",
+      "To permanently delete an item, click 'Delete Forever' (Warning: this cannot be undone)."
+    ],
+    tips: [
+      "Deleted items are automatically purged after 30 days to save space.",
+      "Restoring an invoice will also restore its association with its customer and line items."
+    ],
+  },
+  {
+    id: "financial_reports",
+    category: "invoices",
+    title: "Generating Financial Reports",
+    summary: "Export detailed GST, TDS, and Outstanding Invoice reports for your accountant.",
+    steps: [
+      "Navigate to the 'Reports' tab from the sidebar.",
+      "View the interactive visual charts to analyze monthly revenue and tax distribution.",
+      "Scroll down to 'Compliance Reports' and select your date range.",
+      "Choose a specific customer or leave blank for all.",
+      "Click 'Download CSV' next to the report type (e.g. GST Report, TDS Report, or Outstanding Invoices) to get a spreadsheet."
+    ],
+    tips: [
+      "The GST Report breaks down CGST, SGST, and IGST totals for easy filing.",
+      "Outstanding Invoices report helps you follow up on overdue payments."
+    ],
+  },
+  {
+    id: "tracking_email_logs",
+    category: "settings",
+    title: "Tracking Email Delivery Logs",
+    summary: "Monitor the status of invoices and receipts sent via email.",
+    steps: [
+      "Navigate to the 'Email Logs' page from the sidebar.",
+      "View the history of all dispatched emails.",
+      "Check the status column for 'Delivered' (Green) or 'Failed' (Red).",
+      "If an email fails to deliver, verify your Custom SMTP settings."
+    ],
+    tips: [
+      "You can resend failed emails directly from the Invoice's action menu."
+    ],
+  },
+  {
+    id: "feature_requests",
+    category: "getting_started",
+    title: "Submitting Feature Requests",
+    summary: "Help shape the future of Open Invoice by requesting and upvoting new features.",
+    steps: [
+      "Navigate to the 'Feature Requests' page.",
+      "Browse the board to see what other users have requested.",
+      "Click the 'Upvote' button on ideas you support.",
+      "If you don't see your idea, click 'Submit Request' and describe what you need."
+    ],
+    tips: [
+      "Features with the most upvotes are prioritized by our development team!"
+    ],
+  },
+  {
+    id: "managing_catalog",
+    category: "getting_started",
+    title: "Managing your Product Catalog",
+    summary: "Save time by building a reusable database of your products and services.",
+    steps: [
+      "Navigate to the 'Catalog' page.",
+      "Click 'Add Product / Service'.",
+      "Enter the item name, description, standard price, and default tax rate.",
+      "Save the item. It will now appear in a dropdown when creating Invoices or Quotations."
+    ],
+    tips: [
+      "You can always override the default price and tax rate of a catalog item when adding it to a specific invoice."
+    ],
+  },
+  {
+    id: "managing_customers",
+    category: "getting_started",
+    title: "Centralized Customer CRM",
+    summary: "Keep all your client billing and shipping information organized in one place.",
+    steps: [
+      "Navigate to the 'Customers' page.",
+      "Click 'Add Customer' to create a new client profile.",
+      "Enter their Company Name, Contact Person, Email, Phone, Billing Address, and GSTIN/Tax ID.",
+      "Save the profile to easily select them on future invoices."
+    ],
+    tips: [
+      "Updating a customer's address here will automatically use the new address on any future invoices you create for them."
+    ],
   }
 ];
 
@@ -288,10 +465,10 @@ export default function HelpPage() {
   }, [filtered]);
 
   return (
-    <div className="min-h-screen bg-background pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-8">
+    <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div>
         <h1 className="text-3xl font-bold tracking-tight">Help Center</h1>
-        <p className="text-muted-foreground mt-1">Find answers, learn how to use features, and get support.</p>
+        <p className="text-muted-foreground text-sm mt-1">Find answers, learn how to use features, and get support.</p>
       </div>
 
       <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">

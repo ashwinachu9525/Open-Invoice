@@ -32,6 +32,8 @@ export const invoiceSchema = z.object({
   items: z.array(invoiceItemSchema).min(1, "At least one line item required"),
   paymentCollectionMethod: z.string().optional().default("OFFLINE"),
   vpaAddress: z.string().optional().nullable(),
+  cryptoAddress: z.string().optional().nullable(),
+  cryptoNetwork: z.string().optional().nullable(),
   razorpayOrderId: z.string().optional().nullable(),
   razorpayPaymentLinkId: z.string().optional().nullable(),
   razorpayPaymentLinkUrl: z.string().optional().nullable(),

@@ -33,6 +33,8 @@ export async function generateInvoicePdf(invoiceId: string, companyId?: string):
     const payeeName = encodeURIComponent(invoice.company.name)
     const upiString = `upi://pay?pa=${invoice.vpaAddress}&pn=${payeeName}&am=${invoice.finalAmount.toFixed(2)}&cu=INR&tn=Invoice-${invoice.invoiceNumber}`
     qrCodeDataUrl = await QRCode.toDataURL(upiString, { width: 120, margin: 1 })
+  } else if (invoice.paymentCollectionMethod === "CRYPTO_QR" && (invoice as any).cryptoAddress) {
+    qrCodeDataUrl = await QRCode.toDataURL((invoice as any).cryptoAddress, { width: 120, margin: 1 })
   } else {
     const qrData = JSON.stringify({
       inv: invoice.invoiceNumber,
@@ -43,8 +45,28 @@ export async function generateInvoicePdf(invoiceId: string, companyId?: string):
     qrCodeDataUrl = await QRCode.toDataURL(qrData, { width: 120, margin: 1 })
   }
 
+  // Resolve company logo S3 key to a signed URL for the PDF renderer
+  let resolvedLogoUrl = invoice.company.logo || null
+  if (resolvedLogoUrl && !resolvedLogoUrl.startsWith("http://") && !resolvedLogoUrl.startsWith("https://") && !resolvedLogoUrl.startsWith("data:")) {
+    try {
+      const { getSignedDownloadUrl } = await import("@/services/storage")
+      resolvedLogoUrl = await getSignedDownloadUrl(resolvedLogoUrl, 300)
+    } catch (err) {
+      console.warn("Failed to resolve logo URL for PDF:", err)
+      resolvedLogoUrl = null
+    }
+  }
+
+  const invoiceWithResolvedLogo = {
+    ...invoice,
+    company: {
+      ...invoice.company,
+      logo: resolvedLogoUrl,
+    },
+  }
+
   const buffer = await renderToBuffer(
-    InvoiceDocument({ invoice, qrCodeDataUrl })
+    InvoiceDocument({ invoice: invoiceWithResolvedLogo, qrCodeDataUrl })
   )
 
   if (process.env.S3_ACCESS_KEY_ID) {
@@ -77,6 +99,30 @@ export async function invalidateInvoicePdfCache(invoiceId: string) {
     }
   } catch (err) {
     console.warn("[Redis] Failed to invalidate PDF cache:", err)
+  }
+}
+
+export async function invalidateCompanyPdfCache(companyId: string) {
+  try {
+    if (redis) {
+      const invoices = await prisma.invoice.findMany({
+        where: { companyId },
+        select: { id: true }
+      })
+      const quotations = await prisma.quotation.findMany({
+        where: { companyId },
+        select: { id: true }
+      })
+
+      const pipeline = redis.pipeline()
+      invoices.forEach(inv => pipeline.del(`invoice:pdf:${inv.id}`))
+      quotations.forEach(quo => pipeline.del(`quotation:pdf:${quo.id}`))
+      
+      await pipeline.exec()
+      console.log(`🧹 [PDF CACHE INVALIDATED] for company ${companyId}`)
+    }
+  } catch (err) {
+    console.warn("[Redis] Failed to invalidate company PDF cache:", err)
   }
 }
 
@@ -172,3 +218,33 @@ export async function generateReceiptPdf(invoiceId: string, companyId?: string):
   return buffer
 }
 
+
+import { TestCertificateDocument } from "@/pdf/test-certificate-document"
+
+export async function generateTestCertificatePdf(certificateId: string, companyId?: string): Promise<Buffer> {
+  const db = companyId ? await getTenantDb(companyId) : prisma
+  const certificate = await db.testCertificate.findUnique({
+    where: { id: certificateId },
+    include: { customer: true, company: true, invoice: true },
+  })
+
+  if (!certificate) throw new Error("Test Certificate not found")
+
+  let resolvedLogoUrl = certificate.company.logo || null
+  if (resolvedLogoUrl && !resolvedLogoUrl.startsWith("http://") && !resolvedLogoUrl.startsWith("https://") && !resolvedLogoUrl.startsWith("data:")) {
+    try {
+      const { getSignedDownloadUrl } = await import("@/services/storage")
+      resolvedLogoUrl = await getSignedDownloadUrl(resolvedLogoUrl, 300)
+    } catch (err) {
+      console.warn("Failed to resolve logo URL for PDF:", err)
+      resolvedLogoUrl = null
+    }
+  }
+
+  const companyWithLogo = { ...certificate.company, logo: resolvedLogoUrl }
+  const buffer = await renderToBuffer(
+    TestCertificateDocument({ certificate, company: companyWithLogo })
+  )
+
+  return buffer
+}

@@ -12,6 +12,7 @@ export const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home, tourId: "tour-dashboard" },
   { href: "/invoices", label: "Invoices", icon: FileText, tourId: "tour-invoices" },
   { href: "/quotations", label: "Quotations", icon: FileText },
+  { href: "/certificates", label: "Certificates", icon: FileText },
   { href: "/customers", label: "Customers", icon: Users, tourId: "tour-customers" },
   { href: "/catalog", label: "Catalog", icon: Package },
   { href: "/reports", label: "Reports", icon: BarChart3 },

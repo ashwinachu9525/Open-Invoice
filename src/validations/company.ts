@@ -17,9 +17,12 @@ export const companySchema = z.object({
   msmeType: z.string().optional(),
   tcsRate: z.number().optional(),
   vpaAddress: z.string().optional().nullable(),
+  cryptoAddress: z.string().optional().nullable(),
+  cryptoNetwork: z.string().optional().nullable(),
   razorpayKeyId: z.string().optional().nullable(),
   razorpayKeySecret: z.string().optional().nullable(),
   razorpayWebhookSecret: z.string().optional().nullable(),
+  removeWatermark: z.boolean().optional(),
   customDomain: z.string()
     .transform(val => val?.trim().toLowerCase())
     .refine(val => !val || /^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?$/.test(val), {

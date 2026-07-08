@@ -1,7 +1,7 @@
 import { getExpenses, deleteExpense } from "@/actions/expense"
 import { getCompany } from "@/actions/company"
 import Link from "next/link"
-import { Plus, Receipt, Trash2, Calendar, FileText } from "lucide-react"
+import { Plus, Receipt, Trash2, Calendar, FileText, Download, Edit, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/utils"
 import { auth } from "@/auth"
@@ -32,12 +32,20 @@ export default async function ExpensesPage() {
           <h1 className="text-3xl font-bold tracking-tight">Expenses</h1>
           <p className="text-muted-foreground mt-1">Track your company expenses and receipts.</p>
         </div>
-        <Link href="/expenses/new">
-          <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto">
-            <Plus className="h-4 w-4" />
-            Add Expense
-          </Button>
-        </Link>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Link href="/ai" className="w-full sm:w-auto">
+            <Button variant="outline" className="glass border-white/10 hover:bg-white/8 gap-1.5 w-full">
+              <Sparkles className="h-4 w-4 text-violet-400" />
+              <span className="hidden sm:inline">AI Generate</span>
+            </Button>
+          </Link>
+          <Link href="/expenses/new" className="w-full sm:w-auto">
+            <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white w-full">
+              <Plus className="h-4 w-4" />
+              Add Expense
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-6">
@@ -92,22 +100,35 @@ export default async function ExpensesPage() {
                       </td>
                       <td className="px-6 py-4 text-center">
                         {expense.receiptUrl ? (
-                          <a href={expense.receiptUrl} target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1.5">
-                            <FileText className="w-4 h-4" /> View
-                          </a>
+                          <div className="flex items-center justify-center gap-3">
+                            <a href={`/api/expenses/${expense.id}/receipt`} target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1" title="View">
+                              <FileText className="w-4 h-4" />
+                            </a>
+                            <a href={`/api/expenses/${expense.id}/receipt`} download target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1" title="Download">
+                              <Download className="w-4 h-4" />
+                            </a>
+                          </div>
                         ) : (
                           <span className="text-slate-600">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <form action={async () => {
-                          "use server"
-                          await deleteExpense(expense.id)
-                        }}>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500 hover:text-red-400 hover:bg-red-500/10" type="submit">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </form>
+                        <div className="flex justify-end items-center gap-2">
+                          <Link 
+                            href={`/expenses/${expense.id}/edit`}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Link>
+                          <form action={async () => {
+                            "use server"
+                            await deleteExpense(expense.id)
+                          }}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500 hover:text-red-400 hover:bg-red-500/10" type="submit">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </form>
+                        </div>
                       </td>
                     </tr>
                   ))}

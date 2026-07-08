@@ -158,6 +158,9 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
     
     if (!existing) return { error: "Invoice not found" }
     if (existing.status === "PAID") return { error: "Paid invoices cannot be edited" }
+    if (existing.isFrozen && session.user.role !== "BUSINESS_OWNER" && session.user.role !== "ADMIN") {
+      return { error: "This invoice is frozen and cannot be edited" }
+    }
 
     const parsed = invoiceSchema.safeParse(data)
     if (!parsed.success) {
@@ -273,14 +276,18 @@ export async function getInvoices(opts?: {
     const { company } = await requireCompany(); const prisma = await getTenantDb(company.id)
     const { search, dateFrom, dateTo, page = 1, limit = 10 } = opts ?? {}
     
-    const where = {
+    const baseWhere: any = {
       companyId: company.id,
       deletedAt: null,
+    }
+
+    const filteredWhere: any = {
+      ...baseWhere,
       ...(search
         ? {
             OR: [
-              { invoiceNumber: { contains: search } },
-              { customer: { name: { contains: search } } },
+              { invoiceNumber: { contains: search, mode: "insensitive" } },
+              { customer: { name: { contains: search, mode: "insensitive" } } },
             ],
           }
         : {}),
@@ -297,17 +304,17 @@ export async function getInvoices(opts?: {
     const cacheKey = `invoices:${company.id}:page:${page}:limit:${limit}:search:${search || ""}:from:${dateFrom || ""}:to:${dateTo || ""}`
 
     return await getOrSetCache(cacheKey, async () => {
-      const [invoices, total, allForStats] = await Promise.all([
+      const [invoices, filteredTotal, allForStats] = await Promise.all([
         prisma.invoice.findMany({
-          where,
+          where: filteredWhere,
           include: { customer: true, schedule: true },
           orderBy: { date: "desc" },
           skip: (page - 1) * limit,
           take: limit,
         }),
-        prisma.invoice.count({ where }),
+        prisma.invoice.count({ where: filteredWhere }),
         prisma.invoice.findMany({
-          where,
+          where: baseWhere,
           select: { finalAmount: true, status: true }
         })
       ])
@@ -319,11 +326,11 @@ export async function getInvoices(opts?: {
 
       return { 
         invoices, 
-        totalPages: Math.ceil(total / limit), 
-        totalInvoices: total,
+        totalPages: Math.ceil(filteredTotal / limit), 
+        totalInvoices: filteredTotal,
         stats: { totalAmount, paidCount, pendingCount, overdueCount }
       }
-    }, 3600)
+    }, 30)
   } catch {
     return { invoices: [], totalPages: 0, totalInvoices: 0, stats: { totalAmount: 0, paidCount: 0, pendingCount: 0, overdueCount: 0 } }
   }
@@ -458,6 +465,7 @@ export async function getInvoice(id: string) {
           customer: true,
           items: true,
           payments: true,
+          testCertificates: true,
           statusHistory: { orderBy: { createdAt: "desc" } },
           schedule: true,
           company: true,
@@ -486,6 +494,9 @@ export async function updateInvoiceStatus(
       where: { id, companyId: company.id, deletedAt: null },
     })
     if (!invoice) return { error: "Invoice not found" }
+    if (invoice.isFrozen && session.user.role !== "BUSINESS_OWNER" && session.user.role !== "ADMIN") {
+      return { error: "This invoice is frozen and cannot be modified" }
+    }
 
     const dataToUpdate: any = { status }
     if (paymentUpdate) {
@@ -529,6 +540,15 @@ export async function updateInvoiceStatus(
 export async function deleteInvoice(id: string) {
   try {
     const { session, company } = await requireCompany(); const prisma = await getTenantDb(company.id)
+    
+    const invoice = await prisma.invoice.findFirst({
+      where: { id, companyId: company.id, deletedAt: null }
+    })
+    if (!invoice) return { error: "Invoice not found" }
+    if (invoice.isFrozen && session.user.role !== "BUSINESS_OWNER" && session.user.role !== "ADMIN") {
+      return { error: "This invoice is frozen and cannot be deleted" }
+    }
+
     await prisma.invoice.update({
       where: { id, companyId: company.id },
       data: { deletedAt: new Date(), status: InvoiceStatus.CANCELLED },
@@ -566,6 +586,9 @@ export async function deleteInvoiceByNumber(invoiceNumber: string) {
     })
     
     if (!invoice) return { error: "Invoice not found" }
+    if (invoice.isFrozen && session.user.role !== "BUSINESS_OWNER" && session.user.role !== "ADMIN") {
+      return { error: "This invoice is frozen and cannot be deleted" }
+    }
     
     await prisma.invoice.update({
       where: { id: invoice.id, companyId: company.id },
@@ -699,6 +722,7 @@ export async function cloneInvoice(id: string) {
       console.error("Failed to trigger webhook dispatch job:", err)
     }
 
+    await invalidateCachePattern(`invoices:${company.id}:*`)
     revalidatePath("/invoices")
     revalidatePath("/dashboard")
     return { success: true, id: newInvoice.id }
@@ -874,3 +898,39 @@ export async function sendInvoiceViaWhatsApp(invoiceId: string) {
   }
 }
 
+
+export async function toggleInvoiceFreeze(invoiceId: string, isFrozen: boolean) {
+  try {
+    const { session, company } = await requireCompany();
+    const prisma = await getTenantDb(company.id)
+    
+    // Only BUSINESS_OWNER or ADMIN can freeze/unfreeze
+    if (session.user.role !== "BUSINESS_OWNER" && session.user.role !== "ADMIN") {
+      return { error: "You do not have permission to freeze/unfreeze invoices." }
+    }
+
+    await prisma.invoice.update({
+      where: { id: invoiceId, companyId: company.id },
+      data: { isFrozen }
+    })
+
+    await createAuditLog({
+      companyId: company.id,
+      userId: session.user.id,
+      action: "UPDATE",
+      entity: "Invoice",
+      entityId: invoiceId,
+      details: { action: isFrozen ? "Frozen" : "Unfrozen" }
+    })
+
+    await invalidateCachePattern(`invoice:${company.id}:${invoiceId}`)
+    await invalidateCachePattern(`invoices:${company.id}:*`)
+
+    revalidatePath(`/invoices/${invoiceId}`)
+    revalidatePath("/invoices")
+    return { success: true }
+  } catch (error) {
+    console.error("Toggle invoice freeze error:", error)
+    return { error: "Failed to toggle invoice freeze status" }
+  }
+}

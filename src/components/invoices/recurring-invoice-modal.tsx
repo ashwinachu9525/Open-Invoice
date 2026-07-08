@@ -27,13 +27,14 @@ export function RecurringInvoiceModal({ invoiceId, existingSchedule }: Recurring
 
   const [frequency, setFrequency] = useState(existingSchedule?.frequency || "MONTHLY")
   
-  // Parse existing date to YYYY-MM-DD
+  // Parse existing date to YYYY-MM-DD in local time
   const existingDate = existingSchedule?.nextRunAt ? new Date(existingSchedule.nextRunAt) : new Date()
-  const initialDateStr = existingDate.toISOString().split("T")[0]
+  const pad = (n: number) => n.toString().padStart(2, "0")
+  const initialDateStr = `${existingDate.getFullYear()}-${pad(existingDate.getMonth() + 1)}-${pad(existingDate.getDate())}`
   const [startDate, setStartDate] = useState(initialDateStr)
   
   // Parse hour
-  const initialHourStr = existingDate.getHours().toString().padStart(2, "0") + ":00"
+  const initialHourStr = pad(existingDate.getHours()) + ":00"
   const [timeStr, setTimeStr] = useState(initialHourStr)
 
   const [autoSend, setAutoSend] = useState(existingSchedule?.autoSend || false)

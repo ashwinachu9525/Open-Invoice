@@ -1,6 +1,6 @@
 import { ReactNode } from "react"
 import Link from "next/link"
-import { FileText, Home, Users, Settings, Menu, BarChart3, Sparkles, Zap, Package, Mail, Receipt, HelpCircle } from "lucide-react"
+import { FileText, Home, Users, Settings, Menu, BarChart3, Sparkles, Zap, Package, Mail, Receipt, HelpCircle, Lightbulb, HeadphonesIcon } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
 import { SignOutButton } from "@/components/dashboard/sign-out-button"
 import { ThemeToggle } from "@/components/dashboard/theme-toggle"
@@ -11,6 +11,8 @@ import { OfflineIndicator } from "@/components/layout/offline-indicator"
 import { RandomFeedbackModal } from "@/components/layout/random-feedback-modal"
 import { DesktopNavLinks, MobileNavLinks } from "@/components/layout/sidebar-nav"
 import { ProductTour } from "@/components/dashboard/product-tour"
+import { GlobalShortcutListener } from "@/components/dashboard/global-shortcut-listener"
+import { prisma } from "@/lib/prisma"
 
 
 
@@ -25,8 +27,16 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
 
+  // Fetch user for config
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { dashboardConfig: true }
+  })
+  const config = (user?.dashboardConfig as any) || {}
+
   return (
     <div className="flex min-h-screen w-full">
+      <GlobalShortcutListener customShortcuts={config.keyboardShortcuts} />
       {/* ── Desktop Sidebar ── */}
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col sm:flex glass-sidebar bg-sidebar/80 backdrop-blur-2xl">
         {/* Logo */}
@@ -93,6 +103,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           </Sheet>
 
           <div className="flex w-full items-center justify-end gap-3">
+            <div className="hidden sm:flex items-center gap-1">
+              <Link href="/feature-requests" className="flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
+                <Lightbulb className="h-4 w-4" />
+                <span>Feature Requests</span>
+              </Link>
+              <Link href="/support" className="flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
+                <HeadphonesIcon className="h-4 w-4" />
+                <span>Support</span>
+              </Link>
+            </div>
+            <div className="hidden sm:block h-6 w-px bg-white/10 mx-1" />
             <OfflineIndicator />
             <ThemeToggle />
             <div className="h-8 w-px bg-white/10" />

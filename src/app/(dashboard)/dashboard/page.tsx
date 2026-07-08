@@ -12,9 +12,11 @@ import {
   TrendingUp, Clock, ReceiptText, Shield, Percent, PieChart, Activity
 } from "lucide-react"
 import { redirect } from "next/navigation"
-import { getReferralData } from "@/actions/referral"
-import { ReferralWidget } from "@/components/dashboard/referral-widget"
 import { GoogleReferralWrapper } from "@/components/dashboard/google-referral-wrapper"
+import { QuickActions } from "@/components/dashboard/quick-actions"
+import { RecentInvoices } from "@/components/dashboard/recent-invoices"
+import { RecentQuotations } from "@/components/dashboard/recent-quotations"
+import { RecentExpenses } from "@/components/dashboard/recent-expenses"
 
 // Always fetch fresh data — never serve a cached version
 
@@ -29,14 +31,23 @@ export default async function DashboardPage() {
 
   if (!user?.companyId) redirect("/settings")
 
-  const [stats, referralData] = await Promise.all([
+  const [stats] = await Promise.all([
     getDashboardStats(user.companyId),
-    getReferralData(),
   ])
 
   const hour = new Date().getHours()
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
+
+  const config = (user.dashboardConfig as any) || {}
+  const showRevenueChart = config.showRevenueChart ?? true
+  const showAgingChart = config.showAgingChart ?? true
+  const showCustomerRevenueChart = config.showCustomerRevenueChart ?? true
+  const showTaxCards = config.showTaxCards ?? true
+  const showQuickActions = config.showQuickActions ?? true
+  const showRecentInvoices = config.showRecentInvoices ?? true
+  const showRecentQuotations = config.showRecentQuotations ?? true
+  const showRecentExpenses = config.showRecentExpenses ?? true
 
   const statCards = [
     {
@@ -149,31 +160,40 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── GST / TDS Stats ── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {taxCards.map((card) => (
-          <Card key={card.label} className="glass glass-card border-white/10">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.iconBg}`}>
-                  <card.icon className={`h-5 w-5 ${card.iconColor}`} />
+      {showTaxCards && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {taxCards.map((card) => (
+            <Card key={card.label} className="glass glass-card border-white/10">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.iconBg}`}>
+                    <card.icon className={`h-5 w-5 ${card.iconColor}`} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{card.label}</p>
+                    <p className="text-xl font-bold mt-0.5">{card.value}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">{card.label}</p>
-                  <p className="text-xl font-bold mt-0.5">{card.value}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {/* ── Refer & Earn ── */}
-      {referralData && !isPro && !isStaff && (
-        <ReferralWidget
-          referralCode={referralData.referralCode ?? ""}
-          rewardClaimed={referralData.rewardClaimed}
-          successfulReferrals={referralData.successfulReferrals}
-        />
+      {/* ── Quick Actions ── */}
+      {showQuickActions && (
+        <div className="grid grid-cols-1 mb-2">
+          <QuickActions />
+        </div>
+      )}
+
+      {/* ── Recent Items Grid ── */}
+      {(showRecentInvoices || showRecentQuotations || showRecentExpenses) && (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 items-start mb-2">
+          {showRecentInvoices && <RecentInvoices invoices={stats.recentInvoices} />}
+          {showRecentQuotations && <RecentQuotations quotations={stats.recentQuotations} />}
+          {showRecentExpenses && <RecentExpenses expenses={stats.recentExpenses} />}
+        </div>
       )}
 
       <Separator className="bg-white/8" />
@@ -181,49 +201,55 @@ export default async function DashboardPage() {
       {/* ── Charts Grid ── */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* ── Revenue Chart ── */}
-        <Card className="glass glass-card border-white/10 lg:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              Revenue Overview
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">Monthly revenue for the last 6 months</p>
-          </CardHeader>
-          <Separator className="bg-white/8" />
-          <CardContent className="pt-4">
-            <RevenueChart data={stats.monthlyRevenue} />
-          </CardContent>
-        </Card>
+        {showRevenueChart && (
+          <Card className="glass glass-card border-white/10 lg:col-span-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                Revenue Overview
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Monthly revenue for the last 6 months</p>
+            </CardHeader>
+            <Separator className="bg-white/8" />
+            <CardContent className="pt-4">
+              <RevenueChart data={stats.monthlyRevenue} />
+            </CardContent>
+          </Card>
+        )}
 
         {/* ── Top Customers Revenue ── */}
-        <Card className="glass glass-card border-white/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <PieChart className="h-4 w-4 text-emerald-400" />
-              Top Customers
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">Revenue contribution by client</p>
-          </CardHeader>
-          <Separator className="bg-white/8" />
-          <CardContent className="pt-4">
-            <CustomerRevenueChart data={stats.customerInsights} />
-          </CardContent>
-        </Card>
+        {showCustomerRevenueChart && (
+          <Card className="glass glass-card border-white/10">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <PieChart className="h-4 w-4 text-emerald-400" />
+                Top Customers
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Revenue contribution by client</p>
+            </CardHeader>
+            <Separator className="bg-white/8" />
+            <CardContent className="pt-4">
+              <CustomerRevenueChart data={stats.customerInsights} />
+            </CardContent>
+          </Card>
+        )}
 
         {/* ── Aging Buckets ── */}
-        <Card className="glass glass-card border-white/10 lg:col-span-3">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Activity className="h-4 w-4 text-orange-400" />
-              Accounts Receivable Aging
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">Outstanding balances grouped by days overdue</p>
-          </CardHeader>
-          <Separator className="bg-white/8" />
-          <CardContent className="pt-4">
-            <AgingChart data={stats.agingBuckets} />
-          </CardContent>
-        </Card>
+        {showAgingChart && (
+          <Card className="glass glass-card border-white/10 lg:col-span-3">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Activity className="h-4 w-4 text-orange-400" />
+                Accounts Receivable Aging
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Outstanding balances grouped by days overdue</p>
+            </CardHeader>
+            <Separator className="bg-white/8" />
+            <CardContent className="pt-4">
+              <AgingChart data={stats.agingBuckets} />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

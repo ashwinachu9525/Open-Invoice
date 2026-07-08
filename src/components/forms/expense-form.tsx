@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { createExpense } from "@/actions/expense"
+import { createExpense, updateExpense } from "@/actions/expense"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -21,7 +21,7 @@ const expenseSchema = z.object({
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>
 
-export function ExpenseForm() {
+export function ExpenseForm({ initialData, expenseId }: { initialData?: any, expenseId?: string }) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
@@ -29,10 +29,10 @@ export function ExpenseForm() {
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema) as any,
     defaultValues: {
-      date: new Date().toISOString().split("T")[0],
-      amount: 0,
-      category: "",
-      description: "",
+      date: initialData?.date ? new Date(initialData.date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      amount: initialData?.amount || 0,
+      category: initialData?.category || "",
+      description: initialData?.description || "",
     },
   })
 
@@ -64,13 +64,25 @@ export function ExpenseForm() {
       }
     }
 
-    const res = await createExpense({
-      date: new Date(data.date),
-      amount: data.amount,
-      category: data.category,
-      description: data.description,
-      receiptUrl: receiptUrl || undefined,
-    })
+    let res;
+    
+    if (expenseId) {
+      res = await updateExpense(expenseId, {
+        date: new Date(data.date),
+        amount: data.amount,
+        category: data.category,
+        description: data.description,
+        ...(receiptUrl ? { receiptUrl } : {}), // only update receipt if new one uploaded
+      })
+    } else {
+      res = await createExpense({
+        date: new Date(data.date),
+        amount: data.amount,
+        category: data.category,
+        description: data.description,
+        receiptUrl: receiptUrl || undefined,
+      })
+    }
     
     if (res.error) {
       toast.error(res.error)
@@ -163,6 +175,9 @@ export function ExpenseForm() {
                     }
                   }} 
                 />
+                {!receiptFile && initialData?.receiptUrl && (
+                  <span className="text-xs text-indigo-400">Current receipt uploaded</span>
+                )}
               </div>
             </FormControl>
           </FormItem>

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { formatINR } from "@/services/tax-engine"
-import { Plus, FileSpreadsheet, TrendingUp, CheckCircle2, Clock, Trash2 } from "lucide-react"
+import { Plus, FileSpreadsheet, TrendingUp, CheckCircle2, Clock, Trash2, Sparkles } from "lucide-react"
 import { QuotationFilterBar } from "@/components/quotations/quotation-filter-bar"
 import { QuotationListClient } from "@/components/quotations/quotation-list-client"
 import { Suspense } from "react"
@@ -50,6 +50,12 @@ export default async function QuotationsPage({ searchParams }: PageProps) {
             <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8 gap-1.5 text-muted-foreground hover:text-red-400">
               <Trash2 className="h-4 w-4" />
               <span className="hidden sm:inline">Trash</span>
+            </Button>
+          </Link>
+          <Link href="/ai">
+            <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8 gap-1.5">
+              <Sparkles className="h-4 w-4 text-violet-400" />
+              <span className="hidden sm:inline">AI Generate</span>
             </Button>
           </Link>
           <Link href="/quotations/new">

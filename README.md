@@ -1,6 +1,6 @@
 <h1 align="center">Open Invoice</h1>
 <p align="center">
-  <strong>Open Source AI-Powered Invoicing, Estimation & Indian GST Compliance Platform</strong>
+  <strong>Enterprise AI-Powered Invoicing, Estimation & Indian GST Compliance Platform</strong>
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.1.0-blue.svg" alt="Version"/>
-  <img src="https://img.shields.io/badge/license-Custom-green.svg" alt="License"/>
+  <img src="https://img.shields.io/badge/license-Proprietary-red.svg" alt="License"/>
   <img src="https://img.shields.io/badge/node-20_LTS-brightgreen.svg" alt="Node"/>
   <img src="https://img.shields.io/badge/Next.js-15.x-black.svg" alt="NextJS"/>
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6.svg" alt="TypeScript"/>
@@ -25,9 +25,9 @@
 
 ## ✨ Why Open Invoice?
 
-**Open Invoice** is a modern, self-hostable invoicing, quotation, and business estimation platform designed for freelancers, agencies, and small teams. It delivers enterprise-grade capabilities without the bloat, tracking expenses, automating drafts with AI, and exporting pixel-perfect, tax-compliant PDF documents.
+**Open Invoice** is a modern, enterprise-grade invoicing, quotation, and business estimation platform designed for freelancers, agencies, and small teams. It delivers powerful capabilities without the bloat, tracking expenses, automating drafts with AI, and exporting pixel-perfect, tax-compliant PDF documents.
 
-Open Invoice supports dual deployment modes out of the box: a **Fully Free Self-Hosted Mode** for single businesses and a **Hosted SaaS Mode** complete with subscription tiers, usage limits, and admin approval workflows.
+Open Invoice is a proprietary commercial product and is offered as a **Hosted SaaS Mode** complete with subscription tiers, usage limits, and admin approval workflows.
 
 ---
 
@@ -98,14 +98,14 @@ The application is now accessible at `http://localhost:3000`.
 
 ---
 
-## 🎛️ Application Modes (SaaS vs Self-Host)
+## 🎛️ Application Modes
 
 The platform behavior is controlled by the `APP_MODE` environment variable:
 
-- **Self-Hosted Mode (`APP_MODE="selfhost"` or empty)**:
-  Bypasses all license checks, subscription paywalls, and usage limits. Enables unlimited invoices, quotations, AI credits, and active companies.
 - **Hosted SaaS Mode (`APP_MODE="paid"`)**:
   Enforces a 5-invoice free tier limit. Prompts users to upgrade to Pro and submits requests to the Super Admin panel for licensing. Restricts anonymous generation to 3 requests per IP/day.
+- **Enterprise License Mode (`APP_MODE="enterprise"`)**:
+  For customers who have purchased a valid enterprise license, enabling dedicated deployments with custom SLAs.
 
 ---
 
@@ -287,18 +287,13 @@ docker-compose up --build -d
 
 ## ⚖️ License & Usage Conditions
 
-**CUSTOM NON-COMMERCIAL SELF-HOSTED LICENSE**
+**PROPRIETARY COMMERCIAL LICENSE**
 
-This project is open-source, but it comes with strict commercial limitations:
-
-✅ **ALLOWED:**
-- Self-host the application for your own personal use.
-- Use it internally to run your own freelance business or agency billing.
-- Modify the codebase to suit your internal workflows.
+This project is **closed-source and proprietary**. It is NOT open source.
 
 ❌ **NOT ALLOWED:**
-- Sell, resell, or distribute this software for profit.
-- Deploy the application as a public SaaS (Software as a Service) to charge other users for access.
-- Re-package, white-label, or distribute the codebase.
+- You may NOT self-host the application for free.
+- You may NOT modify, distribute, copy, or reproduce the codebase.
+- You may NOT deploy the application as a public SaaS or internal tool without purchasing a valid commercial license.
 
-See the [LICENSE](./LICENSE) file for the full legal text.
+All rights are reserved by the author. See the [LICENSE](./LICENSE) file for the full legal text.

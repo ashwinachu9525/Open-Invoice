@@ -40,7 +40,7 @@ interface InvoiceListClientProps {
   limit: number
   totalPages: number
   totalInvoices: number
-  searchParamsProps: Record<string, string | undefined>
+  searchParamsProps: Record<string, string>
 }
 
 export function InvoiceListClient({ invoices, currentPage, limit, totalPages, totalInvoices, searchParamsProps }: InvoiceListClientProps) {
@@ -149,7 +149,7 @@ export function InvoiceListClient({ invoices, currentPage, limit, totalPages, to
                 />
               </TableCell>
               <TableCell className="font-mono text-sm font-medium">{inv.invoiceNumber}</TableCell>
-              <TableCell className="font-medium">{inv.customer.name}</TableCell>
+              <TableCell className="font-medium">{inv.customer.companyName || inv.customer.name}</TableCell>
               <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
                 {new Date(inv.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
               </TableCell>

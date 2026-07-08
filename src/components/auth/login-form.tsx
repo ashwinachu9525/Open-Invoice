@@ -13,6 +13,7 @@ import Link from "next/link"
 
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
+import { Eye, EyeOff } from "lucide-react"
 import { loginUser } from "@/actions/auth"
 import { signIn as nextAuthSignIn } from "next-auth/react"
 
@@ -24,6 +25,7 @@ export function LoginForm({ googleAuthEnabled = false }: { googleAuthEnabled?: b
   const [hasPasskey, setHasPasskey] = useState(false)
   const [requiresMfa, setRequiresMfa] = useState(false)
   const [totpToken, setTotpToken] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const isVerified = searchParams.get("verified") === "true"
   const isAccessRemoved = searchParams.get("error") === "AccessRemoved"
 
@@ -103,7 +105,24 @@ export function LoginForm({ googleAuthEnabled = false }: { googleAuthEnabled?: b
             <FormItem className={requiresMfa ? "hidden" : ""}>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input type="password" {...field} />
+                <div className="relative">
+                  <Input type={showPassword ? "text" : "password"} {...field} className="pr-10" />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                  </Button>
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>

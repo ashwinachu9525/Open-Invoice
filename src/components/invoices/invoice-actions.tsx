@@ -33,6 +33,8 @@ interface InvoiceActionsProps {
   status: InvoiceStatus
   finalAmount?: number
   tdsPercentage?: number
+  isFrozen?: boolean
+  userRole?: string
 }
 
 export function InvoiceActions({
@@ -41,6 +43,8 @@ export function InvoiceActions({
   status,
   finalAmount = 0,
   tdsPercentage = 0,
+  isFrozen,
+  userRole,
 }: InvoiceActionsProps) {
   const router = useRouter()
   const [isPending, setIsPending] = useState(false)
@@ -153,6 +157,10 @@ export function InvoiceActions({
       setErrors({ delete: "Failed to delete invoice" })
       setIsDeleting(false)
     }
+  }
+
+  if (isFrozen && userRole !== "BUSINESS_OWNER" && userRole !== "ADMIN") {
+    return null
   }
 
   return (

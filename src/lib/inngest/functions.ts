@@ -1,39 +1,16 @@
 import { inngest } from "./client"
 import { prisma } from "@/lib/prisma"
+import { getTenantDb } from "@/lib/tenant-db"
 import { InvoiceStatus, RecurringFrequency, ScheduleStatus } from "@prisma/client"
 import { generateInvoicePdf } from "@/services/pdf"
 import { sendInvoiceEmail, sendTrialReminderEmail } from "@/services/smtp"
 import { sendWhatsAppMessage } from "@/actions/integrations"
-
-
-function getNextRunDate(frequency: RecurringFrequency, from: Date): Date {
-  const next = new Date(from)
-  // Ensure we keep the same hour and minute that was originally configured
-  // The 'from' date is the old nextRunAt, so it already has the correct hour/minute.
-  switch (frequency) {
-    case "WEEKLY":
-      next.setDate(next.getDate() + 7)
-      break
-    case "MONTHLY":
-      next.setMonth(next.getMonth() + 1)
-      break
-    case "QUARTERLY":
-      next.setMonth(next.getMonth() + 3)
-      break
-    case "HALF_YEARLY":
-      next.setMonth(next.getMonth() + 6)
-      break
-    case "YEARLY":
-      next.setFullYear(next.getFullYear() + 1)
-      break
-  }
-  return next
-}
-
-import { getCompanyNow } from "@/lib/date-utils"
+import { getNextRunDate, getCompanyNow } from "@/lib/date-utils"
+import { createAuditLog } from "@/services/audit"
+import { invalidateCachePattern } from "@/lib/redis"
 
 export const processRecurringInvoices = inngest.createFunction(
-  { id: "process-recurring-invoices", triggers: [{ cron: "0 * * * *" }] },
+  { id: "process-recurring-invoices", triggers: [{ cron: "*/10 * * * *" }] },
   async () => {
     const schedules = await prisma.recurringSchedule.findMany({
       where: {
@@ -44,23 +21,36 @@ export const processRecurringInvoices = inngest.createFunction(
       },
     })
 
+    let processedCount = 0
+
     for (const schedule of schedules) {
       const source = schedule.invoice
       const company = source.company
-      const now = await getCompanyNow(prisma, company.baseCurrency)
+      const tenantDb = await getTenantDb(source.companyId)
+      const now = await getCompanyNow(tenantDb, company.baseCurrency)
 
       if (schedule.nextRunAt > now) {
         continue
       }
 
-      const count = await prisma.invoice.count({ where: { companyId: source.companyId } })
+      const count = await tenantDb.invoice.count({ where: { companyId: source.companyId } })
       const prefix = company.invoicePrefix || "INV"
-      const invoiceNumber = `${prefix}-${now.getFullYear()}-${String(count + 1).padStart(4, "0")}`
+      let seq = count + 1
+      let invoiceNumber = `${prefix}-${now.getFullYear()}-${String(seq).padStart(4, "0")}`
+      while (await tenantDb.invoice.findFirst({ where: { companyId: source.companyId, invoiceNumber } })) {
+        seq++
+        invoiceNumber = `${prefix}-${now.getFullYear()}-${String(seq).padStart(4, "0")}`
+      }
 
+      let durationDays = 30
+      if (source.dueDate && source.date) {
+        const diff = Math.round((new Date(source.dueDate).getTime() - new Date(source.date).getTime()) / (1000 * 60 * 60 * 24))
+        if (diff >= 0 && diff <= 365) durationDays = diff
+      }
       const dueDate = new Date(now)
-      dueDate.setDate(dueDate.getDate() + 30)
+      dueDate.setDate(dueDate.getDate() + durationDays)
 
-      const newInvoice = await prisma.invoice.create({
+      const newInvoice = await tenantDb.invoice.create({
         data: {
           companyId: source.companyId,
           customerId: source.customerId,
@@ -82,7 +72,7 @@ export const processRecurringInvoices = inngest.createFunction(
           finalAmount: source.finalAmount,
           balanceDue: source.finalAmount,
           items: {
-            create: source.items.map((item) => ({
+            create: source.items.map((item: any) => ({
               description: item.description,
               hsnSac: item.hsnSac,
               quantity: item.quantity,
@@ -98,20 +88,23 @@ export const processRecurringInvoices = inngest.createFunction(
       })
 
       if (schedule.autoSend && source.customer.email) {
-        const pdf = await generateInvoicePdf(newInvoice.id)
-        await sendInvoiceEmail({
-          companyId: source.companyId,
-          to: source.customer.email,
-          subject: `Invoice ${invoiceNumber} from ${source.company.name}`,
-          html: `<p>Please find attached invoice ${invoiceNumber}.</p>`,
-          attachments: [{ filename: `${invoiceNumber}.pdf`, content: pdf }],
-        })
-        await prisma.invoice.update({
-          where: { id: newInvoice.id },
-          data: { status: InvoiceStatus.SENT },
-        })
+        try {
+          const pdf = await generateInvoicePdf(newInvoice.id)
+          await sendInvoiceEmail({
+            companyId: source.companyId,
+            to: source.customer.email,
+            subject: `Invoice ${invoiceNumber} from ${source.company.name}`,
+            html: `<p>Please find attached invoice ${invoiceNumber}.</p>`,
+            attachments: [{ filename: `${invoiceNumber}.pdf`, content: pdf }],
+          })
+          await tenantDb.invoice.update({
+            where: { id: newInvoice.id },
+            data: { status: InvoiceStatus.SENT },
+          })
+        } catch (err) {
+          console.error("Failed to auto-send recurring invoice email:", err)
+        }
 
-        // Send WhatsApp if enabled
         if (source.company.openWaEnabled && source.customer.phone) {
           try {
             const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
@@ -123,12 +116,38 @@ export const processRecurringInvoices = inngest.createFunction(
         }
       }
 
-      await prisma.recurringSchedule.update({
+      let nextRun = getNextRunDate(schedule.frequency, schedule.nextRunAt)
+      while (nextRun <= now) {
+        nextRun = getNextRunDate(schedule.frequency, nextRun)
+      }
+
+      await tenantDb.recurringSchedule.update({
         where: { id: schedule.id },
-        data: { nextRunAt: getNextRunDate(schedule.frequency, schedule.nextRunAt) },
+        data: { nextRunAt: nextRun },
       })
 
-      // Send push notification
+      const systemUser = source.company.users[0]
+      if (systemUser) {
+        await createAuditLog({
+          companyId: source.companyId,
+          userId: systemUser.id,
+          action: "RECURRING_INVOICE_GENERATE",
+          entity: "Invoice",
+          entityId: newInvoice.id,
+          details: {
+            invoiceNumber,
+            templateInvoiceId: source.id,
+            frequency: schedule.frequency,
+            trigger: "AUTOMATED_CRON_INNGEST",
+          },
+          db: tenantDb,
+        })
+      }
+
+      await invalidateCachePattern(`invoices:${source.companyId}:*`)
+
+      processedCount++
+
       import("@/lib/push").then(({ sendPushNotification }) => {
         source.company.users.forEach((u: any) => {
           sendPushNotification(u.id, {
@@ -140,7 +159,7 @@ export const processRecurringInvoices = inngest.createFunction(
       })
     }
 
-    return { processed: schedules.length }
+    return { processed: processedCount }
   }
 )
 

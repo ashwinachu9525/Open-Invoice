@@ -28,6 +28,7 @@ model User {
   isBlocked       Boolean   @default(false)
   isPro           Boolean   @default(false)
   proExpiry       DateTime?
+  dashboardConfig Json?
 
   // Referral system
   referralCode         String?   @unique  // e.g. "INV-AB12CD34"
@@ -42,6 +43,9 @@ model User {
   aichatSessions AIChatSession[]
   pushSubscriptions PushSubscription[]
   feedbacks      UserFeedback[]
+  featureRequests FeatureRequest[]
+  featureRequestComments FeatureRequestComment[]
+  featureRequestUpvotes  FeatureRequestUpvote[]
   referralRedemptions ReferralRedemption[] @relation("ReferrerRedemptions")
 
   @@index([companyId])
@@ -148,6 +152,8 @@ model Company {
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
+  autoFreezeMonths Int?
+
   msmeNumber      String?
   msmeType        String?
   tcsRate         Float?    @default(0)
@@ -167,12 +173,26 @@ model Company {
   reminderConfig ReminderConfig?
   expenses       Expense[]
   feedbacks      UserFeedback[]
+  testCertificates TestCertificate[]
   teamInvitations TeamInvitation[]
   apiKeys        ApiKey[]
+  testimonials   Testimonial[]
+  
+  slug              String?   @unique
+  tagline           String?
+  description       String?
+  twitterUrl        String?
+  linkedinUrl       String?
+  instagramUrl      String?
+  githubUrl         String?
+  
+  removeWatermark   Boolean   @default(false)
   customDbUrlEncrypted String?
   trialStartsAt     DateTime?
   trialEndsAt       DateTime?
   vpaAddress        String?
+  cryptoAddress     String?
+  cryptoNetwork     String?
   razorpayKeyId     String?
   razorpayKeySecret String?
   razorpayWebhookSecret String?
@@ -189,6 +209,22 @@ model Company {
   whatsappSentCount      Int      @default(0)    // usage tracking
 
   @@index([gstNumber])
+}
+
+model Testimonial {
+  id          String   @id @default(cuid())
+  companyId   String
+  clientName  String
+  clientRole  String?
+  content     String
+  rating      Int      @default(5)
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
 }
 
 model Customer {
@@ -213,6 +249,7 @@ model Customer {
   company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   invoices Invoice[]
   quotations Quotation[]
+  testCertificates TestCertificate[]
 
   @@index([companyId])
   @@index([name])
@@ -250,6 +287,7 @@ model Invoice {
   themeFont         String?       @default("Helvetica")
   status            InvoiceStatus @default(DRAFT)
   exchangeRate      Float         @default(1)
+  isFrozen          Boolean       @default(false)
 
   subTotal      Float
   totalDiscount Float   @default(0)
@@ -269,6 +307,8 @@ model Invoice {
   pdfUrl        String?
   paymentCollectionMethod String @default("OFFLINE")
   vpaAddress              String?
+  cryptoAddress           String?
+  cryptoNetwork           String?
   razorpayOrderId         String?
   razorpayPaymentLinkId   String?
   razorpayPaymentLinkUrl  String?
@@ -281,6 +321,7 @@ model Invoice {
   customer      Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
   items         InvoiceItem[]
   payments      Payment[]
+  testCertificates TestCertificate[]
   emailLogs     EmailLog[]
   schedule      RecurringSchedule?
   statusHistory InvoiceStatusHistory[]
@@ -764,4 +805,81 @@ model ExchangeRate {
   @@unique([from, to])
 }
 
+model FeatureRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String
+  status      String   @default("Open") // Open, Under Review, Planned, In Progress, Complete, Closed, Acknowledged
+  category    String?
+  imageUrl    String?
+  mergedIntoId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments    FeatureRequestComment[]
+  upvotes     FeatureRequestUpvote[]
+  mergedInto  FeatureRequest? @relation("MergedRequests", fields: [mergedIntoId], references: [id])
+  mergedRequests FeatureRequest[] @relation("MergedRequests")
+
+  @@index([userId])
+  @@index([status])
+  @@index([mergedIntoId])
+}
+
+model FeatureRequestComment {
+  id               String   @id @default(cuid())
+  featureRequestId String
+  userId           String
+  content          String
+  imageUrl         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  featureRequest   FeatureRequest @relation(fields: [featureRequestId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([featureRequestId])
+  @@index([userId])
+}
+
+model FeatureRequestUpvote {
+  id               String   @id @default(cuid())
+  featureRequestId String
+  userId           String
+  createdAt        DateTime @default(now())
+
+  featureRequest   FeatureRequest @relation(fields: [featureRequestId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([featureRequestId, userId])
+}
+
+
+
+model TestCertificate {
+  id                String    @id @default(cuid())
+  companyId         String
+  customerId        String
+  invoiceId         String?
+  certificateNumber String
+  date              DateTime
+  productName       String
+  batchNumber       String?
+  testedParameters  Json
+  remarks           String?
+  authorizedSignatory String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoice  Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([invoiceId])
+  @@index([certificateNumber])
+}

@@ -65,3 +65,47 @@ export async function deleteExpense(id: string) {
     return { error: "Failed to delete expense" }
   }
 }
+
+export async function getExpenseById(id: string) {
+  try {
+    const { company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
+    const expense = await prisma.expense.findFirst({
+      where: { id, companyId: company.id },
+    })
+    return expense
+  } catch (error) {
+    console.error("Failed to fetch expense", error)
+    return null
+  }
+}
+
+export async function updateExpense(id: string, data: {
+  date: Date
+  amount: number
+  category: string
+  description?: string
+  receiptUrl?: string
+}) {
+  try {
+    const { company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
+    
+    await prisma.expense.update({
+      where: { id, companyId: company.id },
+      data: {
+        date: data.date,
+        amount: data.amount,
+        category: data.category,
+        description: data.description,
+        ...(data.receiptUrl !== undefined ? { receiptUrl: data.receiptUrl } : {})
+      },
+    })
+    
+    revalidatePath("/expenses")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to update expense", error)
+    return { error: "Failed to update expense" }
+  }
+}

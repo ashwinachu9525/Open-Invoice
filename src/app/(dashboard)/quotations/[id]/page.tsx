@@ -114,7 +114,7 @@ export default async function QuotationDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm space-y-1">
-            <p className="font-semibold text-base">{quotation.customer.name}</p>
+            <p className="font-semibold text-base">{quotation.customer.name.toUpperCase()}</p>
             {quotation.customer.gstin && (
               <p className="text-muted-foreground font-mono text-xs">GSTIN: {quotation.customer.gstin}</p>
             )}

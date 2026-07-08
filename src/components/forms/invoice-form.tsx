@@ -64,6 +64,8 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
       bankAccountType: "",
       paymentCollectionMethod: "OFFLINE",
       vpaAddress: company?.vpaAddress || "",
+      cryptoAddress: company?.cryptoAddress || "",
+      cryptoNetwork: company?.cryptoNetwork || "",
       razorpayOrderId: null,
       razorpayPaymentLinkId: null,
       razorpayPaymentLinkUrl: null,
@@ -279,18 +281,17 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
           </Alert>
         )}
 
-        {/* ── Section: Invoice Details ── */}
-        <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Invoice Details</p>
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+        {/* ── Section: Invoice Details (2-Column Layout) ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Left Column: Billed To & Config */}
+          <div className="space-y-4 p-5 glass rounded-xl border-white/10 bg-white/5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">Billed To</h3>
             <FormField
               control={form.control}
               name="customerId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm font-medium">
-                    Customer <span className="text-red-400">*</span>
-                  </FormLabel>
+                  <FormLabel className="text-sm font-medium">Customer <span className="text-red-400">*</span></FormLabel>
                   <FormControl>
                     <select className={selectClass} {...field}>
                       <option value="">Select customer</option>
@@ -303,100 +304,103 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-2 gap-4 pt-2">
+              <FormField
+                control={form.control}
+                name="currency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Currency</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <select className={selectClass} {...field}>
+                          {COMMON_CURRENCIES.map((c) => (
+                            <option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>
+                          ))}
+                        </select>
+                        {isFetchingRate && <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />}
+                      </div>
+                    </FormControl>
+                    {watched.currency !== "INR" && watched.exchangeRate !== 1 && (
+                      <p className="text-[10px] text-muted-foreground mt-1">1 {watched.currency} ≈ {watched.exchangeRate} INR</p>
+                    )}
+                    <FormMessage className="text-xs text-red-400" />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="taxJurisdiction"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Tax Region</FormLabel>
+                    <FormControl>
+                      <select className={selectClass} {...field}>
+                        <option value="INDIA_GST">India (GST)</option>
+                        <option value="EU_VAT">EU/Global (VAT/Tax)</option>
+                        <option value="US_SALES_TAX">US (Sales Tax)</option>
+                        <option value="NONE">No Tax</option>
+                      </select>
+                    </FormControl>
+                    <FormMessage className="text-xs text-red-400" />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+
+          {/* Right Column: Invoice Meta */}
+          <div className="space-y-4 p-5 glass rounded-xl border-white/10 bg-white/5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">Invoice Meta</h3>
             <FormField
               control={form.control}
               name="invoiceNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm font-medium">
-                    Invoice # <span className="text-red-400">*</span>
-                  </FormLabel>
+                  <FormLabel className="text-sm font-medium">Invoice # <span className="text-red-400">*</span></FormLabel>
                   <FormControl><Input className={inputClass} {...field} /></FormControl>
                   <FormMessage className="text-xs text-red-400" />
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-medium">
-                    Date <span className="text-red-400">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      className={inputClass}
-                      value={field.value instanceof Date ? field.value.toISOString().split("T")[0] : field.value}
-                      onChange={(e) => field.onChange(new Date(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-xs text-red-400" />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="dueDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-medium">Due Date</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      className={inputClass}
-                      value={field.value instanceof Date ? field.value.toISOString().split("T")[0] : field.value}
-                      onChange={(e) => field.onChange(new Date(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-xs text-red-400" />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="currency"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-medium">Currency</FormLabel>
-                  <FormControl>
-                    <div className="flex items-center gap-2">
-                      <select className={selectClass} {...field}>
-                        {COMMON_CURRENCIES.map((c) => (
-                          <option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>
-                        ))}
-                      </select>
-                      {isFetchingRate && <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />}
-                    </div>
-                  </FormControl>
-                  {watched.currency !== "INR" && watched.exchangeRate !== 1 && (
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      1 {watched.currency} ≈ {watched.exchangeRate} INR
-                    </p>
-                  )}
-                  <FormMessage className="text-xs text-red-400" />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="taxJurisdiction"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-medium">Tax Region</FormLabel>
-                  <FormControl>
-                    <select className={selectClass} {...field}>
-                      <option value="INDIA_GST">India (GST)</option>
-                      <option value="EU_VAT">EU/Global (VAT/Tax)</option>
-                      <option value="US_SALES_TAX">US (Sales Tax)</option>
-                      <option value="NONE">No Tax</option>
-                    </select>
-                  </FormControl>
-                  <FormMessage className="text-xs text-red-400" />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4 pt-2">
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Date <span className="text-red-400">*</span></FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className={inputClass}
+                        value={field.value instanceof Date ? field.value.toISOString().split("T")[0] : field.value}
+                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs text-red-400" />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="dueDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Due Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className={inputClass}
+                        value={field.value instanceof Date ? field.value.toISOString().split("T")[0] : field.value}
+                        onChange={(e) => field.onChange(new Date(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs text-red-400" />
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
         </div>
 
@@ -848,11 +852,24 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
                             form.setValue("vpaAddress", company?.vpaAddress || "")
                           }
                         }
+                        if (e.target.value === "CRYPTO_QR") {
+                          if (!form.getValues("cryptoAddress")) {
+                            form.setValue("cryptoAddress", company?.cryptoAddress || "")
+                          }
+                          if (!form.getValues("cryptoNetwork")) {
+                            form.setValue("cryptoNetwork", company?.cryptoNetwork || "")
+                          }
+                        }
                       }}
                     >
                       <option value="OFFLINE">Just Invoice Creation (Offline)</option>
                       <option value="ONLINE">Online Payment (Razorpay Link)</option>
                       <option value="UPI_QR">Dynamic VPA UPI QR Code on PDF</option>
+                      {company?.subscriptionTier === "PRO" || company?.subscriptionTier === "ENTERPRISE" ? (
+                        <option value="CRYPTO_QR">Crypto Wallet QR Code on PDF</option>
+                      ) : (
+                        <option value="CRYPTO_QR" disabled>Crypto Wallet QR Code (PRO Only)</option>
+                      )}
                     </select>
                   </FormControl>
                   <FormMessage className="text-xs text-red-400" />
@@ -880,6 +897,48 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
                   </FormItem>
                 )}
               />
+            )}
+
+            {watched.paymentCollectionMethod === "CRYPTO_QR" && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="cryptoAddress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">Crypto Wallet Address <span className="text-red-500">*</span></FormLabel>
+                      <FormControl>
+                        <Input
+                          className={inputClass}
+                          placeholder="e.g. 0x123... or bc1q..."
+                          required
+                          {...field}
+                          value={field.value ?? ""}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs text-red-400" />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cryptoNetwork"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">Crypto Network</FormLabel>
+                      <FormControl>
+                        <Input
+                          className={inputClass}
+                          placeholder="e.g. ERC20, BEP20, BTC"
+                          {...field}
+                          value={field.value ?? ""}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs text-red-400" />
+                    </FormItem>
+                  )}
+                />
+              </>
             )}
           </div>
         </div>

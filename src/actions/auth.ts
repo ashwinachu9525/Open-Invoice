@@ -56,8 +56,23 @@ export async function registerUser(data: {
       }
     }
 
+    // Generate unique slug for company
+    let baseSlug = `${parsed.data.name} Business`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+    if (!baseSlug) baseSlug = 'company'
+    let slug = baseSlug
+    let counter = 1
+    while (true) {
+      const existing = await prisma.company.findUnique({ where: { slug } })
+      if (!existing) break
+      slug = `${baseSlug}-${counter}`
+      counter++
+    }
+
     const company = await prisma.company.create({
-      data: { name: `${parsed.data.name}'s Business` },
+      data: { 
+        name: `${parsed.data.name}'s Business`,
+        slug
+      },
     })
 
     const newUser = await prisma.user.create({
@@ -104,12 +119,13 @@ export async function registerUser(data: {
 
 export async function verifyEmail(email: string, otp: string) {
   try {
-    const limit = rateLimit(`verify:${email}`, { windowMs: 15 * 60 * 1000, maxRequests: 5 })
+    const normalizedEmail = email.toLowerCase()
+    const limit = rateLimit(`verify:${normalizedEmail}`, { windowMs: 15 * 60 * 1000, maxRequests: 5 })
     if (!limit.success) return { error: "Too many attempts" }
 
     const tokenRecord = await prisma.verificationToken.findFirst({
       where: {
-        identifier: email,
+        identifier: normalizedEmail,
         token: hashToken(otp),
         expires: { gt: new Date() }
       }
@@ -120,12 +136,12 @@ export async function verifyEmail(email: string, otp: string) {
     }
 
     await prisma.user.update({
-      where: { email },
+      where: { email: normalizedEmail },
       data: { emailVerified: new Date() }
     })
 
     await prisma.verificationToken.delete({
-      where: { identifier_token: { identifier: email, token: hashToken(otp) } }
+      where: { identifier_token: { identifier: normalizedEmail, token: hashToken(otp) } }
     })
 
     return { success: true }
@@ -137,7 +153,8 @@ export async function verifyEmail(email: string, otp: string) {
 
 export async function loginUser(email: string, password: string, totpToken?: string) {
   try {
-    const user = await prisma.user.findUnique({ where: { email, deletedAt: null } })
+    const normalizedEmail = email.toLowerCase()
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail, deletedAt: null } })
     if (user && !user.emailVerified) {
       return { error: "Please verify your email address before logging in.", requiresVerification: true }
     }
@@ -152,7 +169,7 @@ export async function loginUser(email: string, password: string, totpToken?: str
       return { error: "Invalid email or password" }
     }
 
-    const payload: any = { email, password, redirect: false }
+    const payload: any = { email: normalizedEmail, password, redirect: false }
     if (totpToken) {
       payload.totpToken = totpToken
     }

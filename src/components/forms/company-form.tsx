@@ -15,13 +15,35 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { updateCompany } from "@/actions/company"
-import { useState } from "react"
+import { updateCompany, updateCompanyLogo, removeCompanyLogo } from "@/actions/company"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { COMMON_CURRENCIES } from "@/lib/currencies"
 import { toast } from "sonner"
 
+const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml", "image/webp"]
+const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
+
 export function CompanyForm({ initialData }: { initialData: any }) {
   const [isPending, setIsPending] = useState(false)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [hasLogo, setHasLogo] = useState(!!initialData?.logo)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Fetch the current logo preview URL on mount
+  useEffect(() => {
+    if (initialData?.logo) {
+      fetch("/api/logo")
+        .then(res => res.json())
+        .then(data => {
+          if (data.url) setLogoPreview(data.url)
+        })
+        .catch(() => {
+          // Silently fail — preview just won't show
+        })
+    }
+  }, [initialData?.logo])
   
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
@@ -42,12 +64,115 @@ export function CompanyForm({ initialData }: { initialData: any }) {
       msmeType: initialData?.msmeType || "",
       tcsRate: initialData?.tcsRate ?? 0,
       vpaAddress: initialData?.vpaAddress || "",
+      cryptoAddress: initialData?.cryptoAddress || "",
+      cryptoNetwork: initialData?.cryptoNetwork || "",
       razorpayKeyId: initialData?.razorpayKeyId || "",
       razorpayKeySecret: initialData?.razorpayKeySecret || "",
       razorpayWebhookSecret: initialData?.razorpayWebhookSecret || "",
       customDomain: initialData?.customDomain || "",
+      removeWatermark: initialData?.removeWatermark ?? false,
     },
   })
+
+  const handleLogoUpload = useCallback(async (file: File) => {
+    // Validate file type
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      toast.error("Invalid file type. Please upload PNG, JPG, SVG, or WEBP.")
+      return
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File too large. Maximum size is 2MB.")
+      return
+    }
+
+    setIsUploadingLogo(true)
+
+    try {
+      // Upload to S3 via existing upload API
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!uploadRes.ok) {
+        throw new Error("Upload failed")
+      }
+
+      const { url: key } = await uploadRes.json()
+
+      // Save the logo key to the company record
+      const result = await updateCompanyLogo(key)
+
+      if (result.success) {
+        // Show local preview immediately
+        const objectUrl = URL.createObjectURL(file)
+        setLogoPreview(objectUrl)
+        setHasLogo(true)
+        toast.success("Logo uploaded successfully")
+      } else {
+        toast.error(result.error || "Failed to save logo")
+      }
+    } catch (error) {
+      console.error("Logo upload failed:", error)
+      toast.error("Failed to upload logo. Please try again.")
+    } finally {
+      setIsUploadingLogo(false)
+    }
+  }, [])
+
+  const handleRemoveLogo = useCallback(async () => {
+    setIsUploadingLogo(true)
+    try {
+      const result = await removeCompanyLogo()
+      if (result.success) {
+        setLogoPreview(null)
+        setHasLogo(false)
+        if (fileInputRef.current) fileInputRef.current.value = ""
+        toast.success("Logo removed")
+      } else {
+        toast.error(result.error || "Failed to remove logo")
+      }
+    } catch {
+      toast.error("Failed to remove logo")
+    } finally {
+      setIsUploadingLogo(false)
+    }
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      handleLogoUpload(files[0])
+    }
+  }, [handleLogoUpload])
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) {
+      handleLogoUpload(files[0])
+    }
+  }, [handleLogoUpload])
 
   async function onSubmit(data: CompanyFormValues) {
     setIsPending(true)
@@ -63,6 +188,111 @@ export function CompanyForm({ initialData }: { initialData: any }) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Logo Upload Section */}
+        <div className="space-y-3">
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            Company Logo
+          </label>
+          <p className="text-xs text-muted-foreground">
+            This logo will appear on all your invoices and PDF documents.
+          </p>
+          <div className="flex items-start gap-5">
+            {/* Logo Preview */}
+            <div
+              className="relative flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden border-2 border-dashed transition-colors"
+              style={{
+                borderColor: logoPreview || hasLogo ? "hsl(var(--border))" : "hsl(var(--muted-foreground) / 0.3)",
+                backgroundColor: logoPreview || hasLogo ? "hsl(var(--card))" : "hsl(var(--muted) / 0.3)",
+              }}
+            >
+              {logoPreview ? (
+                <img
+                  src={logoPreview}
+                  alt="Company logo"
+                  className="w-full h-full object-contain p-2"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/50">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                    <circle cx="9" cy="9" r="2" />
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                  </svg>
+                </div>
+              )}
+              {isUploadingLogo && (
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+
+            {/* Upload Drop Zone */}
+            <div className="flex-1 space-y-2">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click() }}
+                className="relative rounded-lg border-2 border-dashed px-4 py-4 text-center cursor-pointer transition-all duration-200"
+                style={{
+                  borderColor: isDragging
+                    ? "hsl(var(--primary))"
+                    : "hsl(var(--border))",
+                  backgroundColor: isDragging
+                    ? "hsl(var(--primary) / 0.05)"
+                    : "transparent",
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.svg,.webp"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="logo-upload-input"
+                />
+                <div className="flex flex-col items-center gap-1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" x2="12" y1="3" y2="15" />
+                  </svg>
+                  <span className="text-sm text-muted-foreground">
+                    <span className="font-medium text-primary">Click to upload</span> or drag & drop
+                  </span>
+                  <span className="text-xs text-muted-foreground/70">
+                    PNG, JPG, SVG or WEBP (max 2MB)
+                  </span>
+                </div>
+              </div>
+
+              {(logoPreview || hasLogo) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isUploadingLogo}
+                  onClick={handleRemoveLogo}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5">
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  </svg>
+                  Remove logo
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-white/5 pt-4" />
+
         <div className="grid gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
@@ -286,26 +516,7 @@ export function CompanyForm({ initialData }: { initialData: any }) {
               )}
             />
 
-          <FormField
-            control={form.control}
-            name="invoiceTemplate"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Default Invoice Template</FormLabel>
-                <FormControl>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
-                    {...field}
-                  >
-                    <option value="modern">Modern (Sleek & Professional)</option>
-                    <option value="classic">Classic (Traditional Table)</option>
-                    <option value="minimal">Minimal (Clean & Whitespace)</option>
-                  </select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+
         </div>
 
         <div className="border-t border-white/5 pt-6 space-y-4">
@@ -326,6 +537,57 @@ export function CompanyForm({ initialData }: { initialData: any }) {
                   <FormMessage />
                 </FormItem>
               )}
+            />
+            <FormField
+              control={form.control}
+              name="cryptoAddress"
+              render={({ field }) => {
+                const isTierEligible = initialData?.subscriptionTier === "PRO" || initialData?.subscriptionTier === "ENTERPRISE"
+                return (
+                  <FormItem>
+                    <FormLabel>Default Crypto Wallet Address (PRO)</FormLabel>
+                    <FormControl>
+                      <div className="relative flex items-center">
+                        <Input 
+                          placeholder={isTierEligible ? "e.g. 0x123... or bc1q..." : "Upgrade to Pro"} 
+                          disabled={!isTierEligible}
+                          {...field} 
+                          value={field.value ?? ""} 
+                          className={!isTierEligible ? "pr-20 cursor-not-allowed opacity-60" : ""}
+                        />
+                        {!isTierEligible && (
+                          <span className="absolute right-3 text-[10px] text-amber-500 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 pointer-events-none">
+                            Pro Only
+                          </span>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )
+              }}
+            />
+            <FormField
+              control={form.control}
+              name="cryptoNetwork"
+              render={({ field }) => {
+                const isTierEligible = initialData?.subscriptionTier === "PRO" || initialData?.subscriptionTier === "ENTERPRISE"
+                return (
+                  <FormItem>
+                    <FormLabel>Crypto Network</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder={isTierEligible ? "e.g. BSC, ERC20, BTC" : "Upgrade to Pro"} 
+                        disabled={!isTierEligible}
+                        {...field} 
+                        value={field.value ?? ""} 
+                        className={!isTierEligible ? "cursor-not-allowed opacity-60" : ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )
+              }}
             />
             <FormField
               control={form.control}

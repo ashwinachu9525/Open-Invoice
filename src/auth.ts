@@ -179,9 +179,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     async createUser({ user }) {
       if (user.id && user.name && user.email) {
+        // Generate unique slug for company
+        let baseSlug = `${user.name} Business`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+        if (!baseSlug) baseSlug = 'company'
+        let slug = baseSlug
+        let counter = 1
+        while (true) {
+          const existing = await prisma.company.findUnique({ where: { slug } })
+          if (!existing) break
+          slug = `${baseSlug}-${counter}`
+          counter++
+        }
+
         // Create a default company for the newly created OAuth user
         const company = await prisma.company.create({
-          data: { name: `${user.name}'s Business` },
+          data: { 
+            name: `${user.name}'s Business`,
+            slug
+          },
         })
 
         // Link the company to the user and mark email as verified (since it's from Google)

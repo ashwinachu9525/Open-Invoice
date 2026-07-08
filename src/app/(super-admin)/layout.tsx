@@ -13,6 +13,7 @@ const superAdminNavItems = [
   { href: "/admin/tools", label: "Admin Tools", icon: Wrench },
   { href: "/admin/import", label: "Bulk Importer", icon: Upload },
   { href: "/admin/sql", label: "SQL Console", icon: Database },
+  { href: "/admin/feature-requests", label: "Feature Requests", icon: Zap },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 

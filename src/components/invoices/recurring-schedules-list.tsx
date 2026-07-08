@@ -3,10 +3,11 @@
 import { useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { pauseRecurringSchedule, resumeRecurringSchedule, cancelRecurringSchedule } from "@/actions/recurring"
+import { pauseRecurringSchedule, resumeRecurringSchedule, cancelRecurringSchedule, runRecurringScheduleNow } from "@/actions/recurring"
 import { toast } from "sonner"
-import { CalendarClock, Play, Pause, XCircle, ExternalLink, Mail, MailWarning } from "lucide-react"
+import { CalendarClock, Play, Pause, XCircle, ExternalLink, Mail, MailWarning, Zap, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 interface RecurringSchedulesListProps {
   initialSchedules: any[]
@@ -21,6 +22,24 @@ const statusConfig: Record<string, { label: string; class: string }> = {
 export function RecurringSchedulesList({ initialSchedules }: RecurringSchedulesListProps) {
   const [schedules, setSchedules] = useState<any[]>(initialSchedules)
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const router = useRouter()
+
+  async function handleRunNow(invoiceId: string) {
+    setPendingId(invoiceId)
+    try {
+      const res = await runRecurringScheduleNow(invoiceId)
+      if (res.success && res.invoiceId) {
+        toast.success(`Generated Invoice ${res.invoiceNumber} successfully!`)
+        router.refresh()
+      } else {
+        toast.error(res.error || "Failed to generate invoice from schedule")
+      }
+    } catch {
+      toast.error("Error generating invoice")
+    } finally {
+      setPendingId(null)
+    }
+  }
 
   async function handlePause(invoiceId: string) {
     setPendingId(invoiceId)
@@ -29,6 +48,7 @@ export function RecurringSchedulesList({ initialSchedules }: RecurringSchedulesL
       if (res.success) {
         setSchedules(prev => prev.map(s => s.invoiceId === invoiceId ? { ...s, status: "PAUSED" } : s))
         toast.success("Schedule paused successfully")
+        router.refresh()
       } else {
         toast.error(res.error || "Failed to pause schedule")
       }
@@ -46,6 +66,7 @@ export function RecurringSchedulesList({ initialSchedules }: RecurringSchedulesL
       if (res.success) {
         setSchedules(prev => prev.map(s => s.invoiceId === invoiceId ? { ...s, status: "ACTIVE" } : s))
         toast.success("Schedule resumed successfully")
+        router.refresh()
       } else {
         toast.error(res.error || "Failed to resume schedule")
       }
@@ -63,6 +84,7 @@ export function RecurringSchedulesList({ initialSchedules }: RecurringSchedulesL
       if (res.success) {
         setSchedules(prev => prev.map(s => s.invoiceId === invoiceId ? { ...s, status: "CANCELLED" } : s))
         toast.success("Schedule cancelled successfully")
+        router.refresh()
       } else {
         toast.error(res.error || "Failed to cancel schedule")
       }
@@ -142,7 +164,19 @@ export function RecurringSchedulesList({ initialSchedules }: RecurringSchedulesL
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-1.5">
+                  <div className="flex justify-end gap-1.5 flex-wrap">
+                    {sch.status === "ACTIVE" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRunNow(sch.invoiceId)}
+                        disabled={pendingId === sch.invoiceId}
+                        title="Generate recurring invoice right now"
+                        className="h-8 text-violet-400 hover:text-violet-300 hover:bg-violet-400/10 gap-1 font-semibold border border-violet-500/20"
+                      >
+                        {pendingId === sch.invoiceId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />} Run Now
+                      </Button>
+                    )}
                     {sch.status === "ACTIVE" && (
                       <Button
                         variant="ghost"

@@ -8,14 +8,20 @@ interface WhatsAppShareButtonProps {
   invoiceNumber: string
   finalAmount: number
   customerName: string
+  companyName: string
   pdfUrl: string
+  isPro?: boolean
+  removeWatermark?: boolean
 }
 
 export function WhatsAppShareButton({
   invoiceNumber,
   finalAmount,
   customerName,
+  companyName,
   pdfUrl,
+  isPro = false,
+  removeWatermark = false,
 }: WhatsAppShareButtonProps) {
   function handleShare() {
     const text = encodeURIComponent(
@@ -23,7 +29,7 @@ export function WhatsAppShareButton({
       `Customer: ${customerName}\n` +
       `Amount: ${formatINR(finalAmount)}\n\n` +
       `View / Download PDF:\n${pdfUrl}\n\n` +
-      `_Powered by Open-Invoice_`
+      (removeWatermark || isPro ? "" : `_Powered by Open-Invoice_`)
     )
     window.open(`https://wa.me/?text=${text}`, "_blank")
   }

@@ -16,13 +16,14 @@ const ITEMS_PER_PAGE = 10
 export default async function ManageUsersPage({
   searchParams,
 }: {
-  searchParams: { q?: string; page?: string }
+  searchParams: Promise<{ q?: string; page?: string }>
 }) {
+  const params = await searchParams;
   const session = await auth()
   if (!session?.user || session.user.role !== "SUPER_ADMIN") redirect("/login")
 
-  const query = searchParams.q || ""
-  const currentPage = Number(searchParams.page) || 1
+  const query = params.q || ""
+  const currentPage = Number(params.page) || 1
   const skip = (currentPage - 1) * ITEMS_PER_PAGE
 
   // Build where clause

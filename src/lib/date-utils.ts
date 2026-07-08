@@ -30,3 +30,25 @@ export async function getCompanyNow(db: any, baseCurrency: string | null | undef
   const tz = getCompanyTimezone(baseCurrency)
   return getDbNow(db, tz)
 }
+
+export function getNextRunDate(frequency: string, from: Date): Date {
+  const next = new Date(from)
+  switch (frequency) {
+    case "WEEKLY":
+      next.setDate(next.getDate() + 7)
+      break
+    case "MONTHLY":
+      next.setMonth(next.getMonth() + 1)
+      break
+    case "QUARTERLY":
+      next.setMonth(next.getMonth() + 3)
+      break
+    case "HALF_YEARLY":
+      next.setMonth(next.getMonth() + 6)
+      break
+    case "YEARLY":
+      next.setFullYear(next.getFullYear() + 1)
+      break
+  }
+  return next
+}

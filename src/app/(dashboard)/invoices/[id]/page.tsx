@@ -1,5 +1,6 @@
 import { getInvoice } from "@/actions/invoice"
 import { notFound } from "next/navigation"
+import { auth } from "@/auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,10 +13,12 @@ import { SendEmailButton } from "@/components/invoices/send-email-button"
 import { SendWhatsappButton } from "@/components/invoices/send-whatsapp-button"
 import { RecurringInvoiceModal } from "@/components/invoices/recurring-invoice-modal"
 import { WhatsAppShareButton } from "@/components/invoices/whatsapp-share-button"
-import { Download, Building2, User, FileText, AlertTriangle, Info, TrendingDown } from "lucide-react"
+import { Download, Building2, User, FileText, AlertTriangle, Info, TrendingDown, ClipboardList, Plus } from "lucide-react"
 import { ComplianceButtons } from "@/components/invoices/compliance-buttons"
+import { EditInvoiceButton } from "@/components/invoices/edit-invoice-button"
 import QRCode from "qrcode"
 import { PayOnlineButton } from "@/components/invoices/pay-online-button"
+import { ToggleFreezeButton } from "@/components/invoices/toggle-freeze-button"
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   DRAFT:          { label: "Draft",          class: "bg-gray-500/20 text-gray-400 border-gray-500/30" },
@@ -36,14 +39,23 @@ export default async function InvoiceDetailPage({
   const invoice = await getInvoice(id)
   if (!invoice) return notFound()
 
-  let upiQrCodeDataUrl = ""
+  const session = await auth()
+  const userRole = session?.user?.role || "USER"
+
+  let qrCodeDataUrl = ""
   if ((invoice as any).paymentCollectionMethod === "UPI_QR" && (invoice as any).vpaAddress) {
     try {
       const payeeName = encodeURIComponent(invoice.company.name)
       const upiString = `upi://pay?pa=${(invoice as any).vpaAddress}&pn=${payeeName}&am=${invoice.balanceDue.toFixed(2)}&cu=${invoice.currency}&tn=Invoice-${invoice.invoiceNumber}`
-      upiQrCodeDataUrl = await QRCode.toDataURL(upiString, { width: 180, margin: 1 })
+      qrCodeDataUrl = await QRCode.toDataURL(upiString, { width: 180, margin: 1 })
     } catch (qrErr) {
       console.error("Failed to generate details page UPI QR:", qrErr)
+    }
+  } else if ((invoice as any).paymentCollectionMethod === "CRYPTO_QR" && (invoice as any).cryptoAddress) {
+    try {
+      qrCodeDataUrl = await QRCode.toDataURL((invoice as any).cryptoAddress, { width: 180, margin: 1 })
+    } catch (qrErr) {
+      console.error("Failed to generate details page Crypto QR:", qrErr)
     }
   }
 
@@ -81,6 +93,11 @@ export default async function InvoiceDetailPage({
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${status.class}`}>
               {status.label}
             </span>
+            {invoice.isFrozen && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-amber-500/20 text-amber-400 border-amber-500/30">
+                Frozen
+              </span>
+            )}
           </div>
           <p className="text-muted-foreground text-sm mt-1">
             {invoice.customer.name} &middot; {new Date(invoice.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
@@ -123,13 +140,7 @@ export default async function InvoiceDetailPage({
             showEInvoice={!!invoice.company.gstNumber} 
             showEWayBill={!!invoice.company.gstNumber && invoice.finalAmount >= 50000} 
           />
-          {invoice.status !== "PAID" && (
-            <Link href={`/invoices/${invoice.id}/edit`}>
-              <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8 gap-1.5">
-                Edit
-              </Button>
-            </Link>
-          )}
+          <EditInvoiceButton invoiceId={invoice.id} status={invoice.status} isFrozen={invoice.isFrozen} userRole={userRole} />
           <SendEmailButton invoiceId={invoice.id} />
           <SendWhatsappButton 
             invoiceId={invoice.id}
@@ -143,7 +154,10 @@ export default async function InvoiceDetailPage({
             invoiceNumber={invoice.invoiceNumber}
             finalAmount={invoice.finalAmount}
             customerName={invoice.customer.name}
+            companyName={invoice.company.name}
             pdfUrl={`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/invoices/${invoice.id}/pdf`}
+            isPro={invoice.company.subscriptionTier === "PRO" || invoice.company.subscriptionTier === "ENTERPRISE"}
+            removeWatermark={invoice.company.removeWatermark}
           />
           <RecurringInvoiceModal 
             invoiceId={invoice.id} 
@@ -160,21 +174,44 @@ export default async function InvoiceDetailPage({
             status={invoice.status}
             finalAmount={invoice.finalAmount}
             tdsPercentage={invoice.tdsPercentage}
+            isFrozen={invoice.isFrozen}
+            userRole={userRole}
           />
+          {(userRole === "BUSINESS_OWNER" || userRole === "ADMIN") && (
+            <ToggleFreezeButton invoiceId={invoice.id} isFrozen={invoice.isFrozen} />
+          )}
         </div>
       </div>
 
       {/* ── Payment QR Code Card ── */}
-      {(invoice as any).paymentCollectionMethod === "UPI_QR" && (invoice as any).vpaAddress && ["SENT", "VIEWED", "PARTIALLY_PAID"].includes(invoice.status) && upiQrCodeDataUrl && (
+      {(invoice as any).paymentCollectionMethod === "UPI_QR" && (invoice as any).vpaAddress && ["SENT", "VIEWED", "PARTIALLY_PAID"].includes(invoice.status) && qrCodeDataUrl && (
         <div className="flex justify-start mb-6 animate-in fade-in duration-300">
           <div className="glass border-white/10 p-5 rounded-2xl flex flex-col items-center gap-3 text-center bg-black/20 max-w-xs shadow-xl">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Scan to Pay (UPI)</p>
             <div className="bg-white p-2.5 rounded-xl border border-white/10 shadow-inner">
-              <img src={upiQrCodeDataUrl} className="w-36 h-36" alt="UPI QR" />
+              <img src={qrCodeDataUrl} className="w-36 h-36" alt="UPI QR" />
             </div>
             <p className="text-[11px] text-slate-300 font-medium">Scan with GPay, PhonePe, Paytm, or BHIM</p>
             <div className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1">
               <p className="font-mono text-[10px] text-indigo-400 font-semibold">{(invoice as any).vpaAddress}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(invoice as any).paymentCollectionMethod === "CRYPTO_QR" && (invoice as any).cryptoAddress && ["SENT", "VIEWED", "PARTIALLY_PAID"].includes(invoice.status) && qrCodeDataUrl && (
+        <div className="flex justify-start mb-6 animate-in fade-in duration-300">
+          <div className="glass border-white/10 p-5 rounded-2xl flex flex-col items-center gap-3 text-center bg-black/20 max-w-xs shadow-xl">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Scan to Pay (Crypto)</p>
+            <div className="bg-white p-2.5 rounded-xl border border-white/10 shadow-inner">
+              <img src={qrCodeDataUrl} className="w-36 h-36" alt="Crypto QR" />
+            </div>
+            <p className="text-[11px] text-slate-300 font-medium">Scan to get Wallet Address</p>
+            <div className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1 text-left w-full">
+              <p className="font-mono text-[10px] text-indigo-400 font-semibold break-all leading-relaxed">{(invoice as any).cryptoAddress}</p>
+              {(invoice as any).cryptoNetwork && (
+                <p className="text-[10px] text-slate-400 mt-1 uppercase">Network: {(invoice as any).cryptoNetwork}</p>
+              )}
             </div>
           </div>
         </div>
@@ -220,7 +257,7 @@ export default async function InvoiceDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm space-y-1">
-            <p className="font-semibold text-base">{invoice.customer.name}</p>
+            <p className="font-semibold text-base">{invoice.customer.name.toUpperCase()}</p>
             {invoice.customer.gstin && (
               <p className="text-muted-foreground font-mono text-xs">GSTIN: {invoice.customer.gstin}</p>
             )}
@@ -328,6 +365,50 @@ export default async function InvoiceDetailPage({
                 TDS of {invoice.tdsPercentage}% ({formatINR(invoice.tdsAmount)}) has been deducted. Ensure Form 16A / 26AS reconciliation.
               </AlertDescription>
             </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Test Certificates ── */}
+      <Card className="glass glass-card border-white/10">
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <ClipboardList className="h-4 w-4 text-primary" />
+            Test Certificates
+          </CardTitle>
+          <Link href={`/certificates/new?invoiceId=${invoice.id}`}>
+            <Button size="sm" variant="outline" className="h-8">
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Generate
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {(invoice as any).testCertificates && (invoice as any).testCertificates.length > 0 ? (
+            <div className="space-y-3">
+              {(invoice as any).testCertificates.map((cert: any) => (
+                <div key={cert.id} className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
+                  <div>
+                    <p className="text-sm font-medium">{cert.certificateNumber}</p>
+                    <p className="text-xs text-muted-foreground">{cert.productName} • {new Date(cert.date).toLocaleDateString()}</p>
+                    <div className="flex gap-2 mt-1">
+                      <Link href={`/api/test-certificates/${cert.id}/pdf?public=true`} target="_blank" className="text-xs text-blue-400 hover:underline inline-flex items-center">
+                        <Download className="h-3 w-3 mr-1" />
+                        Download PDF
+                      </Link>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <Link href={`/api/test-certificates/${cert.id}/pdf?public=true`} target="_blank" className="text-xs text-indigo-400 hover:underline">
+                        Public Link
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-sm text-muted-foreground">
+              No test certificates attached to this invoice.
+            </div>
           )}
         </CardContent>
       </Card>

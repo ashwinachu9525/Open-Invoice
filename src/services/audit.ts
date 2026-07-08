@@ -9,9 +9,11 @@ export async function createAuditLog(params: {
   entityId: string
   details?: Record<string, unknown>
   ipAddress?: string
+  db?: any
 }) {
   try {
-    await prisma.auditLog.create({
+    const client = params.db || prisma
+    await client.auditLog.create({
       data: {
         companyId: params.companyId,
         userId: params.userId,

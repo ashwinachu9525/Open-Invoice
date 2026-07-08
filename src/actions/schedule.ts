@@ -1,9 +1,9 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { requireCompany } from "@/lib/auth-helpers"
 import { revalidatePath } from "next/cache"
 import { RecurringFrequency, ScheduleStatus } from "@prisma/client"
+import { getTenantDb } from "@/lib/tenant-db"
 
 export async function createOrUpdateSchedule(data: {
   invoiceId: string
@@ -13,6 +13,7 @@ export async function createOrUpdateSchedule(data: {
 }) {
   try {
     const { company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
 
     const invoice = await prisma.invoice.findFirst({
       where: { id: data.invoiceId, companyId: company.id }
@@ -38,6 +39,7 @@ export async function createOrUpdateSchedule(data: {
     })
 
     revalidatePath(`/invoices/${data.invoiceId}`)
+    revalidatePath("/invoices")
     return { success: true, schedule }
   } catch (error) {
     console.error("Failed to save schedule:", error)
@@ -48,6 +50,7 @@ export async function createOrUpdateSchedule(data: {
 export async function deleteSchedule(invoiceId: string) {
   try {
     const { company } = await requireCompany()
+    const prisma = await getTenantDb(company.id)
 
     const invoice = await prisma.invoice.findFirst({
       where: { id: invoiceId, companyId: company.id }
@@ -67,3 +70,4 @@ export async function deleteSchedule(invoiceId: string) {
     return { error: "Failed to delete schedule" }
   }
 }
+

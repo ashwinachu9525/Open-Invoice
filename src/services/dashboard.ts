@@ -1,13 +1,30 @@
 import { prisma } from "@/lib/prisma"
 
 export async function getDashboardStats(companyId: string) {
-  const [invoices, customers] = await Promise.all([
+  const [invoices, customers, recentQuotations, recentExpenses, allRecentInvoices] = await Promise.all([
     prisma.invoice.findMany({
       where: { companyId, deletedAt: null },
       include: { payments: true, customer: { select: { name: true } } },
     }),
     prisma.customer.count({
       where: { companyId, deletedAt: null },
+    }),
+    prisma.quotation.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { customer: { select: { name: true } } },
+    }),
+    prisma.expense.findMany({
+      where: { companyId },
+      orderBy: { date: 'desc' },
+      take: 5,
+    }),
+    prisma.invoice.findMany({
+      where: { companyId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { customer: { select: { name: true } } },
     })
   ])
 
@@ -45,6 +62,9 @@ export async function getDashboardStats(companyId: string) {
     customerInsights,
     agingBuckets,
     collectionEfficiency,
+    recentInvoices: allRecentInvoices,
+    recentQuotations,
+    recentExpenses,
   }
 }
 

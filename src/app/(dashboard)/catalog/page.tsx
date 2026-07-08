@@ -1,5 +1,5 @@
 import { Metadata } from "next"
-import { Plus } from "lucide-react"
+import { Plus, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { getCatalogItems } from "@/actions/catalog"
@@ -20,12 +20,20 @@ export default async function CatalogPage() {
           <h1 className="text-3xl font-bold tracking-tight">Catalog</h1>
           <p className="text-muted-foreground text-sm mt-1">Manage your products and services</p>
         </div>
-        <Link href="/catalog/new">
-          <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)] w-full sm:w-auto">
-            <Plus className="w-4 h-4" />
-            Add Product / Service
-          </Button>
-        </Link>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Link href="/ai" className="w-full sm:w-auto">
+            <Button variant="outline" className="glass border-white/10 hover:bg-white/8 gap-1.5 w-full">
+              <Sparkles className="h-4 w-4 text-violet-400" />
+              <span className="hidden sm:inline">AI Generate</span>
+            </Button>
+          </Link>
+          <Link href="/catalog/new" className="w-full sm:w-auto">
+            <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)] w-full">
+              <Plus className="w-4 h-4" />
+              Add Product / Service
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="glass rounded-xl border border-white/10 p-6 relative overflow-hidden">

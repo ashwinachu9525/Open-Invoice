@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
 })
 
 export const formatPdfINR = (amount: number) => {
-  return "Rs. " + amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return "₹ " + amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 interface StatementProps {

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
 import Link from "next/link"
-import { Plus, Users, Pencil, Building2 } from "lucide-react"
+import { Plus, Users, Pencil, Building2, Sparkles } from "lucide-react"
 import { CustomerSearch } from "@/components/customers/customer-search"
 import { Suspense } from "react"
 
@@ -35,15 +35,23 @@ export default async function CustomersPage(props: CustomersPageProps) {
           <Suspense fallback={<div className="h-9 w-[200px] bg-white/5 rounded-lg animate-pulse" />}>
             <CustomerSearch />
           </Suspense>
-          <Link href="/customers/new">
-            <Button
-              size="sm"
-              className="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-lg gap-1.5"
-            >
-              <Plus className="h-4 w-4" />
-              Add Customer
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/ai">
+              <Button variant="outline" size="sm" className="glass border-white/10 hover:bg-white/8 gap-1.5">
+                <Sparkles className="h-4 w-4 text-violet-400" />
+                <span className="hidden sm:inline">AI Generate</span>
+              </Button>
+            </Link>
+            <Link href="/customers/new">
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-lg gap-1.5"
+              >
+                <Plus className="h-4 w-4" />
+                Add Customer
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
