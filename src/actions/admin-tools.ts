@@ -799,5 +799,122 @@ export async function exportDatabaseBackup(passwordSecret: string) {
   }
 }
 
+export async function flushRedisCacheAdmin(pattern: string = "*") {
+  const session = await auth()
+  if (session?.user?.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized" }
+  }
+  try {
+    const { flushValkeyCache } = await import("@/lib/redis")
+    const res = await flushValkeyCache(pattern)
+    revalidatePath("/admin/tools")
+    revalidatePath("/admin/health")
+    return res
+  } catch (error: any) {
+    return { success: false, error: error.message || "Failed to invalidate Redis cache." }
+  }
+}
+
+export async function getSystemHealthCheck() {
+  const session = await auth()
+  if (session?.user?.role !== "SUPER_ADMIN") {
+    throw new Error("Unauthorized")
+  }
+
+  try {
+    const totalMem = os.totalmem()
+    const freeMem = os.freemem()
+    const usedMem = totalMem - freeMem
+    const usedPercentage = Math.round((usedMem / totalMem) * 100)
+    const procMem = process.memoryUsage()
+
+    // Test Database Latency
+    const dbStart = Date.now()
+    let dbStatus = "healthy"
+    let dbLatencyMs = 0
+    try {
+      await prisma.$queryRaw`SELECT 1`
+      dbLatencyMs = Date.now() - dbStart
+    } catch (e) {
+      dbStatus = "error"
+      dbLatencyMs = -1
+    }
+
+    // Test Redis Status & Latency
+    const { redis } = await import("@/lib/redis")
+    let redisStatus = "disabled"
+    let redisLatencyMs = 0
+    if (redis) {
+      const redisStart = Date.now()
+      try {
+        await redis.ping()
+        redisLatencyMs = Date.now() - redisStart
+        redisStatus = "healthy"
+      } catch (e) {
+        redisStatus = "error"
+      }
+    }
+
+    // Query active sessions and active user count
+    const [activeSessions, totalUsers, activeUsers24h] = await Promise.all([
+      prisma.session.count({
+        where: { expires: { gt: new Date() } }
+      }),
+      prisma.user.count({
+        where: { deletedAt: null }
+      }),
+      prisma.user.count({
+        where: {
+          updatedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+        }
+      })
+    ])
+
+    const cpus = os.cpus()
+    const loadAvg = os.loadavg()
+
+    return {
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.floor(process.uptime()),
+      cpu: {
+        cores: cpus.length,
+        model: cpus[0]?.model || "Generic CPU",
+        speed: cpus[0]?.speed || 0,
+        loadAvg,
+      },
+      memory: {
+        totalMB: Math.floor(totalMem / (1024 * 1024)),
+        freeMB: Math.floor(freeMem / (1024 * 1024)),
+        usedMB: Math.floor(usedMem / (1024 * 1024)),
+        usedPercentage,
+        processRssMB: Math.floor(procMem.rss / (1024 * 1024)),
+        heapUsedMB: Math.floor(procMem.heapUsed / (1024 * 1024)),
+        heapTotalMB: Math.floor(procMem.heapTotal / (1024 * 1024)),
+      },
+      users: {
+        activeSessions,
+        activeUsers24h,
+        totalUsers,
+      },
+      services: {
+        database: {
+          status: dbStatus,
+          latencyMs: dbLatencyMs,
+          provider: process.env.DATABASE_PROVIDER || "sqlite",
+        },
+        redis: {
+          status: redisStatus,
+          latencyMs: redisLatencyMs,
+          isConfigured: !!(process.env.VALKEY_URL || process.env.REDIS_URL),
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error("Health check error:", error)
+    throw new Error(error.message || "Failed to fetch health metrics.")
+  }
+}
+
+
 
 

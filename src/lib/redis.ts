@@ -76,3 +76,36 @@ export async function invalidateCachePattern(pattern: string) {
     console.warn(`[Redis] Error invalidating pattern ${pattern}:`, error)
   }
 }
+
+/**
+ * Flush all Valkey/Redis cache keys or keys matching a specific pattern.
+ */
+export async function flushValkeyCache(pattern: string = "*") {
+  if (!redis) {
+    return { success: false, message: "Redis/Valkey cache is not configured or connected.", count: 0, mode: "disabled" }
+  }
+
+  try {
+    if (pattern === "*") {
+      await redis.flushdb()
+      return { success: true, message: "Successfully flushed all Redis/Valkey cache database keys.", count: "all", mode: "flushdb" }
+    } else {
+      let deletedCount = 0
+      let cursor = "0"
+      do {
+        const res = await redis.scan(cursor, "MATCH", pattern, "COUNT", 100)
+        cursor = res[0]
+        const keys = res[1]
+        if (keys.length > 0) {
+          await redis.del(...keys)
+          deletedCount += keys.length
+        }
+      } while (cursor !== "0")
+      return { success: true, message: `Successfully invalidated ${deletedCount} cache keys matching pattern "${pattern}".`, count: deletedCount, mode: "pattern" }
+    }
+  } catch (error: any) {
+    console.error("[Redis] Error flushing cache:", error)
+    return { success: false, message: error.message || "Failed to flush Redis cache.", count: 0, mode: "error" }
+  }
+}
+

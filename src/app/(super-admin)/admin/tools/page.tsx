@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { verifyLlmKey, getReferralRedemptions, revokeReferralRedemption, inspectApiKeyAdmin, toggleApiKeyActiveAdmin } from "@/actions/admin-tools"
-import { Wrench, CheckCircle2, XCircle, Loader2, Gift, Trash2, Key, Shield, Calendar } from "lucide-react"
+import { verifyLlmKey, getReferralRedemptions, revokeReferralRedemption, inspectApiKeyAdmin, toggleApiKeyActiveAdmin, flushRedisCacheAdmin } from "@/actions/admin-tools"
+import { Wrench, CheckCircle2, XCircle, Loader2, Gift, Trash2, Key, Shield, Calendar, RefreshCw, Database } from "lucide-react"
 import { toast } from "sonner"
 import {
   AlertDialog,
@@ -396,6 +396,82 @@ export default function AdminToolsPage() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Redis & Valkey Cache Invalidator */}
+      <Card border-amber-500/20>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="w-5 h-5 text-amber-500" />
+            Valkey / Redis Cache Manager
+          </CardTitle>
+          <CardDescription>
+            Purge in-memory data, list query caches, and pre-rendered PDF buffers from Redis/Valkey.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-3 items-end">
+            <div className="space-y-2 md:col-span-2">
+              <Label>Cache Invalidation Pattern</Label>
+              <Select value={cachePattern} onValueChange={setCachePattern}>
+                <SelectTrigger className="bg-slate-900 border-white/10">
+                  <SelectValue placeholder="Select cache scope" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-800">
+                  <SelectItem value="*">⚡️ Flush All Cache Database Keys (*)</SelectItem>
+                  <SelectItem value="invoices:*">📄 Invoice List Caches (invoices:*)</SelectItem>
+                  <SelectItem value="invoice:pdf:*">🖼️ PDF Base64 Buffer Caches (invoice:pdf:*)</SelectItem>
+                  <SelectItem value="quotation:pdf:*">📜 Quotation PDF Caches (quotation:pdf:*)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Selected scope: <code className="text-amber-400 font-mono">{cachePattern}</code>
+              </p>
+            </div>
+
+            <div className="md:col-span-1">
+              <AlertDialog>
+                <AlertDialogTrigger render={
+                  <Button
+                    disabled={isFlushingCache}
+                    className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium shadow-lg shadow-amber-500/20"
+                  >
+                    {isFlushingCache ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Invalidating...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" /> Flush Cache Now
+                      </>
+                    )}
+                  </Button>
+                } />
+                <AlertDialogContent className="bg-slate-900 border-slate-800 text-slate-100">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-slate-100 flex items-center gap-2">
+                      <RefreshCw className="w-5 h-5 text-amber-500" /> Confirm Cache Invalidation
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-slate-400">
+                      Are you sure you want to flush Redis cache keys matching <code className="text-amber-400 font-mono">{cachePattern}</code>? Subsequent requests will fetch fresh data from the database.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="flex gap-2 justify-end">
+                    <AlertDialogCancel className="border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200">
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleFlushCache}
+                      className="bg-amber-600 hover:bg-amber-500 text-slate-100"
+                    >
+                      Confirm &amp; Flush
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
