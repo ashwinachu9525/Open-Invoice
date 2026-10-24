@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { createCustomer, updateCustomer } from "@/actions/customer"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -94,6 +95,7 @@ export function CustomerForm({ mode = "create", customerId, defaultValues }: Cus
       address: "",
       state: "",
       country: "India",
+      showContactPersonName: defaultValues?.showContactPersonName ?? true,
       ...defaultValues,
     },
   })
@@ -172,6 +174,28 @@ export function CustomerForm({ mode = "create", customerId, defaultValues }: Cus
                   <FormLabel className="text-sm font-medium">Phone</FormLabel>
                   <FormControl><Input className={inputClass} placeholder="+91 9876543210" {...field} /></FormControl>
                   <FormMessage className="text-xs text-red-400" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="showContactPersonName"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 p-3.5 shadow-sm md:col-span-2 glass bg-white/[0.02]">
+                  <div className="space-y-0.5 pr-4">
+                    <FormLabel className="text-sm font-medium cursor-pointer">
+                      Show Contact Person on Invoices
+                    </FormLabel>
+                    <p className="text-xs text-muted-foreground">
+                      Display contact person name in &quot;BILL TO&quot; on Invoice PDFs. When disabled, only the Company Name is displayed.
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

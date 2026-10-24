@@ -16,7 +16,7 @@ describe("tax-engine", () => {
     expect(result.sgstAmount).toBe(9000)
     expect(result.igstAmount).toBe(0)
     expect(result.tdsAmount).toBe(10000)
-    expect(result.finalAmount).toBe(108000)
+    expect(result.finalAmount).toBe(118000)
   })
 
   it("calculates inter-state IGST", () => {

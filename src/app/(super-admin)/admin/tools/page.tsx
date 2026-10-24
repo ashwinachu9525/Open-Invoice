@@ -123,6 +123,26 @@ export default function AdminToolsPage() {
     }
   }
 
+  // Cache Manager state & handlers
+  const [cachePattern, setCachePattern] = useState("*")
+  const [isFlushingCache, setIsFlushingCache] = useState(false)
+
+  async function handleFlushCache() {
+    setIsFlushingCache(true)
+    try {
+      const res: any = await flushRedisCacheAdmin(cachePattern)
+      if (res.success) {
+        toast.success(res.message || "Cache successfully flushed")
+      } else {
+        toast.error(res.error || res.message || "Failed to flush cache")
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An error occurred while flushing cache")
+    } finally {
+      setIsFlushingCache(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8 max-w-5xl mx-auto pb-10">
       <div>
@@ -400,7 +420,7 @@ export default function AdminToolsPage() {
       </Card>
 
       {/* Redis & Valkey Cache Invalidator */}
-      <Card border-amber-500/20>
+      <Card className="border-amber-500/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <RefreshCw className="w-5 h-5 text-amber-500" />
@@ -414,7 +434,7 @@ export default function AdminToolsPage() {
           <div className="grid gap-6 md:grid-cols-3 items-end">
             <div className="space-y-2 md:col-span-2">
               <Label>Cache Invalidation Pattern</Label>
-              <Select value={cachePattern} onValueChange={setCachePattern}>
+              <Select value={cachePattern} onValueChange={(val: any) => setCachePattern(val || "*")}>
                 <SelectTrigger className="bg-slate-900 border-white/10">
                   <SelectValue placeholder="Select cache scope" />
                 </SelectTrigger>

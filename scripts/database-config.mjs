@@ -1,4 +1,4 @@
-import "dotenv/config"
+import dotenv from "dotenv"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
@@ -8,6 +8,21 @@ export const ROOT = path.join(__dirname, "..")
 export const DATA_DIR = path.join(ROOT, "data")
 export const CONFIG_PATH = path.join(DATA_DIR, "database.config.json")
 export const SQLITE_DB_PATH = path.join(DATA_DIR, "invoice.db")
+
+// Match Next.js environment loading precedence:
+// When building for production or running in production, load .env.production
+const isProd =
+  process.env.NODE_ENV === "production" ||
+  process.env.npm_lifecycle_event === "build" ||
+  process.env.npm_lifecycle_event === "prebuild" ||
+  process.env.VERCEL === "1"
+
+if (isProd && existsSync(path.join(ROOT, ".env.production"))) {
+  dotenv.config({ path: path.join(ROOT, ".env.production"), override: true })
+} else if (existsSync(path.join(ROOT, ".env.local"))) {
+  dotenv.config({ path: path.join(ROOT, ".env.local"), override: true })
+}
+dotenv.config({ path: path.join(ROOT, ".env") })
 
 /** @typedef {'sqlite' | 'postgresql'} DatabaseProvider */
 

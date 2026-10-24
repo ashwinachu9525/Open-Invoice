@@ -103,6 +103,7 @@ export default async function EditCustomerPage({
                   address: customer.address ?? "",
                   state: customer.state ?? "",
                   country: customer.country ?? "India",
+                  showContactPersonName: customer.showContactPersonName ?? true,
                 }}
               />
             </CardContent>

@@ -50,15 +50,45 @@ export function InvoiceActions({
   const [isPending, setIsPending] = useState(false)
   
   // Paid Dialog State
+  const initialTds = tdsPercentage ?? 0
+  const initialTdsAmount = initialTds > 0 ? Math.round(finalAmount * (initialTds / 100) * 100) / 100 : 0
+  const initialNetBank = Math.max(0, Math.round((finalAmount - initialTdsAmount) * 100) / 100)
+
   const [showPaidDialog, setShowPaidDialog] = useState(false)
-  const [amountPaid, setAmountPaid] = useState(finalAmount ? String(finalAmount) : "")
-  const [tdsOverride, setTdsOverride] = useState(String(tdsPercentage ?? 0))
+  const [amountPaid, setAmountPaid] = useState(String(initialNetBank))
+  const [tdsOverride, setTdsOverride] = useState(String(initialTds))
   const [paymentDate, setPaymentDate] = useState(
     new Date().toISOString().split("T")[0]
   )
   const [paymentRef, setPaymentRef] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [success, setSuccess] = useState(false)
+
+  // Reset dialog state when opening
+  function openPaidDialog() {
+    const curTds = tdsPercentage ?? 0
+    const curTdsAmt = curTds > 0 ? Math.round(finalAmount * (curTds / 100) * 100) / 100 : 0
+    const curNet = Math.max(0, Math.round((finalAmount - curTdsAmt) * 100) / 100)
+    setTdsOverride(String(curTds))
+    setAmountPaid(String(curNet))
+    setPaymentDate(new Date().toISOString().split("T")[0])
+    setPaymentRef("")
+    setErrors({})
+    setSuccess(false)
+    setShowPaidDialog(true)
+  }
+
+  function handleTdsChange(newTdsStr: string) {
+    setTdsOverride(newTdsStr)
+    const newTds = parseFloat(newTdsStr)
+    if (!isNaN(newTds) && newTds >= 0 && newTds <= 100) {
+      const calcTdsAmt = Math.round(finalAmount * (newTds / 100) * 100) / 100
+      const netBank = Math.max(0, Math.round((finalAmount - calcTdsAmt) * 100) / 100)
+      setAmountPaid(String(netBank))
+    }
+    if (errors.tdsOverride) setErrors((p) => ({ ...p, tdsOverride: "" }))
+    if (errors.amountPaid) setErrors((p) => ({ ...p, amountPaid: "" }))
+  }
 
   // Delete Dialog State
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -74,17 +104,21 @@ export function InvoiceActions({
 
   function validatePaidForm() {
     const errs: Record<string, string> = {}
-    const paid = parseFloat(amountPaid)
+    const bankPaid = parseFloat(amountPaid)
     const tds = parseFloat(tdsOverride)
 
-    if (!amountPaid || isNaN(paid) || paid <= 0) {
-      errs.amountPaid = "Enter a valid payment amount greater than 0"
-    } else if (paid > finalAmount) {
-      errs.amountPaid = `Amount cannot exceed invoice total of ₹${finalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+    if (!amountPaid || isNaN(bankPaid) || bankPaid <= 0) {
+      errs.amountPaid = "Enter a valid amount received in bank greater than 0"
     }
 
     if (isNaN(tds) || tds < 0 || tds > 100) {
       errs.tdsOverride = "TDS must be between 0% and 100%"
+    }
+
+    const calculatedTds = tds > 0 ? Math.round(finalAmount * (tds / 100) * 100) / 100 : 0
+    const totalSettled = (isNaN(bankPaid) ? 0 : bankPaid) + calculatedTds
+    if (totalSettled > finalAmount + 1) {
+      errs.amountPaid = `Total settled (₹${totalSettled.toLocaleString("en-IN")}) cannot exceed invoice total of ₹${finalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
     }
 
     if (!paymentDate) {
@@ -98,24 +132,26 @@ export function InvoiceActions({
   async function handleMarkAsPaid() {
     if (!validatePaidForm()) return
 
-    const paid = parseFloat(amountPaid)
+    const bankPaid = parseFloat(amountPaid)
     const tds = parseFloat(tdsOverride)
-    const isPartial = paid < finalAmount
+    const calculatedTdsAmount = tds > 0 ? Math.round(finalAmount * (tds / 100) * 100) / 100 : 0
+    const totalSettled = Math.min(finalAmount, Math.round((bankPaid + calculatedTdsAmount) * 100) / 100)
+    const isPartial = totalSettled < finalAmount
     const newStatus: InvoiceStatus = isPartial ? "PARTIALLY_PAID" : "PAID"
     const noteLines = [
-      `Payment received: ₹${paid.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      `Net received in bank: ₹${bankPaid.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      tds > 0 ? `TDS deducted (${tds}%): ₹${calculatedTdsAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : null,
+      `Total settled: ₹${totalSettled.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
       `Payment date: ${paymentDate}`,
-      tds > 0 ? `TDS deducted: ${tds}%` : null,
       paymentRef ? `Ref: ${paymentRef}` : null,
     ]
       .filter(Boolean)
       .join(" | ")
 
     setIsPending(true)
-    const calculatedTdsAmount = tds > 0 ? (paid * tds) / 100 : 0
     await updateInvoiceStatus(invoiceId, newStatus, noteLines, {
-      amountPaid: paid,
-      balanceDue: Math.max(0, finalAmount - paid),
+      amountPaid: totalSettled,
+      balanceDue: Math.max(0, Math.round((finalAmount - totalSettled) * 100) / 100),
       tdsPercentage: tds,
       tdsAmount: calculatedTdsAmount
     })
@@ -128,15 +164,11 @@ export function InvoiceActions({
     }, 1200)
   }
 
-  const tdsAmount =
-    parseFloat(amountPaid) > 0 && parseFloat(tdsOverride) > 0
-      ? (parseFloat(amountPaid) * parseFloat(tdsOverride)) / 100
-      : 0
-
-  const netReceivable =
-    parseFloat(amountPaid) > 0
-      ? parseFloat(amountPaid) - tdsAmount
-      : 0
+  const currentTds = parseFloat(tdsOverride) || 0
+  const currentTdsAmount = currentTds > 0 ? Math.round(finalAmount * (currentTds / 100) * 100) / 100 : 0
+  const currentBankPaid = parseFloat(amountPaid) || 0
+  const currentTotalSettled = Math.round((currentBankPaid + currentTdsAmount) * 100) / 100
+  const currentBalanceRemaining = Math.max(0, Math.round((finalAmount - currentTotalSettled) * 100) / 100)
 
   async function handleDelete() {
     if (deleteConfirmation !== `delete ${invoiceNumber}`) {
@@ -180,7 +212,7 @@ export function InvoiceActions({
           <Button
             size="sm"
             disabled={isPending}
-            onClick={() => setShowPaidDialog(true)}
+            onClick={openPaidDialog}
             className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md hover:shadow-lg transition-all"
           >
             <CheckCircle className="h-4 w-4 mr-1.5" />
@@ -225,55 +257,32 @@ export function InvoiceActions({
               {/* Invoice Total Info */}
               <Alert className="glass border-white/10">
                 <Info className="h-4 w-4 text-blue-400" />
-                <AlertDescription className="text-sm">
-                  Invoice total:{" "}
-                  <span className="font-semibold">
+                <AlertDescription className="text-sm flex justify-between items-center w-full">
+                  <span>Gross Invoice Total:</span>
+                  <span className="font-bold text-base text-primary">
                     ₹{finalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                   </span>
                 </AlertDescription>
               </Alert>
 
-              {/* Amount Paid */}
-              <div className="space-y-1.5">
-                <Label htmlFor="amount-paid" className="text-sm font-medium">
-                  Amount Received <span className="text-red-400">*</span>
-                </Label>
-                <div className="relative">
-                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="amount-paid"
-                    type="number"
-                    placeholder="0.00"
-                    className="pl-9 glass border-white/10"
-                    value={amountPaid}
-                    onChange={(e) => {
-                      setAmountPaid(e.target.value)
-                      if (errors.amountPaid) setErrors((p) => ({ ...p, amountPaid: "" }))
-                    }}
-                  />
-                </div>
-                {errors.amountPaid && (
-                  <p className="text-xs text-red-400 flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    {errors.amountPaid}
-                  </p>
-                )}
-              </div>
-
               {/* TDS Section */}
               <div className="space-y-1.5">
-                <Label htmlFor="tds-rate" className="text-sm font-medium flex items-center gap-1.5">
-                  <Percent className="h-3.5 w-3.5 text-orange-400" />
-                  TDS Rate (if applicable)
+                <Label htmlFor="tds-rate" className="text-sm font-medium flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Percent className="h-3.5 w-3.5 text-orange-400" />
+                    TDS Rate (Tax Deducted at Source)
+                  </span>
+                  {currentTdsAmount > 0 && (
+                    <span className="text-xs text-orange-400 font-medium">
+                      Withholding: ₹{currentTdsAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
                 </Label>
                 <select
                   id="tds-rate"
                   className="flex h-9 w-full rounded-md border border-white/10 glass px-3 py-1 text-sm bg-transparent"
                   value={tdsOverride}
-                  onChange={(e) => {
-                    setTdsOverride(e.target.value)
-                    if (errors.tdsOverride) setErrors((p) => ({ ...p, tdsOverride: "" }))
-                  }}
+                  onChange={(e) => handleTdsChange(e.target.value)}
                 >
                   {TDS_SECTION_OPTIONS.map((opt) => (
                     <option key={`${opt.value}-${opt.section}`} value={opt.value}>
@@ -292,10 +301,7 @@ export function InvoiceActions({
                       value={tdsOverride}
                       min={0}
                       max={100}
-                      onChange={(e) => {
-                        setTdsOverride(e.target.value)
-                        if (errors.tdsOverride) setErrors((p) => ({ ...p, tdsOverride: "" }))
-                      }}
+                      onChange={(e) => handleTdsChange(e.target.value)}
                     />
                   </div>
                 )}
@@ -303,6 +309,41 @@ export function InvoiceActions({
                   <p className="text-xs text-red-400 flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
                     {errors.tdsOverride}
+                  </p>
+                )}
+              </div>
+
+              {/* Amount Received in Bank */}
+              <div className="space-y-1.5">
+                <Label htmlFor="amount-paid" className="text-sm font-medium flex justify-between items-center">
+                  <span>
+                    Net Amount Received in Bank <span className="text-red-400">*</span>
+                  </span>
+                  {currentTds > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      (Total − TDS Withholding)
+                    </span>
+                  )}
+                </Label>
+                <div className="relative">
+                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="amount-paid"
+                    type="number"
+                    step="any"
+                    placeholder="0.00"
+                    className="pl-9 glass border-white/10"
+                    value={amountPaid}
+                    onChange={(e) => {
+                      setAmountPaid(e.target.value)
+                      if (errors.amountPaid) setErrors((p) => ({ ...p, amountPaid: "" }))
+                    }}
+                  />
+                </div>
+                {errors.amountPaid && (
+                  <p className="text-xs text-red-400 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {errors.amountPaid}
                   </p>
                 )}
               </div>
@@ -344,29 +385,38 @@ export function InvoiceActions({
                 />
               </div>
 
-              {/* TDS Summary */}
-              {parseFloat(amountPaid) > 0 && (
+              {/* Settlement Summary */}
+              {currentBankPaid > 0 && (
                 <div className="rounded-xl border border-white/10 glass p-3 space-y-1.5 text-sm">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Payment Summary</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Settlement Breakdown</p>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Amount Received</span>
-                    <span className="font-medium">₹{parseFloat(amountPaid).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    <span className="text-muted-foreground">Gross Invoice Total</span>
+                    <span className="font-medium">₹{finalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                   </div>
-                  {tdsAmount > 0 && (
+                  {currentTdsAmount > 0 && (
                     <div className="flex justify-between text-orange-400">
-                      <span>TDS Deducted ({tdsOverride}%)</span>
-                      <span>-₹{tdsAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                      <span>TDS Withheld ({tdsOverride}%)</span>
+                      <span>-₹{currentTdsAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
-                  <div className="flex justify-between font-bold border-t border-white/10 pt-1.5 text-emerald-400">
-                    <span>Net Receivable</span>
-                    <span>₹{netReceivable.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                  <div className="flex justify-between text-emerald-400">
+                    <span>Net Received in Bank</span>
+                    <span className="font-medium">₹{currentBankPaid.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                   </div>
-                  {parseFloat(amountPaid) < finalAmount && (
+                  <div className="flex justify-between font-bold border-t border-white/10 pt-1.5">
+                    <span>Total Settled</span>
+                    <span className="text-primary">₹{currentTotalSettled.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  {currentBalanceRemaining <= 0 ? (
+                    <div className="text-xs text-emerald-400 font-medium pt-1 flex items-center gap-1">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Invoice will be marked as fully <strong>Paid</strong>.
+                    </div>
+                  ) : (
                     <Alert className="mt-2 border-yellow-500/30 bg-yellow-500/10">
                       <AlertTriangle className="h-3.5 w-3.5 text-yellow-400" />
                       <AlertDescription className="text-xs text-yellow-400">
-                        Partial payment — invoice will be marked as <strong>Partially Paid</strong>.
+                        Remaining balance of ₹{currentBalanceRemaining.toLocaleString("en-IN", { minimumFractionDigits: 2 })} — invoice will be marked as <strong>Partially Paid</strong>.
                       </AlertDescription>
                     </Alert>
                   )}

@@ -578,45 +578,6 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
 
         <Separator className="bg-white/8" />
 
-        {/* ── Section: TDS ── */}
-        <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <TrendingDown className="h-3.5 w-3.5 text-orange-400" />
-            TDS Configuration
-          </p>
-          <FormField
-            control={form.control}
-            name="tdsPercentage"
-            render={({ field }) => (
-              <FormItem className="max-w-xs">
-                <FormLabel className="text-sm font-medium flex items-center gap-1.5">
-                  <Percent className="h-3.5 w-3.5 text-orange-400" />
-                  TDS Rate
-                </FormLabel>
-                <FormControl>
-                  <select
-                    className={selectClass}
-                    value={field.value}
-                    onChange={(e) => field.onChange(Number(e.target.value))}
-                  >
-                    <option value={0}>No TDS (0%)</option>
-                    <option value={1}>1% — Sec 194C (Contractor)</option>
-                    <option value={2}>2% — Sec 194C / 194J (Technical)</option>
-                    <option value={5}>5% — Sec 194H (Commission)</option>
-                    <option value={10}>10% — Sec 194J (Professional)</option>
-                    {TDS_RATES.filter((r) => ![0, 1, 2, 5, 10].includes(r)).map((rate) => (
-                      <option key={rate} value={rate}>{rate}%</option>
-                    ))}
-                  </select>
-                </FormControl>
-                <FormMessage className="text-xs text-red-400" />
-              </FormItem>
-            )}
-          />
-        </div>
-        
-        <Separator className="bg-white/8" />
-
         {/* ── Section: Notes & Terms ── */}
         <div className="space-y-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Additional Information</p>
@@ -973,15 +934,6 @@ export function InvoiceForm({ customers, defaultInvoiceNumber, sellerState, bank
               <div className="flex justify-between text-muted-foreground">
                 <span>VAT/Tax</span>
                 <span>{formatCurrency(taxPreview.vatAmount, watched.currency)}</span>
-              </div>
-            )}
-            {taxPreview.tdsAmount > 0 && (
-              <div className="flex justify-between text-orange-400">
-                <span className="flex items-center gap-1">
-                  <TrendingDown className="h-3.5 w-3.5" />
-                  TDS ({taxPreview.tdsPercentage}%)
-                </span>
-                <span>-{formatCurrency(taxPreview.tdsAmount, watched.currency)}</span>
               </div>
             )}
             <Separator className="bg-white/10 my-1" />

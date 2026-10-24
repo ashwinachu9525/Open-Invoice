@@ -192,7 +192,7 @@ export default function AdminHealthPage() {
       {/* Main Metric Cards Grid */}
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Memory Telemetry Card */}
-        <Card border-white/10>
+        <Card className="border-white/10">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <HardDrive className="w-5 h-5 text-indigo-400" />
@@ -240,7 +240,7 @@ export default function AdminHealthPage() {
         </Card>
 
         {/* CPU Telemetry Card */}
-        <Card border-white/10>
+        <Card className="border-white/10">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Cpu className="w-5 h-5 text-amber-500" />
@@ -284,7 +284,7 @@ export default function AdminHealthPage() {
       {/* Concurrent Users & Services Grid */}
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Concurrent Users Card */}
-        <Card border-white/10>
+        <Card className="border-white/10">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5 text-emerald-400" />
@@ -316,7 +316,7 @@ export default function AdminHealthPage() {
         </Card>
 
         {/* Infrastructure & Database Services Card */}
-        <Card border-white/10>
+        <Card className="border-white/10">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Server className="w-5 h-5 text-sky-400" />

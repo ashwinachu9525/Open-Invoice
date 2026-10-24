@@ -146,6 +146,7 @@ export function QuotationDocument({ quotation, qrCodeDataUrl }: QuotationPDFProp
   const themeFont = template === "classic" ? "Times-Roman" : (quotation.themeFont || "Helvetica")
 
   const isPro = quotation.company.subscriptionTier === "PRO" || quotation.company.subscriptionTier === "ENTERPRISE"
+  const showContactPerson = (quotation.customer as any)?.showContactPersonName !== false
 
   const hasTax = quotation.items.some((item) => item.taxPercentage > 0)
   const hasHsn = quotation.items.some((item) => item.hsnSac && item.hsnSac.trim() !== "")
@@ -166,8 +167,14 @@ export function QuotationDocument({ quotation, qrCodeDataUrl }: QuotationPDFProp
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <View style={{ width: "50%" }}>
                 <Text style={{ fontWeight: "bold", marginBottom: 4 }}>Quote To:</Text>
-                <Text>{quotation.customer.name.toUpperCase()}</Text>
-                {quotation.customer.companyName && <Text>{quotation.customer.companyName}</Text>}
+                {showContactPerson ? (
+                  <>
+                    {quotation.customer.name && <Text>{quotation.customer.name.toUpperCase()}</Text>}
+                    {quotation.customer.companyName && <Text>{quotation.customer.companyName}</Text>}
+                  </>
+                ) : (
+                  quotation.customer.companyName && <Text>{quotation.customer.companyName.toUpperCase()}</Text>
+                )}
                 {quotation.customer.address && <Text>{quotation.customer.address}</Text>}
               </View>
               <View style={{ width: "50%", alignItems: "flex-end" }}>
@@ -195,8 +202,14 @@ export function QuotationDocument({ quotation, qrCodeDataUrl }: QuotationPDFProp
             <View style={{ borderTopWidth: 1, borderTopColor: "#e5e7eb", paddingTop: 15, flexDirection: "row", justifyContent: "space-between" }}>
               <View>
                 <Text style={{ fontSize: 8, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Quote To</Text>
-                <Text style={{ fontWeight: "bold", fontSize: 11, color: "#111827" }}>{quotation.customer.name.toUpperCase()}</Text>
-                {quotation.customer.companyName && <Text style={{ color: "#374151" }}>{quotation.customer.companyName}</Text>}
+                {showContactPerson ? (
+                  <>
+                    {quotation.customer.name && <Text style={{ fontWeight: "bold", fontSize: 11, color: "#111827" }}>{quotation.customer.name.toUpperCase()}</Text>}
+                    {quotation.customer.companyName && <Text style={{ color: "#374151" }}>{quotation.customer.companyName}</Text>}
+                  </>
+                ) : (
+                  quotation.customer.companyName && <Text style={{ fontWeight: "bold", fontSize: 11, color: "#111827" }}>{quotation.customer.companyName.toUpperCase()}</Text>
+                )}
                 {quotation.customer.address && <Text style={{ color: "#4b5563" }}>{quotation.customer.address}</Text>}
               </View>
               <View style={{ alignItems: "flex-end" }}>
@@ -239,8 +252,14 @@ export function QuotationDocument({ quotation, qrCodeDataUrl }: QuotationPDFProp
             <View style={styles.modInfoGrid}>
               <View style={{ width: "50%" }}>
                 <Text style={styles.modSectionLabel}>Quote To</Text>
-                <Text style={styles.modTextBase}>{quotation.customer.name.toUpperCase()}</Text>
-                {quotation.customer.companyName && <Text style={styles.modTextMuted}>{quotation.customer.companyName}</Text>}
+                {showContactPerson ? (
+                  <>
+                    {quotation.customer.name && <Text style={styles.modTextBase}>{quotation.customer.name.toUpperCase()}</Text>}
+                    {quotation.customer.companyName && <Text style={styles.modTextMuted}>{quotation.customer.companyName}</Text>}
+                  </>
+                ) : (
+                  quotation.customer.companyName && <Text style={styles.modTextBase}>{quotation.customer.companyName.toUpperCase()}</Text>
+                )}
                 {quotation.customer.address && <Text style={[styles.modTextMuted, { marginTop: 4 }]}>{quotation.customer.address}</Text>}
                 {quotation.customer.gstin && <Text style={[styles.modTextMuted, { marginTop: 4 }]}>GSTIN: {quotation.customer.gstin}</Text>}
                 {quotation.customer.phone && <Text style={styles.modTextMuted}>{quotation.customer.phone}</Text>}
@@ -366,10 +385,10 @@ export function QuotationDocument({ quotation, qrCodeDataUrl }: QuotationPDFProp
                   <Text style={{ color: "#4b5563" }}>Rs. {formatPdfINR(quotation.tcsAmount)}</Text>
                 </View>
               )}
-              {(quotation.tdsAmount > 0 || quotation.tcsAmount) && (
+              {quotation.tdsAmount > 0 && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: "#e5e7eb" }}>
                   <Text style={{ color: "#111827", fontWeight: "bold" }}>Net Payable</Text>
-                  <Text style={{ color: "#111827", fontWeight: "bold" }}>Rs. {formatPdfINR(quotation.finalAmount - quotation.tdsAmount + (quotation.tcsAmount || 0))}</Text>
+                  <Text style={{ color: "#111827", fontWeight: "bold" }}>Rs. {formatPdfINR(quotation.finalAmount - quotation.tdsAmount)}</Text>
                 </View>
               )}
             </View>
@@ -441,10 +460,10 @@ export function QuotationDocument({ quotation, qrCodeDataUrl }: QuotationPDFProp
                 <Text style={styles.modNetLabel}>Total Amount</Text>
                 <Text style={[styles.modNetValue, { color: themeColor }]}>Rs. {formatPdfINR(quotation.finalAmount)}</Text>
               </View>
-              {(quotation.tdsAmount > 0 || quotation.tcsAmount) && (
+              {quotation.tdsAmount > 0 && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 8 }}>
                   <Text style={styles.modTotalLabel}>Net Payable</Text>
-                  <Text style={styles.modTotalValue}>Rs. {formatPdfINR(quotation.finalAmount - quotation.tdsAmount + (quotation.tcsAmount || 0))}</Text>
+                  <Text style={styles.modTotalValue}>Rs. {formatPdfINR(quotation.finalAmount - quotation.tdsAmount)}</Text>
                 </View>
               )}
             </View>

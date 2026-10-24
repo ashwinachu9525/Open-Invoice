@@ -57,6 +57,22 @@ export async function updateCustomer(id: string, data: CustomerFormValues) {
       where: { id },
       data: parsed.data,
     })
+
+    // Invalidate invoice PDF and path caches for this customer
+    try {
+      const invoices = await db.invoice.findMany({
+        where: { customerId: id },
+        select: { id: true },
+      })
+      const { invalidateInvoicePdfCache } = await import("@/services/pdf")
+      for (const inv of invoices) {
+        await invalidateInvoicePdfCache(inv.id)
+        revalidatePath(`/invoices/${inv.id}`)
+      }
+      revalidatePath("/invoices")
+    } catch (cacheErr) {
+      console.warn("Failed to invalidate invoice caches after customer update:", cacheErr)
+    }
   } catch (error) {
     console.error("Failed to update customer:", error)
     return { error: "Failed to update customer" }

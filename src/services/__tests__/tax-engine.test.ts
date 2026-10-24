@@ -95,9 +95,9 @@ describe("Tax Engine", () => {
       // Taxable: 1000
       // Tax: 180
       // TDS: 100 (10% of 1000)
-      // Final: 1000 + 180 - 100 = 1080
+      // Invoice Final: 1000 + 180 = 1180 (TDS is withheld at payment time, not deducted from invoice total)
       expect(result.tdsAmount).toBe(100)
-      expect(result.finalAmount).toBe(1080)
+      expect(result.finalAmount).toBe(1180)
     })
     
     it("handles no tax jurisdiction", () => {

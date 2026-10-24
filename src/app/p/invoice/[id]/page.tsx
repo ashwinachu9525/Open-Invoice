@@ -102,8 +102,16 @@ export default async function PublicInvoicePage({
                 <Building2 className="w-4 h-4" /> Bill To
               </h3>
               <div className="space-y-1">
-                <p className="text-lg font-medium text-slate-900">{customer.name}</p>
-                {customer.companyName && <p className="text-slate-600">{customer.companyName}</p>}
+                {(customer as any)?.showContactPersonName !== false ? (
+                  <>
+                    <p className="text-lg font-medium text-slate-900">{customer.name}</p>
+                    {customer.companyName && <p className="text-slate-600">{customer.companyName}</p>}
+                  </>
+                ) : (
+                  <p className="text-lg font-medium text-slate-900">
+                    {customer.companyName || customer.name}
+                  </p>
+                )}
                 {customer.address && <p className="text-slate-500">{customer.address}</p>}
                 {customer.gstin && <p className="text-slate-500">GSTIN: {customer.gstin}</p>}
               </div>

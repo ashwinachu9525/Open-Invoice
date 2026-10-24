@@ -116,7 +116,8 @@ export function calculateInvoiceTax(params: {
   const tcsRate = params.tcsRate ?? 0
   const tcsAmount = round2((taxableAmount + totalTax) * (tcsRate / 100))
   
-  const finalAmount = round2(taxableAmount + totalTax + tcsAmount - tdsAmount)
+  // Total invoice value billed to customer (TDS is withheld by customer at payment time, not deducted from invoice total)
+  const finalAmount = round2(taxableAmount + totalTax + tcsAmount)
 
   return {
     subTotal,

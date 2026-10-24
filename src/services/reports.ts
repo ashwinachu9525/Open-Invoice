@@ -46,7 +46,7 @@ export async function generateTdsReport(companyId: string, from: Date, to: Date)
     taxableAmount: inv.subTotal - inv.totalDiscount,
     tdsRate: inv.tdsPercentage,
     tdsAmount: inv.tdsAmount,
-    netPayable: inv.finalAmount,
+    netPayable: inv.finalAmount - inv.tdsAmount,
   }))
 }
 

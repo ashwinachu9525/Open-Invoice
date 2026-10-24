@@ -27,7 +27,7 @@ export const invoiceSchema = z.object({
   bankAccountType: z.string().optional(),
   themeColor: z.string().optional(),
   themeFont: z.string().optional(),
-  tdsPercentage: z.number().min(0).max(100),
+  tdsPercentage: z.number().min(0).max(100).optional().default(0),
   tcsRate: z.number().min(0).max(100).optional().default(0),
   items: z.array(invoiceItemSchema).min(1, "At least one line item required"),
   paymentCollectionMethod: z.string().optional().default("OFFLINE"),

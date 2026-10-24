@@ -150,6 +150,7 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
   const themeFont = template === "classic" ? "Times-Roman" : (invoice.themeFont || "Helvetica")
 
   const isPro = invoice.company.subscriptionTier === "PRO" || invoice.company.subscriptionTier === "ENTERPRISE"
+  const showContactPerson = (invoice.customer as any)?.showContactPersonName !== false
 
   const hasTax = invoice.items.some((item) => item.taxPercentage > 0)
   const hasHsn = invoice.items.some((item) => item.hsnSac && item.hsnSac.trim() !== "")
@@ -170,8 +171,14 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <View style={{ width: "50%" }}>
                 <Text style={{ fontWeight: "bold", marginBottom: 4 }}>Billed To:</Text>
-                <Text>{invoice.customer.name.toUpperCase()}</Text>
-                {invoice.customer.companyName && <Text>{invoice.customer.companyName}</Text>}
+                {showContactPerson ? (
+                  <>
+                    {invoice.customer.name && <Text>{invoice.customer.name.toUpperCase()}</Text>}
+                    {invoice.customer.companyName && <Text>{invoice.customer.companyName}</Text>}
+                  </>
+                ) : (
+                  invoice.customer.companyName && <Text>{invoice.customer.companyName.toUpperCase()}</Text>
+                )}
                 {invoice.customer.address && <Text>{invoice.customer.address}</Text>}
               </View>
               <View style={{ width: "50%", alignItems: "flex-end" }}>
@@ -199,8 +206,14 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
             <View style={{ borderTopWidth: 1, borderTopColor: "#e5e7eb", paddingTop: 15, flexDirection: "row", justifyContent: "space-between" }}>
               <View>
                 <Text style={{ fontSize: 8, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Invoice To</Text>
-                <Text style={{ fontWeight: "bold", fontSize: 11, color: "#111827" }}>{invoice.customer.name.toUpperCase()}</Text>
-                {invoice.customer.companyName && <Text style={{ color: "#374151" }}>{invoice.customer.companyName}</Text>}
+                {showContactPerson ? (
+                  <>
+                    {invoice.customer.name && <Text style={{ fontWeight: "bold", fontSize: 11, color: "#111827" }}>{invoice.customer.name.toUpperCase()}</Text>}
+                    {invoice.customer.companyName && <Text style={{ color: "#374151" }}>{invoice.customer.companyName}</Text>}
+                  </>
+                ) : (
+                  invoice.customer.companyName && <Text style={{ fontWeight: "bold", fontSize: 11, color: "#111827" }}>{invoice.customer.companyName.toUpperCase()}</Text>
+                )}
                 {invoice.customer.address && <Text style={{ color: "#4b5563" }}>{invoice.customer.address}</Text>}
               </View>
               <View style={{ alignItems: "flex-end" }}>
@@ -243,8 +256,14 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
             <View style={styles.modInfoGrid}>
               <View style={{ width: "50%" }}>
                 <Text style={styles.modSectionLabel}>Billed To</Text>
-                <Text style={styles.modTextBase}>{invoice.customer.name.toUpperCase()}</Text>
-                {invoice.customer.companyName && <Text style={styles.modTextMuted}>{invoice.customer.companyName}</Text>}
+                {showContactPerson ? (
+                  <>
+                    {invoice.customer.name && <Text style={styles.modTextBase}>{invoice.customer.name.toUpperCase()}</Text>}
+                    {invoice.customer.companyName && <Text style={styles.modTextMuted}>{invoice.customer.companyName}</Text>}
+                  </>
+                ) : (
+                  invoice.customer.companyName && <Text style={styles.modTextBase}>{invoice.customer.companyName.toUpperCase()}</Text>
+                )}
                 {invoice.customer.address && <Text style={[styles.modTextMuted, { marginTop: 4 }]}>{invoice.customer.address}</Text>}
                 {invoice.customer.gstin && <Text style={[styles.modTextMuted, { marginTop: 4 }]}>GSTIN: {invoice.customer.gstin}</Text>}
                 {invoice.customer.phone && <Text style={styles.modTextMuted}>{invoice.customer.phone}</Text>}
@@ -370,10 +389,10 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
                   <Text style={{ color: "#4b5563" }}>Rs. {formatPdfINR(invoice.tcsAmount)}</Text>
                 </View>
               )}
-              {(invoice.tdsAmount > 0 || invoice.tcsAmount) && (
+              {invoice.tdsAmount > 0 && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: "#e5e7eb" }}>
                   <Text style={{ color: "#111827", fontWeight: "bold" }}>Net Payable</Text>
-                  <Text style={{ color: "#111827", fontWeight: "bold" }}>Rs. {formatPdfINR(invoice.finalAmount - invoice.tdsAmount + (invoice.tcsAmount || 0))}</Text>
+                  <Text style={{ color: "#111827", fontWeight: "bold" }}>Rs. {formatPdfINR(invoice.finalAmount - invoice.tdsAmount)}</Text>
                 </View>
               )}
             </View>
@@ -445,10 +464,10 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
                 <Text style={styles.modNetLabel}>Total Amount</Text>
                 <Text style={[styles.modNetValue, { color: themeColor }]}>Rs. {formatPdfINR(invoice.finalAmount)}</Text>
               </View>
-              {(invoice.tdsAmount > 0 || invoice.tcsAmount) && (
+              {invoice.tdsAmount > 0 && (
                 <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 8 }}>
                   <Text style={styles.modTotalLabel}>Net Payable</Text>
-                  <Text style={styles.modTotalValue}>Rs. {formatPdfINR(invoice.finalAmount - invoice.tdsAmount + (invoice.tcsAmount || 0))}</Text>
+                  <Text style={styles.modTotalValue}>Rs. {formatPdfINR(invoice.finalAmount - invoice.tdsAmount)}</Text>
                 </View>
               )}
             </View>

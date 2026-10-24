@@ -100,7 +100,7 @@ export default async function InvoiceDetailPage({
             )}
           </div>
           <p className="text-muted-foreground text-sm mt-1">
-            {invoice.customer.name} &middot; {new Date(invoice.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
+            {invoice.customer.showContactPersonName !== false ? invoice.customer.name : (invoice.customer.companyName || invoice.customer.name)} &middot; {new Date(invoice.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
             {invoice.dueDate && (
               <> &middot; Due {new Date(invoice.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</>
             )}
@@ -257,7 +257,18 @@ export default async function InvoiceDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm space-y-1">
-            <p className="font-semibold text-base">{invoice.customer.name.toUpperCase()}</p>
+            {invoice.customer.showContactPersonName !== false ? (
+              <>
+                <p className="font-semibold text-base">{invoice.customer.name.toUpperCase()}</p>
+                {invoice.customer.companyName && (
+                  <p className="text-muted-foreground text-sm">{invoice.customer.companyName}</p>
+                )}
+              </>
+            ) : (
+              <p className="font-semibold text-base">
+                {(invoice.customer.companyName || invoice.customer.name).toUpperCase()}
+              </p>
+            )}
             {invoice.customer.gstin && (
               <p className="text-muted-foreground font-mono text-xs">GSTIN: {invoice.customer.gstin}</p>
             )}
@@ -328,26 +339,29 @@ export default async function InvoiceDetailPage({
                 <span>{formatINR(invoice.igstAmount)}</span>
               </div>
             )}
-            {invoice.tdsAmount > 0 && (
-              <div className="flex justify-between text-orange-400">
-                <span className="flex items-center gap-1">
-                  <TrendingDown className="h-3.5 w-3.5" />
-                  TDS ({invoice.tdsPercentage}%)
-                </span>
-                <span>-{formatINR(invoice.tdsAmount)}</span>
-              </div>
-            )}
             <Separator className="bg-white/15" />
             <div className="flex justify-between font-bold text-base">
-              <span>Total</span>
+              <span>Total Invoice Amount</span>
               <span className="text-primary">{formatINR(invoice.finalAmount)}</span>
             </div>
             {invoice.amountPaid > 0 && (
               <>
                 <div className="flex justify-between text-emerald-400">
-                  <span>Paid</span>
+                  <span>Total Settled</span>
                   <span>{formatINR(invoice.amountPaid)}</span>
                 </div>
+                {invoice.tdsAmount > 0 && (
+                  <>
+                    <div className="flex justify-between text-xs text-muted-foreground pl-2">
+                      <span>• Bank Received</span>
+                      <span>{formatINR(Math.max(0, invoice.amountPaid - invoice.tdsAmount))}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-orange-400 pl-2">
+                      <span>• TDS Withheld ({invoice.tdsPercentage}%)</span>
+                      <span>{formatINR(invoice.tdsAmount)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between font-semibold text-yellow-400">
                   <span>Balance Due</span>
                   <span>{formatINR(invoice.balanceDue)}</span>

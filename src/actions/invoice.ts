@@ -42,7 +42,7 @@ export async function createInvoice(data: unknown) {
       items: parsed.data.items,
       sellerState: company.state,
       buyerState: customer.state,
-      tdsPercentage: parsed.data.tdsPercentage,
+      tdsPercentage: 0,
       tcsRate: parsed.data.tcsRate,
     })
 
@@ -73,8 +73,8 @@ export async function createInvoice(data: unknown) {
           cgstAmount: tax.cgstAmount,
           sgstAmount: tax.sgstAmount,
           igstAmount: tax.igstAmount,
-          tdsPercentage: tax.tdsPercentage,
-          tdsAmount: tax.tdsAmount,
+          tdsPercentage: 0,
+          tdsAmount: 0,
           tcsRate: tax.tcsRate ?? 0,
           tcsAmount: tax.tcsAmount ?? 0,
           finalAmount: tax.finalAmount,
@@ -172,13 +172,19 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
     })
     if (!customer) return { error: "Customer not found" }
 
+    const existingTdsPercentage = existing.tdsPercentage || 0
+
     const tax = calculateInvoiceTax({
       items: parsed.data.items,
       sellerState: company.state,
       buyerState: customer.state,
-      tdsPercentage: parsed.data.tdsPercentage,
+      tdsPercentage: existingTdsPercentage,
       tcsRate: parsed.data.tcsRate,
     })
+
+    const existingTdsAmount = existingTdsPercentage > 0 
+      ? Math.round(tax.taxableAmount * (existingTdsPercentage / 100) * 100) / 100 
+      : 0
 
     await prisma.$transaction(async (tx: any) => {
       // Delete old items
@@ -210,8 +216,8 @@ export async function updateInvoice(invoiceId: string, data: unknown) {
           cgstAmount: tax.cgstAmount,
           sgstAmount: tax.sgstAmount,
           igstAmount: tax.igstAmount,
-          tdsPercentage: tax.tdsPercentage,
-          tdsAmount: tax.tdsAmount,
+          tdsPercentage: existingTdsPercentage,
+          tdsAmount: existingTdsAmount,
           tcsRate: tax.tcsRate ?? 0,
           tcsAmount: tax.tcsAmount ?? 0,
           finalAmount: tax.finalAmount,
@@ -668,8 +674,8 @@ export async function cloneInvoice(id: string) {
         cgstAmount: invoice.cgstAmount,
         sgstAmount: invoice.sgstAmount,
         igstAmount: invoice.igstAmount,
-        tdsPercentage: invoice.tdsPercentage,
-        tdsAmount: invoice.tdsAmount,
+        tdsPercentage: 0,
+        tdsAmount: 0,
         finalAmount: invoice.finalAmount,
         balanceDue: invoice.finalAmount,
         items: {

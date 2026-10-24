@@ -10,6 +10,7 @@ export const customerSchema = z.object({
   address: z.string().optional(),
   state: z.string().optional(),
   country: z.string().optional(),
+  showContactPersonName: z.boolean().optional(),
 })
 
 export type CustomerFormValues = z.infer<typeof customerSchema>

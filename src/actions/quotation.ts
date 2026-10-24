@@ -26,7 +26,7 @@ export async function createQuotation(data: unknown) {
       items: parsed.data.items,
       sellerState: company.state,
       buyerState: customer.state,
-      tdsPercentage: parsed.data.tdsPercentage,
+      tdsPercentage: 0,
       tcsRate: parsed.data.tcsRate,
     })
 
@@ -51,8 +51,8 @@ export async function createQuotation(data: unknown) {
           cgstAmount: tax.cgstAmount,
           sgstAmount: tax.sgstAmount,
           igstAmount: tax.igstAmount,
-          tdsPercentage: tax.tdsPercentage,
-          tdsAmount: tax.tdsAmount,
+          tdsPercentage: 0,
+          tdsAmount: 0,
           tcsRate: tax.tcsRate ?? 0,
           tcsAmount: tax.tcsAmount ?? 0,
           finalAmount: tax.finalAmount,
@@ -119,7 +119,7 @@ export async function updateQuotation(id: string, data: unknown) {
       items: parsed.data.items,
       sellerState: company.state,
       buyerState: customer.state,
-      tdsPercentage: parsed.data.tdsPercentage,
+      tdsPercentage: 0,
       tcsRate: parsed.data.tcsRate,
     })
 
@@ -147,8 +147,8 @@ export async function updateQuotation(id: string, data: unknown) {
           cgstAmount: tax.cgstAmount,
           sgstAmount: tax.sgstAmount,
           igstAmount: tax.igstAmount,
-          tdsPercentage: tax.tdsPercentage,
-          tdsAmount: tax.tdsAmount,
+          tdsPercentage: 0,
+          tdsAmount: 0,
           tcsRate: tax.tcsRate ?? 0,
           tcsAmount: tax.tcsAmount ?? 0,
           finalAmount: tax.finalAmount,
@@ -225,8 +225,8 @@ export async function convertToInvoice(quotationId: string) {
           cgstAmount: quotation.cgstAmount,
           sgstAmount: quotation.sgstAmount,
           igstAmount: quotation.igstAmount,
-          tdsPercentage: quotation.tdsPercentage,
-          tdsAmount: quotation.tdsAmount,
+          tdsPercentage: 0,
+          tdsAmount: 0,
           finalAmount: quotation.finalAmount,
           balanceDue: quotation.finalAmount,
           items: {

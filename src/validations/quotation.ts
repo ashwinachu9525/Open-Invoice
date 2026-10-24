@@ -20,7 +20,7 @@ export const quotationSchema = z.object({
   terms: z.string().optional(),
   themeColor: z.string().optional(),
   themeFont: z.string().optional(),
-  tdsPercentage: z.number().min(0).max(100),
+  tdsPercentage: z.number().min(0).max(100).optional().default(0),
   tcsRate: z.number().min(0).max(100).optional().default(0),
   items: z.array(quotationItemSchema).min(1, "At least one line item required"),
 })
