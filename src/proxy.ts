@@ -32,8 +32,8 @@ export default auth(async (request) => {
   const platformHostnames = ["open-invoice.com", "app.open-invoice.com"]
   const isPlatformDomain = platformHostnames.some(d => hostname.startsWith(d)) || hostname === "localhost:3000"
 
-  // Only rewrite if it's not a platform domain and not a static resource / core api
-  const isStaticFile = path.includes(".") || path.startsWith("/_next/") || path.startsWith("/api/")
+  // Only rewrite if it's not a platform domain and not a static resource / core api / verification portal
+  const isStaticFile = path.includes(".") || path.startsWith("/_next/") || path.startsWith("/api/") || path.startsWith("/verify")
 
   if (!isPlatformDomain && !isStaticFile) {
     try {

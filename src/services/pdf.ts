@@ -6,6 +6,11 @@ import { uploadFile } from "@/services/storage"
 import { prisma } from "@/lib/prisma"
 import { getTenantDb } from "@/lib/tenant-db"
 import { redis } from "@/lib/redis"
+import {
+  generateVerificationToken,
+  getInvoiceVerificationUrl,
+  calculatePdfHash,
+} from "@/lib/invoice-verification"
 
 export async function generateInvoicePdf(invoiceId: string, companyId?: string): Promise<Buffer> {
   const cacheKey = `invoice:pdf:${invoiceId}`
@@ -28,21 +33,41 @@ export async function generateInvoicePdf(invoiceId: string, companyId?: string):
 
   if (!invoice) throw new Error("Invoice not found")
 
-  let qrCodeDataUrl = ""
+  // Ensure verificationToken exists for secure verification
+  let verificationToken = invoice.verificationToken
+  if (!verificationToken) {
+    verificationToken = generateVerificationToken()
+    try {
+      await db.invoice.update({
+        where: { id: invoiceId },
+        data: { verificationToken },
+      })
+    } catch (e) {
+      console.warn("Failed to persist verification token:", e)
+    }
+  }
+
+  // Generate official secure verification URL with HMAC-SHA256 signature
+  const verificationUrl = getInvoiceVerificationUrl({
+    ...invoice,
+    verificationToken,
+  })
+
+  // Generate QR code for the verification URL (never raw JSON)
+  const verificationQrCodeDataUrl = await QRCode.toDataURL(verificationUrl, {
+    width: 140,
+    margin: 1,
+    errorCorrectionLevel: "M",
+  })
+
+  // Separate payment QR code if UPI or Crypto payment collection is configured
+  let paymentQrCodeDataUrl: string | undefined = undefined
   if (invoice.paymentCollectionMethod === "UPI_QR" && invoice.vpaAddress) {
     const payeeName = encodeURIComponent(invoice.company.name)
     const upiString = `upi://pay?pa=${invoice.vpaAddress}&pn=${payeeName}&am=${invoice.finalAmount.toFixed(2)}&cu=INR&tn=Invoice-${invoice.invoiceNumber}`
-    qrCodeDataUrl = await QRCode.toDataURL(upiString, { width: 120, margin: 1 })
+    paymentQrCodeDataUrl = await QRCode.toDataURL(upiString, { width: 120, margin: 1 })
   } else if (invoice.paymentCollectionMethod === "CRYPTO_QR" && (invoice as any).cryptoAddress) {
-    qrCodeDataUrl = await QRCode.toDataURL((invoice as any).cryptoAddress, { width: 120, margin: 1 })
-  } else {
-    const qrData = JSON.stringify({
-      inv: invoice.invoiceNumber,
-      amt: invoice.finalAmount,
-      gst: invoice.company.gstNumber,
-      date: invoice.date.toISOString().split("T")[0],
-    })
-    qrCodeDataUrl = await QRCode.toDataURL(qrData, { width: 120, margin: 1 })
+    paymentQrCodeDataUrl = await QRCode.toDataURL((invoice as any).cryptoAddress, { width: 120, margin: 1 })
   }
 
   // Resolve company logo S3 key to a signed URL for the PDF renderer
@@ -66,8 +91,27 @@ export async function generateInvoicePdf(invoiceId: string, companyId?: string):
   }
 
   const buffer = await renderToBuffer(
-    InvoiceDocument({ invoice: invoiceWithResolvedLogo, qrCodeDataUrl })
+    InvoiceDocument({
+      invoice: invoiceWithResolvedLogo,
+      qrCodeDataUrl: verificationQrCodeDataUrl,
+      verificationQrCodeDataUrl,
+      paymentQrCodeDataUrl,
+    })
   )
+
+  // Compute and persist the authoritative PDF document hash
+  const pdfHash = calculatePdfHash(buffer)
+  try {
+    await db.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        pdfHash,
+        verificationToken,
+      },
+    })
+  } catch (err) {
+    console.warn("Failed to persist pdfHash:", err)
+  }
 
   if (process.env.S3_ACCESS_KEY_ID) {
     const key = `invoices/${invoice.companyId}/${invoice.invoiceNumber}.pdf`

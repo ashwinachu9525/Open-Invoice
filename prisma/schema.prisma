@@ -1,5 +1,5 @@
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
 }
 
 generator client {
@@ -313,6 +313,8 @@ model Invoice {
   razorpayOrderId         String?
   razorpayPaymentLinkId   String?
   razorpayPaymentLinkUrl  String?
+  verificationToken       String?   @unique
+  pdfHash                 String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

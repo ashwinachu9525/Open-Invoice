@@ -142,12 +142,22 @@ interface InvoicePDFProps {
     }
   }
   qrCodeDataUrl?: string
+  verificationQrCodeDataUrl?: string
+  paymentQrCodeDataUrl?: string
 }
 
-export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
+export function InvoiceDocument({
+  invoice,
+  qrCodeDataUrl,
+  verificationQrCodeDataUrl,
+  paymentQrCodeDataUrl,
+}: InvoicePDFProps) {
   const template = invoice.company.invoiceTemplate || "modern"
   const themeColor = template === "classic" || template === "minimal" ? "#000000" : (invoice.themeColor || "#09090B")
   const themeFont = template === "classic" ? "Times-Roman" : (invoice.themeFont || "Helvetica")
+
+  const effectiveVerifyQr = verificationQrCodeDataUrl || (paymentQrCodeDataUrl ? undefined : qrCodeDataUrl)
+  const effectivePaymentQr = paymentQrCodeDataUrl
 
   const isPro = invoice.company.subscriptionTier === "PRO" || invoice.company.subscriptionTier === "ENTERPRISE"
   const showContactPerson = (invoice.customer as any)?.showContactPersonName !== false
@@ -565,23 +575,37 @@ export function InvoiceDocument({ invoice, qrCodeDataUrl }: InvoicePDFProps) {
         {/* --- FOOTER --- */}
         <View style={styles.footer}>
           <View style={{ borderTopWidth: 1, borderTopColor: "#E4E4E7", paddingTop: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
-            <View style={{ width: "33%" }}>
-              {qrCodeDataUrl && (
+            <View style={{ width: "42%", flexDirection: "row", gap: 10, alignItems: "flex-end" }}>
+              {effectiveVerifyQr && (
                 <View style={{ alignItems: "flex-start" }}>
-                  <Image src={qrCodeDataUrl} style={{ width: 50, height: 50, borderRadius: 4 }} />
-                  <Text style={{ fontSize: 5, color: "#A1A1AA", marginTop: 4, fontWeight: "bold", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    {invoice.paymentCollectionMethod === "UPI_QR" ? "SCAN TO PAY" : invoice.paymentCollectionMethod === "CRYPTO_QR" ? "SCAN TO PAY" : "VERIFY INVOICE"}
+                  <Image src={effectiveVerifyQr} style={{ width: 46, height: 46, borderRadius: 4 }} />
+                  <Text style={{ fontSize: 5, color: "#16a34a", marginTop: 3, fontWeight: "bold", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    VERIFY INVOICE
+                  </Text>
+                  <Text style={{ fontSize: 4, color: "#A1A1AA", marginTop: 1 }}>
+                    Scan to verify authenticity
+                  </Text>
+                </View>
+              )}
+              {effectivePaymentQr && (
+                <View style={{ alignItems: "flex-start" }}>
+                  <Image src={effectivePaymentQr} style={{ width: 46, height: 46, borderRadius: 4 }} />
+                  <Text style={{ fontSize: 5, color: "#2563eb", marginTop: 3, fontWeight: "bold", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    SCAN TO PAY
+                  </Text>
+                  <Text style={{ fontSize: 4, color: "#A1A1AA", marginTop: 1 }}>
+                    {invoice.paymentCollectionMethod === "UPI_QR" ? "UPI QR Payment" : "Crypto Wallet"}
                   </Text>
                 </View>
               )}
             </View>
-            <View style={{ width: "34%", alignItems: "center", paddingBottom: 4 }}>
+            <View style={{ width: "29%", alignItems: "center", paddingBottom: 4 }}>
               <Text style={{ fontSize: 7, color: "#A1A1AA", textAlign: "center" }}>
                 This is an electronically generated document.
               </Text>
               <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} style={{ fontSize: 7, color: "#A1A1AA", marginTop: 4 }} />
             </View>
-            <View style={{ width: "33%", alignItems: "flex-end", paddingBottom: 4 }}>
+            <View style={{ width: "29%", alignItems: "flex-end", paddingBottom: 4 }}>
               {!invoice.company.removeWatermark && !isPro && (
                 <View style={{ alignItems: "flex-end" }}>
                   <Text style={{ fontSize: 7, color: "#A1A1AA", marginBottom: 2 }}>Powered by</Text>
