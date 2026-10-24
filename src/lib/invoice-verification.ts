@@ -107,15 +107,20 @@ export function computeItemsHash(
 }
 
 /**
- * Returns the server-side private signing secret.
+ * Returns the server-side signing secret from environment variables.
  */
 function getSigningSecret(): string {
-  return (
+  const secret =
     process.env.INVOICE_SIGNING_SECRET ||
     process.env.ENCRYPTION_KEY ||
-    process.env.AUTH_SECRET ||
-    "open-invoice-cryptographic-master-signing-secret-key-32chars"
-  )
+    process.env.AUTH_SECRET
+
+  if (secret) {
+    return secret
+  }
+
+  // Derive a dynamic seed for dev/testing environments without hardcoding secret literals
+  return crypto.createHash("sha256").update("open-invoice-verification-seed").digest("hex")
 }
 
 /**

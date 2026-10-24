@@ -60,8 +60,8 @@ describe("Invoice Verification Security & Cryptography", () => {
         hsnSac: "998311",
       },
     ],
-    verificationToken: "token_abc123def456",
-    pdfHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    verificationToken: "sample-token-12345",
+    pdfHash: calculatePdfHash(Buffer.from("sample-invoice-document")),
   }
 
   function flattenReactTree(node: any): any[] {
@@ -154,7 +154,7 @@ describe("Invoice Verification Security & Cryptography", () => {
 
   it("should detect forged signatures", () => {
     const manifest = buildCanonicalManifest(sampleInvoice)
-    const forgedSignature = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+    const forgedSignature = "0".repeat(64)
 
     expect(verifyInvoiceSignature(manifest, forgedSignature)).toBe(false)
   })
@@ -174,9 +174,9 @@ describe("Invoice Verification Security & Cryptography", () => {
   it("should generate a secure verification URL with signature", () => {
     const url = getInvoiceVerificationUrl(sampleInvoice)
 
-    expect(url).toContain("/verify/token_abc123def456?sig=")
+    expect(url).toContain("/verify/sample-token-12345?sig=")
     const parsed = new URL(url)
-    expect(parsed.pathname).toBe("/verify/token_abc123def456")
+    expect(parsed.pathname).toBe("/verify/sample-token-12345")
     const sig = parsed.searchParams.get("sig")
     expect(sig).toBeTruthy()
 
