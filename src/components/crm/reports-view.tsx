@@ -1,0 +1,151 @@
+"use client"
+
+import * as React from "react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import {
+  BarChart3,
+  TrendingUp,
+  Target,
+  Award,
+  Users,
+  PieChart,
+  Briefcase,
+} from "lucide-react"
+
+interface ReportsViewProps {
+  data: {
+    leadSources: Array<{ source: string; total: number; converted: number; conversionRate: number }>
+    repLeaderboard: Array<{ name: string; email: string; dealsWon: number; wonValue: number; totalDeals: number }>
+    weightedForecast: number
+    totalLeads: number
+    totalDeals: number
+  }
+}
+
+export function ReportsView({ data }: ReportsViewProps) {
+  return (
+    <div className="space-y-6">
+      {/* ── KPI Forecast Banner ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="glass border-white/10 shadow-sm p-4">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+            Weighted Revenue Forecast
+          </span>
+          <span className="text-2xl font-bold text-emerald-400 mt-1 block">
+            ₹{data.weightedForecast.toLocaleString("en-IN")}
+          </span>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Probability-adjusted expected revenue from open pipeline
+          </p>
+        </Card>
+
+        <Card className="glass border-white/10 shadow-sm p-4">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+            Total Pipeline Deals
+          </span>
+          <span className="text-2xl font-bold text-foreground mt-1 block">
+            {data.totalDeals}
+          </span>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Active commercial bids across all sales reps
+          </p>
+        </Card>
+
+        <Card className="glass border-white/10 shadow-sm p-4">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+            Leads Ingested
+          </span>
+          <span className="text-2xl font-bold text-purple-400 mt-1 block">
+            {data.totalLeads}
+          </span>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Top-of-funnel inbound and marketing prospects
+          </p>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ── Lead Source Effectiveness ── */}
+        <Card className="glass border-white/10 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <PieChart className="h-4 w-4 text-emerald-400" />
+              Lead Source Conversion Effectiveness
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              Conversion rate breakdown across marketing channels
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.leadSources.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">
+                No lead sources recorded yet.
+              </div>
+            ) : (
+              data.leadSources.map((ls, idx) => (
+                <div key={idx} className="p-3 rounded-xl bg-white/5 border border-white/8 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-foreground">{ls.source}</span>
+                    <span className="font-semibold text-emerald-400">{ls.conversionRate}% converted</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"
+                      style={{ width: `${Math.min(100, ls.conversionRate)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>{ls.total} leads total</span>
+                    <span>{ls.converted} converted to customers</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Sales Rep Leaderboard ── */}
+        <Card className="glass border-white/10 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <Award className="h-4 w-4 text-amber-400" />
+              Sales Rep Performance Leaderboard
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              Deals won and revenue generated by sales team members
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.repLeaderboard.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">
+                No sales reps assigned yet.
+              </div>
+            ) : (
+              data.repLeaderboard.map((rep, idx) => (
+                <div key={idx} className="p-3 rounded-xl bg-white/5 border border-white/8 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-white font-bold text-xs flex items-center justify-center">
+                      #{idx + 1}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-foreground">{rep.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{rep.dealsWon} won of {rep.totalDeals} assigned</p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-emerald-400">
+                      ₹{rep.wonValue.toLocaleString("en-IN")}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block">Won Revenue</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}

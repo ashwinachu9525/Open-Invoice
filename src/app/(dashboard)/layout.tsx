@@ -12,6 +12,7 @@ import { RandomFeedbackModal } from "@/components/layout/random-feedback-modal"
 import { DesktopNavLinks, MobileNavLinks } from "@/components/layout/sidebar-nav"
 import { ProductTour } from "@/components/dashboard/product-tour"
 import { GlobalShortcutListener } from "@/components/dashboard/global-shortcut-listener"
+import { AppSwitcher } from "@/components/layout/app-switcher"
 import { prisma } from "@/lib/prisma"
 
 
@@ -50,6 +51,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               <p className="text-[10px] text-muted-foreground leading-none mt-0.5">Indian GST Suite</p>
             </div>
           </Link>
+        </div>
+
+        <div className="px-3 pt-3">
+          <AppSwitcher />
         </div>
 
         {/* Nav */}
@@ -92,6 +97,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
                   </div>
                   <span className="font-bold gradient-text">{APP_NAME}</span>
                 </Link>
+              </div>
+              <div className="px-3 pt-3">
+                <AppSwitcher />
               </div>
               <nav className="flex-1 overflow-auto grid gap-1 p-3 mt-2">
                 <MobileNavLinks />

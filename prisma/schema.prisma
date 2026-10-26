@@ -47,6 +47,12 @@ model User {
   featureRequestUpvotes  FeatureRequestUpvote[]
   referralRedemptions ReferralRedemption[] @relation("ReferrerRedemptions")
 
+  // CRM relations
+  assignedCrmLeads      CrmLead[]        @relation("AssignedLeads")
+  assignedCrmDeals      CrmDeal[]        @relation("AssignedDeals")
+  assignedCrmActivities CrmActivity[]    @relation("AssignedActivities")
+  createdCrmWorkflows   CrmWorkflow[]    @relation("CreatedWorkflows")
+
   @@index([companyId])
   @@index([email])
 }
@@ -177,6 +183,15 @@ model Company {
   apiKeys        ApiKey[]
   testimonials   Testimonial[]
   backups        CompanyBackup[]
+
+  // CRM Suite relations
+  crmLeads        CrmLead[]
+  crmDeals        CrmDeal[]
+  crmStages       CrmStage[]
+  crmActivities   CrmActivity[]
+  crmWorkflows    CrmWorkflow[]
+  crmWorkflowLogs CrmWorkflowLog[]
+  crmCampaigns    CrmCampaign[]
   
   slug              String?   @unique
   tagline           String?
@@ -251,6 +266,11 @@ model Customer {
   invoices Invoice[]
   quotations Quotation[]
   testCertificates TestCertificate[]
+
+  // CRM Suite relations
+  deals           CrmDeal[]
+  crmActivities   CrmActivity[]
+  leads           CrmLead[]
 
   @@index([companyId])
   @@index([name])
@@ -903,4 +923,193 @@ model CompanyBackup {
   @@index([companyId])
   @@index([createdAt])
 }
+
+// ─────────────────────────────────────────────────────────────
+// CRM Suite Models
+// ─────────────────────────────────────────────────────────────
+
+model CrmLead {
+  id                  String    @id @default(cuid())
+  companyId           String
+  name                String
+  companyName         String?
+  email               String?
+  phone               String?
+  title               String?
+  source              String    @default("WEBSITE") // WEBSITE, REFERRAL, INBOUND, LINKEDIN, CAMPAIGN, COLD_CALL
+  status              String    @default("NEW")     // NEW, CONTACTED, QUALIFIED, UNQUALIFIED, CONVERTED
+  score               Int       @default(10)
+  region              String?   // e.g. Bengaluru, Mumbai, Delhi, Remote
+  estimatedValue      Float?
+  notes               String?
+  assignedToId        String?
+  convertedCustomerId String?
+  convertedDealId     String?
+  customFields        Json?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  company             Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignedTo          User?         @relation("AssignedLeads", fields: [assignedToId], references: [id], onDelete: SetNull)
+  convertedCustomer   Customer?     @relation(fields: [convertedCustomerId], references: [id], onDelete: SetNull)
+  convertedDeal       CrmDeal?      @relation("ConvertedFromLead")
+  activities          CrmActivity[]
+
+  @@index([companyId])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([convertedCustomerId])
+}
+
+model CrmStage {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  order       Int      @default(0)
+  probability Int      @default(50) // 0-100%
+  color       String   @default("#3b82f6")
+  isWon       Boolean  @default(false)
+  isLost      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deals       CrmDeal[]
+
+  @@index([companyId])
+  @@index([order])
+}
+
+model CrmDeal {
+  id                String    @id @default(cuid())
+  companyId         String
+  title             String
+  value             Float     @default(0)
+  currency          String    @default("INR")
+  stageId           String
+  stageName         String?
+  customerId        String?
+  leadId            String?   @unique
+  assignedToId      String?
+  expectedCloseDate DateTime?
+  probability       Int       @default(50)
+  status            String    @default("OPEN") // OPEN, WON, LOST
+  lossReason        String?
+  notes             String?
+  customFields      Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  company           Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stage             CrmStage      @relation(fields: [stageId], references: [id])
+  customer          Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lead              CrmLead?      @relation("ConvertedFromLead", fields: [leadId], references: [id], onDelete: SetNull)
+  assignedTo        User?         @relation("AssignedDeals", fields: [assignedToId], references: [id], onDelete: SetNull)
+  activities        CrmActivity[]
+
+  @@index([companyId])
+  @@index([stageId])
+  @@index([customerId])
+  @@index([assignedToId])
+  @@index([status])
+}
+
+model CrmActivity {
+  id           String    @id @default(cuid())
+  companyId    String
+  type         String    @default("TASK") // CALL, EMAIL, MEETING, NOTE, TASK
+  title        String
+  description  String?
+  status       String    @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  dueDate      DateTime?
+  completedAt  DateTime?
+  assignedToId String?
+  customerId   String?
+  dealId       String?
+  leadId       String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignedTo   User?     @relation("AssignedActivities", fields: [assignedToId], references: [id], onDelete: SetNull)
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  deal         CrmDeal?  @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  lead         CrmLead?  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([assignedToId])
+  @@index([customerId])
+  @@index([dealId])
+  @@index([leadId])
+  @@index([status])
+}
+
+model CrmCampaign {
+  id             String    @id @default(cuid())
+  companyId      String
+  name           String
+  type           String    @default("EMAIL") // EMAIL, NEWSLETTER, PRODUCT_ANNOUNCEMENT, NURTURE
+  status         String    @default("DRAFT") // DRAFT, SCHEDULED, ACTIVE, COMPLETED, PAUSED
+  subject        String?
+  content        String?
+  targetAudience String?   @default("ALL_LEADS") // ALL_LEADS, QUALIFIED_LEADS, EXISTING_CUSTOMERS
+  sentCount      Int       @default(0)
+  openCount      Int       @default(0)
+  clickCount     Int       @default(0)
+  scheduledAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model CrmWorkflow {
+  id             String    @id @default(cuid())
+  companyId      String
+  name           String
+  description    String?
+  triggerType    String    // LEAD_CREATED, LEAD_STATUS_CHANGED, DEAL_STAGE_CHANGED, DEAL_WON, ACTIVITY_OVERDUE, MANUAL
+  triggerConfig  Json?
+  conditions     Json      @default("[]") // Array of { field, operator, value }
+  actions        Json      @default("[]") // Array of { actionType, config }
+  isActive       Boolean   @default(true)
+  isDraft        Boolean   @default(false)
+  executionCount Int       @default(0)
+  lastExecutedAt DateTime?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy      User?            @relation("CreatedWorkflows", fields: [createdById], references: [id], onDelete: SetNull)
+  logs           CrmWorkflowLog[]
+
+  @@index([companyId])
+  @@index([isActive])
+}
+
+model CrmWorkflowLog {
+  id              String      @id @default(cuid())
+  workflowId      String
+  companyId       String
+  entityType      String      // LEAD, DEAL, CUSTOMER, ACTIVITY
+  entityId        String
+  status          String      // SUCCESS, FAILED, SKIPPED
+  actionsExecuted Json
+  error           String?
+  executedAt      DateTime    @default(now())
+
+  workflow        CrmWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  company         Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([companyId])
+  @@index([executedAt])
+}
+
 
