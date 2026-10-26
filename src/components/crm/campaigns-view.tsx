@@ -17,6 +17,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Megaphone,
   Plus,
   Send,
@@ -36,9 +43,17 @@ import {
   Rocket,
   FileText,
   AlertCircle,
+  Edit3,
+  MoreVertical,
+  AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
-import { createCrmCampaign, launchCrmCampaign, deleteCrmCampaign } from "@/actions/crm"
+import {
+  createCrmCampaign,
+  updateCrmCampaign,
+  launchCrmCampaign,
+  deleteCrmCampaign,
+} from "@/actions/crm"
 import Link from "next/link"
 
 interface AudienceCounts {
@@ -82,10 +97,13 @@ export function CampaignsView({
 }: CampaignsViewProps) {
   const router = useRouter()
   const [openModal, setOpenModal] = React.useState(false)
+  const [isEditingId, setIsEditingId] = React.useState<string | null>(null)
   const [isLaunchImmediate, setIsLaunchImmediate] = React.useState(true)
   const [loading, setLoading] = React.useState(false)
+  const [deleting, setDeleting] = React.useState(false)
   const [launchingId, setLaunchingId] = React.useState<string | null>(null)
   const [previewCampaign, setPreviewCampaign] = React.useState<any | null>(null)
+  const [campaignToDelete, setCampaignToDelete] = React.useState<any | null>(null)
 
   const [form, setForm] = React.useState({
     name: "",
@@ -101,18 +119,42 @@ export function CampaignsView({
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search)
       if (params.get("action") === "launch" || params.get("action") === "new") {
-        setIsLaunchImmediate(true)
-        setOpenModal(true)
+        handleOpenCreate(true)
       }
     }
   }, [])
 
-  const handleOpenModal = (launchNow: boolean) => {
+  const handleOpenCreate = (launchNow: boolean) => {
+    setIsEditingId(null)
+    setForm({
+      name: "",
+      type: "EMAIL",
+      subject: "",
+      targetAudience: "QUALIFIED_LEADS",
+      content: "",
+      scheduledAt: "",
+    })
     setIsLaunchImmediate(launchNow)
     setOpenModal(true)
   }
 
+  const handleStartEdit = (camp: any) => {
+    setIsEditingId(camp.id)
+    setForm({
+      name: camp.name || "",
+      type: camp.type || "EMAIL",
+      subject: camp.subject || "",
+      targetAudience: camp.targetAudience || "QUALIFIED_LEADS",
+      content: camp.content || "",
+      scheduledAt: camp.scheduledAt ? new Date(camp.scheduledAt).toISOString().slice(0, 16) : "",
+    })
+    setIsLaunchImmediate(false)
+    setPreviewCampaign(null)
+    setOpenModal(true)
+  }
+
   const handleApplyTemplate = (tmpl: typeof STARTER_TEMPLATES[0]) => {
+    setIsEditingId(null)
     setForm({
       name: tmpl.name,
       type: "EMAIL",
@@ -133,22 +175,42 @@ export function CampaignsView({
 
     setLoading(true)
     try {
-      const res = await createCrmCampaign(form)
-      if (res.error) throw new Error(res.error)
+      if (isEditingId) {
+        // Update existing campaign
+        const res = await updateCrmCampaign(isEditingId, form)
+        if (res.error) throw new Error(res.error)
 
-      if (launchImmediately && res.campaign?.id) {
-        toast.info("Campaign created! Dispatching broadcast to audience...")
-        const launchRes = await launchCrmCampaign(res.campaign.id)
-        if (launchRes.error) {
-          toast.warning(`Campaign saved, but broadcast had an issue: ${launchRes.error}`)
+        if (launchImmediately) {
+          toast.info("Changes saved! Dispatching broadcast outreach...")
+          const launchRes = await launchCrmCampaign(isEditingId)
+          if (launchRes.error) {
+            toast.warning(`Campaign updated, but dispatch returned: ${launchRes.error}`)
+          } else {
+            toast.success(`🚀 Broadcast dispatched successfully to ${launchRes.sentCount} recipients!`)
+          }
         } else {
-          toast.success(`🚀 Broadcast dispatched successfully to ${launchRes.sentCount} recipients!`)
+          toast.success("Campaign updated successfully!")
         }
       } else {
-        toast.success("Campaign sequence saved as draft!")
+        // Create new campaign
+        const res = await createCrmCampaign(form)
+        if (res.error) throw new Error(res.error)
+
+        if (launchImmediately && res.campaign?.id) {
+          toast.info("Campaign created! Dispatching broadcast outreach...")
+          const launchRes = await launchCrmCampaign(res.campaign.id)
+          if (launchRes.error) {
+            toast.warning(`Campaign saved, but broadcast had an issue: ${launchRes.error}`)
+          } else {
+            toast.success(`🚀 Broadcast dispatched successfully to ${launchRes.sentCount} recipients!`)
+          }
+        } else {
+          toast.success("Campaign saved as draft!")
+        }
       }
 
       setOpenModal(false)
+      setIsEditingId(null)
       setForm({ name: "", type: "EMAIL", subject: "", targetAudience: "QUALIFIED_LEADS", content: "", scheduledAt: "" })
       router.refresh()
     } catch (err: any) {
@@ -179,17 +241,22 @@ export function CampaignsView({
     }
   }
 
-  const handleDelete = async (campaignId: string) => {
+  const handleConfirmDelete = async () => {
+    if (!campaignToDelete) return
+    setDeleting(true)
     try {
-      const res = await deleteCrmCampaign(campaignId)
+      const res = await deleteCrmCampaign(campaignToDelete.id)
       if (res.error) throw new Error(res.error)
-      toast.success("Campaign removed")
-      if (previewCampaign?.id === campaignId) {
+      toast.success(`Campaign "${campaignToDelete.name}" deleted`)
+      if (previewCampaign?.id === campaignToDelete.id) {
         setPreviewCampaign(null)
       }
+      setCampaignToDelete(null)
       router.refresh()
     } catch (err: any) {
       toast.error(err.message || "Failed to delete campaign")
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -225,7 +292,7 @@ export function CampaignsView({
             </Button>
           </Link>
           <Button
-            onClick={() => handleOpenModal(false)}
+            onClick={() => handleOpenCreate(false)}
             variant="outline"
             size="sm"
             className="h-9 gap-1.5 glass border-white/10 text-xs text-muted-foreground hover:text-foreground"
@@ -234,7 +301,7 @@ export function CampaignsView({
             <span>New Draft</span>
           </Button>
           <Button
-            onClick={() => handleOpenModal(true)}
+            onClick={() => handleOpenCreate(true)}
             size="sm"
             className="h-9 gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-500/20"
           >
@@ -300,14 +367,14 @@ export function CampaignsView({
 
               <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
                 <Button
-                  onClick={() => handleOpenModal(true)}
+                  onClick={() => handleOpenCreate(true)}
                   className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold gap-2 px-4 shadow-lg shadow-emerald-500/20"
                 >
                   <Send className="h-3.5 w-3.5" />
                   <span>Launch & Send Broadcast</span>
                 </Button>
                 <Button
-                  onClick={() => handleOpenModal(false)}
+                  onClick={() => handleOpenCreate(false)}
                   variant="outline"
                   className="glass border-white/10 text-xs"
                 >
@@ -361,7 +428,6 @@ export function CampaignsView({
         /* ── Campaigns Grid ── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {initialCampaigns.map((camp) => {
-            const hasDispatched = Boolean(camp.sentCount && camp.sentCount > 0)
             const targetCount =
               camp.targetAudience === "QUALIFIED_LEADS"
                 ? audienceCounts.QUALIFIED_LEADS
@@ -385,7 +451,7 @@ export function CampaignsView({
                       </CardDescription>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5">
                       <Badge
                         variant="outline"
                         className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
@@ -398,15 +464,45 @@ export function CampaignsView({
                       >
                         {camp.status}
                       </Badge>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleDelete(camp.id)}
-                        className="h-7 w-7 text-muted-foreground hover:text-red-400"
-                        title="Delete campaign"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+
+                      {/* Dropdown Menu for Edit / Delete / Preview */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="h-7 w-7 rounded-lg inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors">
+                          <MoreVertical className="h-3.5 w-3.5" />
+                          <span className="sr-only">Campaign options</span>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44 glass border-white/10 p-1 rounded-xl">
+                          <DropdownMenuItem
+                            onClick={() => handleStartEdit(camp)}
+                            className="text-xs flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded-lg p-2"
+                          >
+                            <Edit3 className="h-3.5 w-3.5 text-blue-400" />
+                            <span>Edit Campaign</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setPreviewCampaign(camp)}
+                            className="text-xs flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded-lg p-2"
+                          >
+                            <Eye className="h-3.5 w-3.5 text-teal-400" />
+                            <span>Preview Details</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleLaunch(camp.id)}
+                            className="text-xs flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded-lg p-2 text-emerald-400"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            <span>Launch Broadcast</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-white/10" />
+                          <DropdownMenuItem
+                            onClick={() => setCampaignToDelete(camp)}
+                            className="text-xs flex items-center gap-2 cursor-pointer hover:bg-red-500/10 text-red-400 rounded-lg p-2"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Delete Campaign</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardHeader>
@@ -447,23 +543,14 @@ export function CampaignsView({
                     </div>
                   </div>
 
-                  {/* Actions: Launch & Send Broadcast & Preview */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPreviewCampaign(camp)}
-                      className="h-8 text-xs glass border-white/10 hover:bg-white/10"
-                      title="Preview campaign"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-
+                  {/* Primary & Secondary Action Row with visible Edit and Delete buttons */}
+                  <div className="space-y-2 pt-1">
+                    {/* Launch CTA */}
                     <Button
                       onClick={() => handleLaunch(camp.id)}
                       disabled={launchingId === camp.id}
                       size="sm"
-                      className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs gap-1.5 h-8 font-bold shadow-md shadow-emerald-500/20"
+                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs gap-1.5 h-8 font-bold shadow-md shadow-emerald-500/20"
                     >
                       {launchingId === camp.id ? (
                         <>
@@ -477,6 +564,40 @@ export function CampaignsView({
                         </>
                       )}
                     </Button>
+
+                    {/* Secondary Actions: Edit, Preview, Delete */}
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleStartEdit(camp)}
+                        className="h-7 text-xs glass border-white/10 hover:bg-white/10 hover:text-blue-400 gap-1 px-2"
+                        title="Edit campaign"
+                      >
+                        <Edit3 className="h-3 w-3" />
+                        <span>Edit</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPreviewCampaign(camp)}
+                        className="h-7 text-xs glass border-white/10 hover:bg-white/10 hover:text-teal-400 gap-1 px-2"
+                        title="Preview details"
+                      >
+                        <Eye className="h-3 w-3" />
+                        <span>Preview</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCampaignToDelete(camp)}
+                        className="h-7 text-xs glass border-white/10 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 gap-1 px-2 text-muted-foreground"
+                        title="Delete campaign"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        <span>Delete</span>
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -485,18 +606,24 @@ export function CampaignsView({
         </div>
       )}
 
-      {/* ── Create / Launch Campaign Modal ── */}
+      {/* ── Create / Edit Campaign Modal ── */}
       <Dialog open={openModal} onOpenChange={setOpenModal}>
         <DialogContent className="sm:max-w-lg glass border-white/10 rounded-2xl p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-bold text-foreground">
               <div className="h-7 w-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                <Send className="h-4 w-4" />
+                {isEditingId ? <Edit3 className="h-4 w-4 text-blue-400" /> : <Send className="h-4 w-4" />}
               </div>
-              {isLaunchImmediate ? "Launch & Send Broadcast" : "Create Campaign Draft"}
+              {isEditingId
+                ? "Edit Campaign Details"
+                : isLaunchImmediate
+                ? "Launch & Send Broadcast"
+                : "Create Campaign Draft"}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Configure targeted messaging and dispatch directly to leads or customers.
+              {isEditingId
+                ? "Update campaign message, audience targeting, or schedule settings."
+                : "Configure targeted messaging and dispatch directly to leads or customers."}
             </DialogDescription>
           </DialogHeader>
 
@@ -578,7 +705,7 @@ export function CampaignsView({
                 type="button"
                 variant="ghost"
                 onClick={() => setOpenModal(false)}
-                className="text-xs order-2 sm:order-1"
+                className="text-xs order-3 sm:order-1"
               >
                 Cancel
               </Button>
@@ -587,9 +714,9 @@ export function CampaignsView({
                 variant="outline"
                 disabled={loading}
                 onClick={() => handleSaveOrLaunch(false)}
-                className="text-xs glass border-white/10 order-3 sm:order-2"
+                className="text-xs glass border-white/10 order-2 sm:order-2"
               >
-                Save as Draft
+                {isEditingId ? "Save Changes" : "Save as Draft"}
               </Button>
               <Button
                 type="button"
@@ -605,7 +732,7 @@ export function CampaignsView({
                 ) : (
                   <>
                     <Send className="h-3.5 w-3.5 mr-1" />
-                    <span>Launch & Send Broadcast</span>
+                    <span>{isEditingId ? "Save & Launch Broadcast" : "Launch & Send Broadcast"}</span>
                   </>
                 )}
               </Button>
@@ -623,9 +750,37 @@ export function CampaignsView({
                 <DialogTitle className="text-base font-bold text-foreground">
                   {previewCampaign.name}
                 </DialogTitle>
-                <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400">
-                  {previewCampaign.status}
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400">
+                    {previewCampaign.status}
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      const toEdit = previewCampaign
+                      setPreviewCampaign(null)
+                      handleStartEdit(toEdit)
+                    }}
+                    className="h-7 px-2 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 gap-1"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                    <span>Edit</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      const toDel = previewCampaign
+                      setPreviewCampaign(null)
+                      setCampaignToDelete(toDel)
+                    }}
+                    className="h-7 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 gap-1"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    <span>Delete</span>
+                  </Button>
+                </div>
               </div>
               <DialogDescription className="text-xs text-muted-foreground">
                 Audience: <strong>{previewCampaign.targetAudience.replace(/_/g, " ")}</strong>
@@ -670,14 +825,29 @@ export function CampaignsView({
               </div>
             </div>
 
-            <DialogFooter className="flex flex-col sm:flex-row gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => setPreviewCampaign(null)}
-                className="text-xs"
-              >
-                Close
-              </Button>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 justify-between">
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => setPreviewCampaign(null)}
+                  className="text-xs"
+                >
+                  Close
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const toEdit = previewCampaign
+                    setPreviewCampaign(null)
+                    handleStartEdit(toEdit)
+                  }}
+                  className="text-xs glass border-white/10 text-blue-400 hover:text-blue-300 gap-1.5"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  <span>Edit Campaign</span>
+                </Button>
+              </div>
+
               <Button
                 onClick={() => handleLaunch(previewCampaign.id)}
                 disabled={launchingId === previewCampaign.id}
@@ -699,6 +869,51 @@ export function CampaignsView({
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ── Confirm Delete Modal ── */}
+      <Dialog open={Boolean(campaignToDelete)} onOpenChange={(open) => !open && setCampaignToDelete(null)}>
+        <DialogContent className="sm:max-w-md glass border-white/10 rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-red-400">
+              <AlertTriangle className="h-5 w-5 text-red-400" />
+              Delete Campaign
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Are you sure you want to delete{" "}
+              <strong className="text-foreground font-semibold">"{campaignToDelete?.name}"</strong>?
+              This action cannot be undone and will remove all delivery stats for this campaign.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="pt-3 flex flex-row gap-2 justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => setCampaignToDelete(null)}
+              disabled={deleting}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold gap-1.5 shadow-md shadow-red-500/20"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Deleting...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Yes, Delete Campaign</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

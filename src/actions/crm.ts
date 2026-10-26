@@ -1066,6 +1066,41 @@ export async function launchCrmCampaign(campaignId: string) {
   }
 }
 
+export async function updateCrmCampaign(
+  campaignId: string,
+  input: {
+    name?: string
+    type?: string
+    subject?: string
+    content?: string
+    targetAudience?: string
+    status?: string
+    scheduledAt?: string | null
+  }
+) {
+  try {
+    const { companyId, db } = await requireUserAndTenant()
+    const campaign = await db.crmCampaign.update({
+      where: { id: campaignId, companyId },
+      data: {
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.type !== undefined && { type: input.type }),
+        ...(input.subject !== undefined && { subject: input.subject }),
+        ...(input.content !== undefined && { content: input.content }),
+        ...(input.targetAudience !== undefined && { targetAudience: input.targetAudience }),
+        ...(input.status !== undefined && { status: input.status }),
+        ...(input.scheduledAt !== undefined && {
+          scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
+        }),
+      },
+    })
+    revalidatePath("/crm/campaigns")
+    return { success: true, campaign }
+  } catch (error: any) {
+    return { error: error.message || "Failed to update campaign." }
+  }
+}
+
 export async function deleteCrmCampaign(campaignId: string) {
   try {
     const { companyId, db } = await requireUserAndTenant()
