@@ -272,3 +272,20 @@ export async function runRecurringScheduleNow(invoiceId: string) {
   }
 }
 
+export async function getCronSetupInfo() {
+  try {
+    const { company } = await requireCompany()
+    const cronSecret = process.env.CRON_SECRET || ""
+    return {
+      success: true,
+      hasCronSecret: Boolean(cronSecret),
+      cronSecret,
+      endpointPath: "/api/cron/recurring",
+      companyName: company.name,
+    }
+  } catch (err: any) {
+    return { error: err?.message || "Failed to load cron setup information" }
+  }
+}
+
+
