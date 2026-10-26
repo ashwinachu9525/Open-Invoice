@@ -51,6 +51,31 @@ describe("Email Templates Service", () => {
       expect(html).toContain("Hello world!")
       expect(html).toContain("Sent via")
     })
+
+    it("displays 'Open Invoice' in copyright footer when showCompanyInEmailFooter is false", () => {
+      const currentYear = new Date().getFullYear()
+      const html = buildModernEmailShell({
+        title: "Test Notification",
+        companyName: "Acme Client Corp",
+        contentHtml: "<p>Hello</p>",
+        showCompanyInEmailFooter: false,
+      })
+
+      expect(html).toContain(`&copy; ${currentYear} Open Invoice. All rights reserved.`)
+      expect(html).not.toContain(`&copy; ${currentYear} Acme Client Corp. All rights reserved.`)
+    })
+
+    it("displays Company Name in copyright footer when showCompanyInEmailFooter is true", () => {
+      const currentYear = new Date().getFullYear()
+      const html = buildModernEmailShell({
+        title: "Test Notification",
+        companyName: "Acme Client Corp",
+        contentHtml: "<p>Hello</p>",
+        showCompanyInEmailFooter: true,
+      })
+
+      expect(html).toContain(`&copy; ${currentYear} Acme Client Corp. All rights reserved.`)
+    })
   })
 
   describe("buildModernInvoiceEmailHtml", () => {
@@ -125,6 +150,39 @@ describe("Email Templates Service", () => {
       expect(html).toContain("TOTAL PAID")
       expect(html).toContain("Paid in Full")
       expect(html).toContain("View Invoice Details")
+    })
+
+    it("respects showCompanyInEmailFooter configuration in invoice emails", () => {
+      const currentYear = new Date().getFullYear()
+
+      // Default: OFF -> shows Open Invoice
+      const htmlOff = buildModernInvoiceEmailHtml({
+        invoice: {
+          id: "inv-1",
+          invoiceNumber: "INV-001",
+          date: new Date(),
+          dueDate: new Date(),
+          finalAmount: 1000,
+        },
+        company: { name: "Client Corp XYZ", showCompanyInEmailFooter: false },
+        customer: { name: "Customer 1" },
+      })
+      expect(htmlOff).toContain(`&copy; ${currentYear} Open Invoice. All rights reserved.`)
+      expect(htmlOff).not.toContain(`&copy; ${currentYear} Client Corp XYZ. All rights reserved.`)
+
+      // Enabled: ON -> shows Client Corp XYZ
+      const htmlOn = buildModernInvoiceEmailHtml({
+        invoice: {
+          id: "inv-2",
+          invoiceNumber: "INV-002",
+          date: new Date(),
+          dueDate: new Date(),
+          finalAmount: 2000,
+        },
+        company: { name: "Client Corp XYZ", showCompanyInEmailFooter: true },
+        customer: { name: "Customer 2" },
+      })
+      expect(htmlOn).toContain(`&copy; ${currentYear} Client Corp XYZ. All rights reserved.`)
     })
   })
 

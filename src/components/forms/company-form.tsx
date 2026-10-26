@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { companySchema, CompanyFormValues } from "@/validations/company"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import {
   Form,
@@ -71,6 +72,7 @@ export function CompanyForm({ initialData }: { initialData: any }) {
       razorpayWebhookSecret: initialData?.razorpayWebhookSecret || "",
       customDomain: initialData?.customDomain || "",
       removeWatermark: initialData?.removeWatermark ?? false,
+      showCompanyInEmailFooter: initialData?.showCompanyInEmailFooter ?? false,
     },
   })
 
@@ -668,6 +670,56 @@ export function CompanyForm({ initialData }: { initialData: any }) {
                     }
                   </FormDescription>
                   <FormMessage />
+                </FormItem>
+              )
+            }}
+          />
+        </div>
+
+        {/* Email Footer Branding Configuration */}
+        <div className="border-t border-white/5 pt-6 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Email Template Footer Branding</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Control how your organization or client name is presented in the copyright line of outbound email templates (invoices, quotations, and marketing campaigns).</p>
+          </div>
+
+          <FormField
+            control={form.control}
+            name="showCompanyInEmailFooter"
+            render={({ field }) => {
+              const companyName = form.watch("name") || initialData?.name || "Company"
+              const currentYear = new Date().getFullYear()
+              const isEnabled = Boolean(field.value)
+
+              return (
+                <FormItem className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-white/10 p-4 bg-white/2 gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <FormLabel className="text-sm font-bold text-foreground cursor-pointer">
+                        Show Company Name in Email Footer
+                      </FormLabel>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${isEnabled ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-slate-500/10 text-slate-400 border-slate-500/20"}`}>
+                        {isEnabled ? "ON" : "OFF"}
+                      </span>
+                    </div>
+                    <FormDescription className="text-xs text-muted-foreground">
+                      {isEnabled
+                        ? `When enabled, footers show © ${currentYear} ${companyName}. All rights reserved.`
+                        : `When disabled, footers show © ${currentYear} Open Invoice. All rights reserved.`}
+                    </FormDescription>
+                    <div className="text-[11px] text-slate-400 font-mono mt-1 pt-1 border-t border-white/5">
+                      Copyright Line Preview:{" "}
+                      <span className={isEnabled ? "text-emerald-400 font-semibold" : "text-indigo-400 font-semibold"}>
+                        &copy; {currentYear} {isEnabled ? companyName : "Open Invoice"}. All rights reserved.
+                      </span>
+                    </div>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={Boolean(field.value)}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )
             }}

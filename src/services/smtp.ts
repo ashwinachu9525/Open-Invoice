@@ -25,6 +25,7 @@ export function buildEmailLayout(
     badgeText?: string
     badgeColor?: "indigo" | "emerald" | "amber" | "rose" | "slate"
     companyName?: string
+    showCompanyInEmailFooter?: boolean | null
   }
 ) {
   const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
@@ -34,6 +35,7 @@ export function buildEmailLayout(
     badgeColor: options?.badgeColor || "indigo",
     companyName: options?.companyName || appName,
     appName,
+    showCompanyInEmailFooter: Boolean(options?.showCompanyInEmailFooter),
     contentHtml: `
       <h1 style="margin: 0 0 20px 0; font-size: 22px; font-weight: 800; color: #0f172a; text-align: center; letter-spacing: -0.3px;">
         ${escapeHtml(title)}
@@ -309,9 +311,15 @@ export async function sendInvoiceEmail(params: {
   invoiceId?: string
 }) {
   const transporter = await getEmailTransporter(params.companyId)
-  const settings = await prisma.emailSetting.findUnique({
-    where: { companyId: params.companyId },
-  })
+  const [settings, company] = await Promise.all([
+    prisma.emailSetting.findUnique({
+      where: { companyId: params.companyId },
+    }),
+    prisma.company.findUnique({
+      where: { id: params.companyId },
+      select: { name: true, showCompanyInEmailFooter: true },
+    }),
+  ])
   if (!transporter || !settings) throw new Error("SMTP not configured")
 
   let status = "sent"
@@ -324,6 +332,7 @@ export async function sendInvoiceEmail(params: {
       badgeText: "INVOICE",
       badgeColor: "indigo",
       companyName: settings.fromName || undefined,
+      showCompanyInEmailFooter: company?.showCompanyInEmailFooter ?? false,
     })
   }
 
@@ -365,9 +374,15 @@ export async function sendQuotationEmail(params: {
   quotationId?: string
 }) {
   const transporter = await getEmailTransporter(params.companyId)
-  const settings = await prisma.emailSetting.findUnique({
-    where: { companyId: params.companyId },
-  })
+  const [settings, company] = await Promise.all([
+    prisma.emailSetting.findUnique({
+      where: { companyId: params.companyId },
+    }),
+    prisma.company.findUnique({
+      where: { id: params.companyId },
+      select: { name: true, showCompanyInEmailFooter: true },
+    }),
+  ])
   if (!transporter || !settings) throw new Error("SMTP not configured")
 
   let status = "sent"
@@ -380,6 +395,7 @@ export async function sendQuotationEmail(params: {
       badgeText: "QUOTATION",
       badgeColor: "indigo",
       companyName: settings.fromName || undefined,
+      showCompanyInEmailFooter: company?.showCompanyInEmailFooter ?? false,
     })
   }
 
@@ -435,9 +451,15 @@ export async function sendCrmCampaignEmail(params: {
   const resolvedTargetUrl = rawButtonUrl && rawButtonUrl.length > 0 ? rawButtonUrl : appUrl
   const resolvedButtonText = rawButtonText
 
-  const settings = await prisma.emailSetting.findUnique({
-    where: { companyId: params.companyId },
-  })
+  const [settings, company] = await Promise.all([
+    prisma.emailSetting.findUnique({
+      where: { companyId: params.companyId },
+    }),
+    prisma.company.findUnique({
+      where: { id: params.companyId },
+      select: { name: true, showCompanyInEmailFooter: true },
+    }),
+  ])
 
   let transporter: nodemailer.Transporter | null = null
   let from = ""
@@ -534,7 +556,7 @@ export async function sendCrmCampaignEmail(params: {
 
   // Format HTML body with Modern Template, Dynamic CTA Button, and Open Tracking Pixel
   const formattedHtml = buildModernCampaignEmailHtml({
-    companyName: settings?.fromName || appName,
+    companyName: settings?.fromName || company?.name || appName,
     subject: params.subject,
     content: params.content,
     recipientName: params.recipientName,
@@ -542,6 +564,7 @@ export async function sendCrmCampaignEmail(params: {
     clickTrackingUrl: resolvedButtonText ? clickTrackingUrl : null,
     openTrackingUrl,
     appName,
+    showCompanyInEmailFooter: company?.showCompanyInEmailFooter ?? false,
   })
 
   try {

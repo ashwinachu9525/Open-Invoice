@@ -23,6 +23,7 @@ export const companySchema = z.object({
   razorpayKeySecret: z.string().optional().nullable(),
   razorpayWebhookSecret: z.string().optional().nullable(),
   removeWatermark: z.boolean().optional(),
+  showCompanyInEmailFooter: z.boolean().optional(),
   customDomain: z.string()
     .transform(val => val?.trim().toLowerCase())
     .refine(val => !val || /^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(:[0-9]{1,5})?$/.test(val), {

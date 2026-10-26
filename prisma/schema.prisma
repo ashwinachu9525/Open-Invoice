@@ -203,6 +203,7 @@ model Company {
   githubUrl         String?
   
   removeWatermark   Boolean   @default(false)
+  showCompanyInEmailFooter Boolean @default(false)
   customDbUrlEncrypted String?
   trialStartsAt     DateTime?
   trialEndsAt       DateTime?

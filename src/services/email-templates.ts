@@ -60,9 +60,11 @@ export function buildModernEmailShell(params: {
   footerNote?: string
   appName?: string
   appUrl?: string
+  showCompanyInEmailFooter?: boolean
 }): string {
   const appName = params.appName || process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
   const companyName = params.companyName || appName
+  const copyrightHolder = params.showCompanyInEmailFooter ? companyName : appName
   const badgeText = params.badgeText
   const badgeColor = params.badgeColor || "indigo"
 
@@ -233,7 +235,7 @@ export function buildModernEmailShell(params: {
                 Sent via <strong style="color: #64748b;">${escapeHtml(appName)}</strong> &bull; Intelligent Invoicing &amp; CRM Platform
               </p>
               <p style="margin: 0; font-size: 11px; color: #cbd5e1;">
-                &copy; ${new Date().getFullYear()} ${escapeHtml(companyName)}. All rights reserved.
+                &copy; ${new Date().getFullYear()} ${escapeHtml(copyrightHolder)}. All rights reserved.
               </p>
             </td>
           </tr>
@@ -288,6 +290,7 @@ export function buildModernInvoiceEmailHtml(params: {
     website?: string | null
     address?: string | null
     gstNumber?: string | null
+    showCompanyInEmailFooter?: boolean | null
   }
   customer: {
     name: string
@@ -576,6 +579,7 @@ export function buildModernInvoiceEmailHtml(params: {
     contentHtml,
     footerNote: "This invoice email was generated automatically. Please do not reply directly if no sender mailbox is configured.",
     appUrl,
+    showCompanyInEmailFooter: Boolean(company.showCompanyInEmailFooter),
   })
 }
 
@@ -605,6 +609,7 @@ export function buildModernQuotationEmailHtml(params: {
     phone?: string | null
     website?: string | null
     address?: string | null
+    showCompanyInEmailFooter?: boolean | null
   }
   customer: {
     name: string
@@ -792,6 +797,7 @@ export function buildModernQuotationEmailHtml(params: {
     contentHtml,
     footerNote: "This quotation is subject to terms and conditions outlined in the attached proposal.",
     appUrl,
+    showCompanyInEmailFooter: Boolean(company.showCompanyInEmailFooter),
   })
 }
 
@@ -818,6 +824,7 @@ export function buildModernPaymentReceiptEmailHtml(params: {
     logo?: string | null
     email?: string | null
     phone?: string | null
+    showCompanyInEmailFooter?: boolean | null
   }
   customer: {
     name: string
@@ -923,6 +930,7 @@ export function buildModernPaymentReceiptEmailHtml(params: {
     contentHtml,
     footerNote: "Thank you for your business! Please keep this receipt for your financial records.",
     appUrl,
+    showCompanyInEmailFooter: Boolean(company.showCompanyInEmailFooter),
   })
 }
 
@@ -940,6 +948,7 @@ export function buildModernCampaignEmailHtml(params: {
   openTrackingUrl?: string | null
   unsubscribeUrl?: string | null
   appName?: string
+  showCompanyInEmailFooter?: boolean | null
 }): string {
   const appName = params.appName || process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
   const companyName = params.companyName || appName
@@ -1022,5 +1031,6 @@ export function buildModernCampaignEmailHtml(params: {
     contentHtml,
     footerNote: `You are receiving this communication as a valued contact of ${companyName}.`,
     appName,
+    showCompanyInEmailFooter: Boolean(params.showCompanyInEmailFooter),
   })
 }
