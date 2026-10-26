@@ -975,6 +975,97 @@ export async function createCrmCampaign(input: {
   }
 }
 
+export async function launchCrmCampaign(campaignId: string) {
+  try {
+    const { user, companyId, db } = await requireUserAndTenant()
+    const campaign = await db.crmCampaign.findUnique({
+      where: { id: campaignId, companyId }
+    })
+    if (!campaign) return { error: "Campaign not found" }
+
+    // Fetch recipients based on audience
+    let recipients: Array<{ id: string; name: string; email: string; type: "LEAD" | "CUSTOMER" }> = []
+
+    if (campaign.targetAudience === "QUALIFIED_LEADS") {
+      const leads = await db.crmLead.findMany({
+        where: { companyId, status: "QUALIFIED", email: { not: null }, deletedAt: null },
+        select: { id: true, name: true, email: true }
+      })
+      recipients = leads.filter((l: any) => Boolean(l.email)).map((l: any) => ({ ...l, type: "LEAD" }))
+    } else if (campaign.targetAudience === "EXISTING_CUSTOMERS") {
+      const customers = await db.customer.findMany({
+        where: { companyId, email: { not: null }, deletedAt: null },
+        select: { id: true, name: true, email: true }
+      })
+      recipients = customers.filter((c: any) => Boolean(c.email)).map((c: any) => ({ ...c, type: "CUSTOMER" }))
+    } else {
+      // ALL_LEADS (default)
+      const leads = await db.crmLead.findMany({
+        where: { companyId, status: { not: "CONVERTED" }, email: { not: null }, deletedAt: null },
+        select: { id: true, name: true, email: true }
+      })
+      recipients = leads.filter((l: any) => Boolean(l.email)).map((l: any) => ({ ...l, type: "LEAD" }))
+    }
+
+    if (recipients.length === 0) {
+      return { error: `No recipients with valid email addresses found in "${campaign.targetAudience.replace(/_/g, " ")}"` }
+    }
+
+    let sentCount = 0
+    for (const rec of recipients) {
+      try {
+        const personalizedSubject = (campaign.subject || "Outreach").replace(/\{\{name\}\}/gi, rec.name)
+        const personalizedContent = (campaign.content || "").replace(/\{\{name\}\}/gi, rec.name)
+
+        await db.crmActivity.create({
+          data: {
+            companyId,
+            type: "EMAIL",
+            title: `Campaign Outreach: ${personalizedSubject}`,
+            description: personalizedContent,
+            status: "COMPLETED",
+            completedAt: new Date(),
+            assignedToId: user.id,
+            leadId: rec.type === "LEAD" ? rec.id : null,
+            customerId: rec.type === "CUSTOMER" ? rec.id : null,
+          }
+        })
+        sentCount++
+      } catch (sendErr) {
+        console.warn("Failed to dispatch campaign activity:", sendErr)
+      }
+    }
+
+    const updated = await db.crmCampaign.update({
+      where: { id: campaignId },
+      data: {
+        status: "ACTIVE",
+        sentCount: { increment: sentCount },
+      }
+    })
+
+    revalidatePath("/crm/campaigns")
+    revalidatePath("/crm/activities")
+    revalidatePath("/crm/dashboard")
+    return { success: true, campaign: updated, sentCount }
+  } catch (error: any) {
+    return { error: error.message || "Failed to launch campaign." }
+  }
+}
+
+export async function deleteCrmCampaign(campaignId: string) {
+  try {
+    const { companyId, db } = await requireUserAndTenant()
+    await db.crmCampaign.delete({
+      where: { id: campaignId, companyId }
+    })
+    revalidatePath("/crm/campaigns")
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message || "Failed to delete campaign." }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 // Workflow Studio (Visual Trigger → Conditions → Actions)
 // ─────────────────────────────────────────────────────────────
