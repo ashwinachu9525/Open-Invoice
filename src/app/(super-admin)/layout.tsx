@@ -12,7 +12,7 @@ const superAdminNavItems = [
   { href: "/admin/health", label: "Health Check", icon: Activity },
   { href: "/admin/users", label: "Manage Users", icon: Users },
   { href: "/admin/tools", label: "Admin Tools", icon: Wrench },
-  { href: "/admin/import", label: "Bulk Importer", icon: Upload },
+  { href: "/admin/import", label: "Backup & Restore", icon: Database },
   { href: "/admin/sql", label: "SQL Console", icon: Database },
   { href: "/admin/feature-requests", label: "Feature Requests", icon: Zap },
   { href: "/admin/settings", label: "Settings", icon: Settings },

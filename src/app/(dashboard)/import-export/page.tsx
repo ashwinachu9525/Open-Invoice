@@ -6,13 +6,14 @@ import {
   Download, Upload, FileText, Users, Package, FileJson,
   FileCode2, AlertTriangle, CheckCircle2, XCircle,
   ArrowUpDown, ChevronDown, ChevronRight, Eye, Loader2,
-  FileImage, RefreshCw, Sparkles
+  FileImage, RefreshCw, Sparkles, Database
 } from "lucide-react"
 import type { InvoiceImportDraft, ImportResult } from "@/lib/import/types"
 import { CATALOG_CSV_TEMPLATE, CUSTOMER_CSV_TEMPLATE } from "@/lib/import/csv-parser"
+import { BackupRestoreView } from "@/components/backup/backup-restore-view"
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type Tab = "export" | "csv-import" | "legacy-invoice"
+type Tab = "backup-restore" | "export" | "csv-import" | "legacy-invoice"
 type CsvImportType = "catalog" | "customers"
 type ExportFormat = "csv" | "json" | "xml"
 
@@ -700,13 +701,15 @@ export default function ImportExportPage() {
 
       {/* Tab bar */}
       <div className="glass rounded-2xl border border-white/10 overflow-hidden">
-        <div className="flex border-b border-border/40">
+        <div className="flex border-b border-border/40 overflow-x-auto">
+          <TabButton id="backup-restore" active={activeTab === "backup-restore"} onClick={() => setActiveTab("backup-restore")} icon={Database} label="Backup & Restore" description="Complete & modular backup" />
           <TabButton id="export"         active={activeTab === "export"}         onClick={() => setActiveTab("export")}         icon={Download}    label="Export Data"          description="Download CSV, JSON, XML" />
           <TabButton id="csv-import"     active={activeTab === "csv-import"}     onClick={() => setActiveTab("csv-import")}     icon={Upload}      label="Import CSV"           description="Catalog & customer bulk import" />
           <TabButton id="legacy-invoice" active={activeTab === "legacy-invoice"} onClick={() => setActiveTab("legacy-invoice")} icon={Sparkles}    label="Legacy Invoice"       description="OCR, XML & JSON upload" />
         </div>
 
         <div className="p-6">
+          {activeTab === "backup-restore" && <BackupRestoreView />}
           {activeTab === "export"         && <ExportTab />}
           {activeTab === "csv-import"     && <CsvImportTab />}
           {activeTab === "legacy-invoice" && <LegacyInvoiceTab />}

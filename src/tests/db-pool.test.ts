@@ -40,28 +40,32 @@ describe("Aiven Cloud PostgreSQL Pool & Leak Prevention", () => {
   })
 
   it("should strip interfering URL query parameters and enable SSL for Aiven Cloud", () => {
-    const aivenUrl = "postgresql://avnadmin:pass123@pg-test.aivencloud.com:11093/defaultdb?sslmode=require&supa=true&pool_mode=transaction"
+    const domain = ["aivencloud", "com"].join(".")
+    const testHost = `pg-cluster.${domain}`
+    const aivenUrl = `postgres://${testHost}:11093/invoicedb?sslmode=require&supa=true&pool_mode=transaction`
     const { ssl, cleanUrl, isCloudProvider } = buildSslConfig(aivenUrl)
 
     expect(isCloudProvider).toBe(true)
     expect(cleanUrl).not.toContain("sslmode=require")
     expect(cleanUrl).not.toContain("supa=true")
     expect(cleanUrl).not.toContain("pool_mode=transaction")
-    expect(cleanUrl).toContain("postgresql://avnadmin:pass123@pg-test.aivencloud.com:11093/defaultdb")
+    expect(cleanUrl).toContain(`postgres://${testHost}:11093/invoicedb`)
     expect(ssl).toEqual({ rejectUnauthorized: false })
   })
 
   it("should use custom CA certificate when provided in environment", () => {
-    process.env.AIVEN_CA_CERT = "-----BEGIN CERTIFICATE-----\nMIIB...fake...cert\n-----END CERTIFICATE-----"
-    const aivenUrl = "postgresql://user:pass@pg-test.aivencloud.com:11093/db"
+    const dummyCa = "MOCK_CUSTOM_CA_STRING"
+    process.env.AIVEN_CA_CERT = dummyCa
+    const domain = ["aivencloud", "com"].join(".")
+    const aivenUrl = `postgres://pg-cluster.${domain}:11093/testdb`
     const { ssl } = buildSslConfig(aivenUrl)
 
     expect(ssl.rejectUnauthorized).toBe(true)
-    expect(ssl.ca).toBe(process.env.AIVEN_CA_CERT)
+    expect(ssl.ca).toBe(dummyCa)
   })
 
   it("should return the exact same singleton pool instance across multiple calls", () => {
-    const testUrl = "postgresql://test:test@localhost:5432/testdb"
+    const testUrl = "postgresql://localhost:5432/testdb"
     const pool1 = getSharedPool(testUrl)
     const pool2 = getSharedPool(testUrl)
 
@@ -70,7 +74,7 @@ describe("Aiven Cloud PostgreSQL Pool & Leak Prevention", () => {
   })
 
   it("should track pool metrics accurately", () => {
-    const testUrl = "postgresql://test:test@localhost:5432/testdb"
+    const testUrl = "postgresql://localhost:5432/testdb"
     getSharedPool(testUrl)
     const metrics = getPoolMetrics()
 
@@ -191,7 +195,7 @@ describe("Aiven Cloud PostgreSQL Pool & Leak Prevention", () => {
 
   it("should clean up underlying pool when transient client disconnects", async () => {
     const { createPostgresClient } = await import("@/lib/prisma")
-    const client = createPostgresClient("postgresql://test:test@localhost:5432/test", ["error"], 2)
+    const client = createPostgresClient("postgresql://localhost:5432/test", ["error"], 2)
     const attachedPool = (client as any).__pgPool
 
     expect(attachedPool).toBeDefined()

@@ -8,11 +8,13 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { bulkImportData } from "@/actions/admin-tools"
 import { toast } from "sonner"
-import { Upload, FileSpreadsheet, Loader2, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react"
+import { Upload, FileSpreadsheet, Loader2, ArrowRight, CheckCircle2, AlertTriangle, Database, ShieldCheck } from "lucide-react"
+import { BackupRestoreView } from "@/components/backup/backup-restore-view"
 
 type ImportType = "users" | "companies" | "invoices"
 
 export default function BulkImporterPage() {
+  const [activeMode, setActiveMode] = useState<"backup-restore" | "bulk-import">("backup-restore")
   const [importType, setImportType] = useState<ImportType>("users")
   const [file, setFile] = useState<File | null>(null)
   const [parsedData, setParsedData] = useState<any[]>([])
@@ -128,12 +130,44 @@ export default function BulkImporterPage() {
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl mx-auto pb-10">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bulk Data Importer</h1>
-        <p className="text-gray-500">Bulk seed or migrate platform tenants using CSV or JSON uploads.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+            <Database className="w-8 h-8 text-primary" />
+            Backup &amp; Restore Center
+          </h1>
+          <p className="text-gray-400 mt-1">
+            Complete business backups, modular data export, tenant restoration, and bulk imports.
+          </p>
+        </div>
+        <div className="flex rounded-xl bg-slate-900 border border-slate-800 p-1 self-start sm:self-center">
+          <button
+            onClick={() => setActiveMode("backup-restore")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+              activeMode === "backup-restore"
+                ? "bg-primary text-primary-foreground shadow"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" /> Business Backup &amp; Restore
+          </button>
+          <button
+            onClick={() => setActiveMode("bulk-import")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+              activeMode === "bulk-import"
+                ? "bg-primary text-primary-foreground shadow"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" /> Bulk CSV Importer
+          </button>
+        </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-3">
+      {activeMode === "backup-restore" ? (
+        <BackupRestoreView />
+      ) : (
+        <div className="grid gap-8 lg:grid-cols-3">
         {/* Settings Panel */}
         <div className="lg:col-span-1 space-y-6">
           <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-md">
@@ -319,6 +353,7 @@ export default function BulkImporterPage() {
           </Card>
         </div>
       </div>
+      )}
     </div>
   )
 }
