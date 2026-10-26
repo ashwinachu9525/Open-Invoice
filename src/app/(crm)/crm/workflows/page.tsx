@@ -1,6 +1,8 @@
 import { getCrmWorkflows } from "@/actions/crm"
 import { WorkflowStudio } from "@/components/crm/workflow-studio"
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "Workflow Studio | Visual CRM Automation",
   description: "Visual Trigger ➔ Conditions ➔ Actions builder for sales processes.",

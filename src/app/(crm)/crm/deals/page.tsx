@@ -1,6 +1,8 @@
 import { getCrmPipeline } from "@/actions/crm"
 import { DealsPipelineView } from "@/components/crm/deals-pipeline-view"
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "Deals & Sales Pipeline | CRM Suite",
   description: "Custom sales stages, deal values, probability weighting, and revenue forecasts.",

@@ -131,7 +131,6 @@ if (
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma
-  globalForPrisma.prismaProvider = currentProvider
-}
+// Persist prisma singleton on globalThis across all environments (including warm serverless lambdas)
+globalForPrisma.prisma = prisma
+globalForPrisma.prismaProvider = currentProvider

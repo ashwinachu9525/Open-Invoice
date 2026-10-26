@@ -1,6 +1,8 @@
 import { getCrmPipeline } from "@/actions/crm"
 import { CrmSettingsView } from "@/components/crm/crm-settings-view"
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "CRM Settings | Pipeline Stages & Rules",
   description: "Configure custom stages, probability weighting, and automation rules.",

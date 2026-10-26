@@ -11,6 +11,22 @@ async function requireUserAndTenant() {
   if (!session?.user?.id) {
     throw new Error("Unauthorized: Please sign in.")
   }
+  const companyId = session.user.companyId
+  if (companyId) {
+    const db = await getTenantDb(companyId)
+    return {
+      user: {
+        id: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+        role: session.user.role,
+        companyId,
+      },
+      companyId,
+      db,
+    }
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     include: { company: true }

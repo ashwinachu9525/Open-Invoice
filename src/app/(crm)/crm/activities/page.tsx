@@ -1,6 +1,8 @@
 import { getCrmActivities } from "@/actions/crm"
 import { ActivitiesView } from "@/components/crm/activities-view"
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "Activities & Tasks | CRM Suite",
   description: "Schedule, log and complete calls, meetings, emails, and follow-up tasks.",

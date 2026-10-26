@@ -17,10 +17,9 @@ const globalForTenantClients = globalThis as unknown as {
 const tenantClientsCache = globalForTenantClients.tenantClientsCache ?? new Map<string, CachedTenantClient>()
 const scopedClientsCache = globalForTenantClients.scopedClientsCache ?? new Map<string, any>()
 
-if (process.env.NODE_ENV !== "production") {
-  globalForTenantClients.tenantClientsCache = tenantClientsCache
-  globalForTenantClients.scopedClientsCache = scopedClientsCache
-}
+// Persist caches across warm lambda invocations and dev reloads
+globalForTenantClients.tenantClientsCache = tenantClientsCache
+globalForTenantClients.scopedClientsCache = scopedClientsCache
 
 // Instantiate or retrieve a cached client for a custom database URL
 function getOrCreateCustomClient(companyId: string, url: string): PrismaClient {
@@ -116,6 +115,13 @@ const MODEL_DATE_FIELDS: Record<string, { hasCreatedAt: boolean; hasUpdatedAt: b
   PasswordResetToken: { hasCreatedAt: true, hasUpdatedAt: false },
   SystemConfig: { hasCreatedAt: false, hasUpdatedAt: true },
   ExchangeRate: { hasCreatedAt: false, hasUpdatedAt: true },
+  CrmLead: { hasCreatedAt: true, hasUpdatedAt: true },
+  CrmDeal: { hasCreatedAt: true, hasUpdatedAt: true },
+  CrmStage: { hasCreatedAt: true, hasUpdatedAt: true },
+  CrmActivity: { hasCreatedAt: true, hasUpdatedAt: true },
+  CrmCampaign: { hasCreatedAt: true, hasUpdatedAt: true },
+  CrmWorkflow: { hasCreatedAt: true, hasUpdatedAt: true },
+  CrmWorkflowLog: { hasCreatedAt: true, hasUpdatedAt: false },
 }
 
 // Extends a PrismaClient to automatically scope all data operations to a specific companyId

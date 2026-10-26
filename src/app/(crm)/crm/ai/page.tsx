@@ -1,5 +1,7 @@
 import { CrmAiChat } from "@/components/crm/crm-ai-chat"
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "CRM AI Copilot | Safe Natural Language Automation",
   description: "Ask questions, detect stalled deals, and generate automated workflows in plain English.",

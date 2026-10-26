@@ -19,6 +19,8 @@ import {
   UserCheck,
 } from "lucide-react"
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "CRM Dashboard | Sales & Pipeline Overview",
   description: "Sales overview, pipeline KPIs, task schedule, and recent activity.",

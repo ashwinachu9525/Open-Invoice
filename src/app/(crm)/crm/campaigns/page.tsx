@@ -1,6 +1,8 @@
 import { getCrmCampaigns } from "@/actions/crm"
 import { CampaignsView } from "@/components/crm/campaigns-view"
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "Email Campaigns & Lead Nurturing | CRM Suite",
   description: "Create targeted outreach campaigns and lead nurturing sequences.",

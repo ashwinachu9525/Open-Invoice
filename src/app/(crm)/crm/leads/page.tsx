@@ -1,5 +1,8 @@
 import { getLeads } from "@/actions/crm"
 import { LeadsView } from "@/components/crm/leads-view"
+import { AlertCircle } from "lucide-react"
+
+export const dynamic = "force-dynamic"
 
 export const metadata = {
   title: "Leads Management | CRM Suite",
@@ -20,6 +23,13 @@ export default async function LeadsPage() {
           </p>
         </div>
       </div>
+
+      {result.error && (
+        <div className="p-4 rounded-xl border border-destructive/20 bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{result.error}</span>
+        </div>
+      )}
 
       <LeadsView initialLeads={leads} />
     </div>

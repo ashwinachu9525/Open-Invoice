@@ -1,6 +1,8 @@
 import { getCrmReportsData } from "@/actions/crm"
 import { ReportsView } from "@/components/crm/reports-view"
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "CRM Analytics & Forecasts | CRM Suite",
   description: "Sales conversion rates, representative leaderboard, and weighted pipeline forecasts.",

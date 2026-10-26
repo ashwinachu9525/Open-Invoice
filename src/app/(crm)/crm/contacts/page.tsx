@@ -1,6 +1,8 @@
 import { getCrmContacts } from "@/actions/crm"
 import { ContactsView } from "@/components/crm/contacts-view"
 
+export const dynamic = "force-dynamic"
+
 export const metadata = {
   title: "Contacts & Accounts | CRM Suite",
   description: "Unified directory of customer profiles, companies, deals, and invoice ledgers.",

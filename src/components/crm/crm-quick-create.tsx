@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -223,72 +224,74 @@ export function CrmQuickCreate() {
           <span>New</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-2xl glass shadow-2xl border-white/10">
-          <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
-            CRM Quick Actions
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator className="bg-white/10" />
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1">
+              CRM Quick Actions
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-white/10" />
 
-          <DropdownMenuItem
-            onClick={() => setActiveModal("lead")}
-            className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
-              <Target className="h-3.5 w-3.5" />
-            </div>
-            New Lead
-          </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setActiveModal("lead")}
+              className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                <Target className="h-3.5 w-3.5" />
+              </div>
+              New Lead
+            </DropdownMenuItem>
 
-          <DropdownMenuItem
-            onClick={() => setActiveModal("contact")}
-            className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400">
-              <UserPlus className="h-3.5 w-3.5" />
-            </div>
-            New Contact / Company
-          </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setActiveModal("contact")}
+              className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400">
+                <UserPlus className="h-3.5 w-3.5" />
+              </div>
+              New Contact / Company
+            </DropdownMenuItem>
 
-          <DropdownMenuItem
-            onClick={() => setActiveModal("deal")}
-            className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400">
-              <Briefcase className="h-3.5 w-3.5" />
-            </div>
-            New Deal
-          </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setActiveModal("deal")}
+              className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400">
+                <Briefcase className="h-3.5 w-3.5" />
+              </div>
+              New Deal
+            </DropdownMenuItem>
 
-          <DropdownMenuItem
-            onClick={() => setActiveModal("task")}
-            className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-500/20 text-purple-400">
-              <CalendarCheck className="h-3.5 w-3.5" />
-            </div>
-            New Task / Meeting
-          </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setActiveModal("task")}
+              className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-500/20 text-purple-400">
+                <CalendarCheck className="h-3.5 w-3.5" />
+              </div>
+              New Task / Meeting
+            </DropdownMenuItem>
 
-          <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuSeparator className="bg-white/10" />
 
-          <DropdownMenuItem
-            onClick={() => setActiveModal("workflow")}
-            className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400">
-              <Workflow className="h-3.5 w-3.5" />
-            </div>
-            New Workflow
-          </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setActiveModal("workflow")}
+              className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400">
+                <Workflow className="h-3.5 w-3.5" />
+              </div>
+              New Workflow
+            </DropdownMenuItem>
 
-          <DropdownMenuItem
-            onClick={() => setActiveModal("dashboard")}
-            className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-teal-500/20 text-teal-400">
-              <LayoutDashboard className="h-3.5 w-3.5" />
-            </div>
-            New Dashboard
-          </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setActiveModal("dashboard")}
+              className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-teal-500/20 text-teal-400">
+                <LayoutDashboard className="h-3.5 w-3.5" />
+              </div>
+              New Dashboard
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
 
