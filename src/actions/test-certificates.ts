@@ -117,3 +117,72 @@ export async function getPublicTestCertificate(id: string) {
     return { error: "Failed to fetch test certificate." }
   }
 }
+
+export async function deleteTestCertificate(id: string) {
+  const session = await auth()
+  if (!session?.user?.companyId) {
+    return { error: "Unauthorized" }
+  }
+
+  try {
+    await prisma.testCertificate.update({
+      where: { id, companyId: session.user.companyId },
+      data: { deletedAt: new Date() },
+    })
+    revalidatePath("/certificates")
+    return { success: true }
+  } catch (error) {
+    return { error: "Failed to delete test certificate." }
+  }
+}
+
+export async function getNextCertificateNumber(): Promise<string> {
+  const session = await auth()
+  if (!session?.user?.companyId) {
+    return `TC-${Date.now().toString().slice(-6)}`
+  }
+
+  try {
+    const latest = await prisma.testCertificate.findFirst({
+      where: { companyId: session.user.companyId },
+      orderBy: { createdAt: "desc" },
+      select: { certificateNumber: true },
+    })
+
+    if (!latest?.certificateNumber) {
+      return "TC-001"
+    }
+
+    const match = latest.certificateNumber.match(/(\d+)$/)
+    if (match) {
+      const nextNum = parseInt(match[1], 10) + 1
+      const prefix = latest.certificateNumber.replace(/(\d+)$/, "")
+      return `${prefix}${String(nextNum).padStart(match[1].length, "0")}`
+    }
+
+    return `TC-${Date.now().toString().slice(-6)}`
+  } catch {
+    return `TC-${Date.now().toString().slice(-6)}`
+  }
+}
+
+export async function getInvoicesForCertificate() {
+  const session = await auth()
+  if (!session?.user?.companyId) return []
+
+  try {
+    return await prisma.invoice.findMany({
+      where: { companyId: session.user.companyId, deletedAt: null },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        customerId: true,
+        items: { select: { description: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    })
+  } catch {
+    return []
+  }
+}

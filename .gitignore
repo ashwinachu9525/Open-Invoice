@@ -50,7 +50,11 @@ next-env.d.ts
 /data/*.db-shm
 /data/database.config.json
 
-certificates
+# Root SSL certificates directory (if used)
+/certificates/
+*.pem
+*.key
+*.crt
 
 # scratch directory
 /scratch/
