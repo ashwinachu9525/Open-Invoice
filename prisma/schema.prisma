@@ -1026,6 +1026,8 @@ model CrmActivity {
   priority     String    @default("MEDIUM") // HIGHEST, HIGH, MEDIUM, LOW, LOWEST
   jiraKey      String?   // e.g. CRM-42
   comments     Json?     // Array of { id, authorName, heading, text, createdAt }
+  subtasks     Json?     // Array of { id, key, title, completed, assigneeName, createdAt }
+  history      Json?     // Array of { id, authorName, action, from, to, createdAt }
   dueDate      DateTime?
   completedAt  DateTime?
   assignedToId String?

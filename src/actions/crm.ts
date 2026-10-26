@@ -751,6 +751,8 @@ export async function getCrmActivities(filters?: { type?: string; status?: strin
         jiraKey: act.jiraKey || `CRM-${activities.length - idx}`,
         priority: act.priority || "MEDIUM",
         comments: Array.isArray(act.comments) ? act.comments : [],
+        subtasks: Array.isArray(act.subtasks) ? act.subtasks : [],
+        history: Array.isArray(act.history) ? act.history : [],
       }
     })
 
@@ -833,34 +835,261 @@ export async function updateActivityDetails(id: string, data: {
   dueDate?: string | null
   assignedToId?: string | null
 }) {
-  try {
-    const { companyId, db } = await requireUserAndTenant()
-    const updateData: any = {}
-    if (data.title !== undefined) updateData.title = data.title
-    if (data.description !== undefined) updateData.description = data.description
-    if (data.status !== undefined) {
-      updateData.status = data.status
-      if (data.status === "DONE" || data.status === "COMPLETED") {
-        updateData.completedAt = new Date()
-      } else {
-        updateData.completedAt = null
-      }
-    }
-    if (data.priority !== undefined) updateData.priority = data.priority
-    if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null
-    if (data.assignedToId !== undefined) updateData.assignedToId = data.assignedToId
+  return withDbRetry(async () => {
+    try {
+      const { user, companyId, db } = await requireUserAndTenant()
+      const existing = await db.crmActivity.findUnique({
+        where: { id, companyId },
+        include: { assignedTo: true }
+      })
+      if (!existing) return { error: "Activity not found" }
 
-    const updated = await db.crmActivity.update({
-      where: { id, companyId },
-      data: updateData,
-      include: { assignedTo: true, customer: true, deal: true, lead: true }
-    })
-    revalidatePath("/crm/activities")
-    revalidatePath("/crm/dashboard")
-    return { success: true, activity: updated }
-  } catch (error: any) {
-    return { error: error.message || "Failed to update activity details." }
-  }
+      const existingHistory: any[] = Array.isArray(existing.history) ? existing.history : []
+      const authorName = user?.name || user?.email || "Team Member"
+      const newHistoryEntries: any[] = []
+
+      const updateData: any = {}
+      if (data.title !== undefined && data.title !== existing.title) {
+        updateData.title = data.title
+        newHistoryEntries.push({
+          id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          authorName,
+          field: "SUMMARY",
+          from: existing.title,
+          to: data.title,
+          createdAt: new Date().toISOString(),
+        })
+      }
+      if (data.description !== undefined && data.description !== existing.description) {
+        updateData.description = data.description
+        newHistoryEntries.push({
+          id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          authorName,
+          field: "DESCRIPTION",
+          from: "Previous content",
+          to: "Updated description & acceptance criteria",
+          createdAt: new Date().toISOString(),
+        })
+      }
+      if (data.status !== undefined && data.status !== existing.status) {
+        updateData.status = data.status
+        if (data.status === "DONE" || data.status === "COMPLETED") {
+          updateData.completedAt = new Date()
+        } else {
+          updateData.completedAt = null
+        }
+        newHistoryEntries.push({
+          id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          authorName,
+          field: "STATUS",
+          from: existing.status,
+          to: data.status,
+          createdAt: new Date().toISOString(),
+        })
+      }
+      if (data.priority !== undefined && data.priority !== existing.priority) {
+        updateData.priority = data.priority
+        newHistoryEntries.push({
+          id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          authorName,
+          field: "PRIORITY",
+          from: existing.priority,
+          to: data.priority,
+          createdAt: new Date().toISOString(),
+        })
+      }
+      if (data.dueDate !== undefined) {
+        const newDue = data.dueDate ? new Date(data.dueDate) : null
+        updateData.dueDate = newDue
+        newHistoryEntries.push({
+          id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          authorName,
+          field: "DUE_DATE",
+          from: existing.dueDate ? new Date(existing.dueDate).toLocaleDateString() : "None",
+          to: newDue ? newDue.toLocaleDateString() : "Cleared",
+          createdAt: new Date().toISOString(),
+        })
+      }
+      if (data.assignedToId !== undefined && data.assignedToId !== existing.assignedToId) {
+        updateData.assignedToId = data.assignedToId
+        newHistoryEntries.push({
+          id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          authorName,
+          field: "ASSIGNEE",
+          from: existing.assignedTo?.name || "Unassigned",
+          to: data.assignedToId ? "Assigned user" : "Unassigned",
+          createdAt: new Date().toISOString(),
+        })
+      }
+
+      if (newHistoryEntries.length > 0) {
+        updateData.history = [...newHistoryEntries, ...existingHistory]
+      }
+
+      const updated = await db.crmActivity.update({
+        where: { id, companyId },
+        data: updateData,
+        include: { assignedTo: true, customer: true, deal: true, lead: true }
+      })
+
+      revalidatePath("/crm/activities")
+      revalidatePath("/crm/dashboard")
+      return { success: true, activity: updated }
+    } catch (error: any) {
+      return { error: error.message || "Failed to update activity details." }
+    }
+  })
+}
+
+export async function addActivitySubtask(activityId: string, input: {
+  title: string
+  assigneeName?: string
+}) {
+  return withDbRetry(async () => {
+    try {
+      const { user, companyId, db } = await requireUserAndTenant()
+      const activity = await db.crmActivity.findUnique({
+        where: { id: activityId, companyId }
+      })
+      if (!activity) return { error: "Activity not found" }
+
+      const existingSubtasks: any[] = Array.isArray(activity.subtasks) ? activity.subtasks : []
+      const existingHistory: any[] = Array.isArray(activity.history) ? activity.history : []
+      const authorName = user?.name || user?.email || "Team Member"
+      const subtaskKey = `${activity.jiraKey || "CRM"}-${existingSubtasks.length + 1}`
+
+      const newSubtask = {
+        id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        key: subtaskKey,
+        title: input.title.trim(),
+        completed: false,
+        assigneeName: input.assigneeName || null,
+        createdAt: new Date().toISOString(),
+      }
+
+      const updatedHistory = [
+        {
+          id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          authorName,
+          field: "SUBTASK",
+          action: "CREATED",
+          to: `Created sub-task ${subtaskKey}: "${input.title}"`,
+          createdAt: new Date().toISOString(),
+        },
+        ...existingHistory,
+      ]
+
+      const updated = await db.crmActivity.update({
+        where: { id: activityId, companyId },
+        data: {
+          subtasks: [...existingSubtasks, newSubtask],
+          history: updatedHistory,
+        },
+        include: { assignedTo: true, customer: true, deal: true, lead: true }
+      })
+
+      revalidatePath("/crm/activities")
+      return { success: true, activity: updated, subtask: newSubtask }
+    } catch (error: any) {
+      return { error: error.message || "Failed to add sub-task." }
+    }
+  })
+}
+
+export async function toggleActivitySubtask(activityId: string, subtaskId: string, completed: boolean) {
+  return withDbRetry(async () => {
+    try {
+      const { user, companyId, db } = await requireUserAndTenant()
+      const activity = await db.crmActivity.findUnique({
+        where: { id: activityId, companyId }
+      })
+      if (!activity) return { error: "Activity not found" }
+
+      const existingSubtasks: any[] = Array.isArray(activity.subtasks) ? activity.subtasks : []
+      const existingHistory: any[] = Array.isArray(activity.history) ? activity.history : []
+      const authorName = user?.name || user?.email || "Team Member"
+
+      let targetTitle = ""
+      const updatedSubtasks = existingSubtasks.map((st: any) => {
+        if (st.id === subtaskId) {
+          targetTitle = st.title
+          return { ...st, completed }
+        }
+        return st
+      })
+
+      const updatedHistory = [
+        {
+          id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          authorName,
+          field: "SUBTASK",
+          action: completed ? "COMPLETED" : "REOPENED",
+          to: `${completed ? "Completed" : "Reopened"} sub-task: "${targetTitle}"`,
+          createdAt: new Date().toISOString(),
+        },
+        ...existingHistory,
+      ]
+
+      const updated = await db.crmActivity.update({
+        where: { id: activityId, companyId },
+        data: {
+          subtasks: updatedSubtasks,
+          history: updatedHistory,
+        },
+        include: { assignedTo: true, customer: true, deal: true, lead: true }
+      })
+
+      revalidatePath("/crm/activities")
+      return { success: true, activity: updated }
+    } catch (error: any) {
+      return { error: error.message || "Failed to toggle sub-task." }
+    }
+  })
+}
+
+export async function deleteActivitySubtask(activityId: string, subtaskId: string) {
+  return withDbRetry(async () => {
+    try {
+      const { user, companyId, db } = await requireUserAndTenant()
+      const activity = await db.crmActivity.findUnique({
+        where: { id: activityId, companyId }
+      })
+      if (!activity) return { error: "Activity not found" }
+
+      const existingSubtasks: any[] = Array.isArray(activity.subtasks) ? activity.subtasks : []
+      const existingHistory: any[] = Array.isArray(activity.history) ? activity.history : []
+      const authorName = user?.name || user?.email || "Team Member"
+
+      const removed = existingSubtasks.find((st: any) => st.id === subtaskId)
+      const updatedSubtasks = existingSubtasks.filter((st: any) => st.id !== subtaskId)
+
+      const updatedHistory = [
+        {
+          id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          authorName,
+          field: "SUBTASK",
+          action: "DELETED",
+          to: `Removed sub-task: "${removed?.title || "sub-task"}"`,
+          createdAt: new Date().toISOString(),
+        },
+        ...existingHistory,
+      ]
+
+      const updated = await db.crmActivity.update({
+        where: { id: activityId, companyId },
+        data: {
+          subtasks: updatedSubtasks,
+          history: updatedHistory,
+        },
+        include: { assignedTo: true, customer: true, deal: true, lead: true }
+      })
+
+      revalidatePath("/crm/activities")
+      return { success: true, activity: updated }
+    } catch (error: any) {
+      return { error: error.message || "Failed to delete sub-task." }
+    }
+  })
 }
 
 export async function addActivityComment(activityId: string, input: {
