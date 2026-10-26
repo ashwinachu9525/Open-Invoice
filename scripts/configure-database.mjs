@@ -12,10 +12,11 @@ import {
 const args = process.argv.slice(2)
 const providerArg = args.find((a) => a.startsWith("--provider="))?.split("=")[1]
 
-if (providerArg === "sqlite" || providerArg === "postgresql") {
+if (providerArg === "sqlite" || providerArg === "postgresql" || providerArg === "postgres") {
+  const normProvider = providerArg === "postgres" ? "postgresql" : providerArg
   const existing = getDatabaseConfig()
   saveDatabaseConfig({
-    provider: providerArg,
+    provider: normProvider,
     postgresqlUrl: existing.postgresqlUrl,
   })
 }
@@ -70,7 +71,7 @@ if (config.provider === "sqlite") {
 }
 
 try {
-  execSync("npx prisma db push", {
+  execSync("npx prisma db push --accept-data-loss", {
     cwd: ROOT,
     stdio: "inherit",
     env: { ...process.env, DATABASE_URL: databaseUrl },
