@@ -11,6 +11,11 @@ export const metadata = {
 export default async function CampaignsPage() {
   const result = await getCrmCampaigns()
   const campaigns = result.campaigns || []
+  const audienceCounts = (result as any).audienceCounts || {
+    QUALIFIED_LEADS: 0,
+    ALL_LEADS: 0,
+    EXISTING_CUSTOMERS: 0,
+  }
 
   return (
     <div className="space-y-6">
@@ -23,7 +28,7 @@ export default async function CampaignsPage() {
         </div>
       </div>
 
-      <CampaignsView initialCampaigns={campaigns} />
+      <CampaignsView initialCampaigns={campaigns} audienceCounts={audienceCounts} />
     </div>
   )
 }

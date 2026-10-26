@@ -33,6 +33,7 @@ import {
   LayoutDashboard,
   Sparkles,
   Loader2,
+  Send,
 } from "lucide-react"
 import { toast } from "sonner"
 import { createLead, createDeal, createCrmContact, createCrmActivity, createCrmWorkflow } from "@/actions/crm"
@@ -280,6 +281,16 @@ export function CrmQuickCreate() {
                 <Workflow className="h-3.5 w-3.5" />
               </div>
               New Workflow
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={() => router.push("/crm/campaigns?action=launch")}
+              className="flex items-center gap-2.5 p-2 rounded-xl cursor-pointer hover:bg-white/10 text-xs font-medium"
+            >
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                <Send className="h-3.5 w-3.5" />
+              </div>
+              Launch Email Broadcast
             </DropdownMenuItem>
 
             <DropdownMenuItem

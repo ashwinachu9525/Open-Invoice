@@ -936,11 +936,24 @@ export async function deleteActivity(id: string) {
 export async function getCrmCampaigns() {
   try {
     const { companyId, db } = await requireUserAndTenant()
-    const campaigns = await db.crmCampaign.findMany({
-      where: { companyId },
-      orderBy: { createdAt: "desc" }
-    })
-    return { success: true, campaigns }
+    const [campaigns, qualifiedCount, allLeadsCount, customersCount] = await Promise.all([
+      db.crmCampaign.findMany({
+        where: { companyId },
+        orderBy: { createdAt: "desc" }
+      }),
+      db.crmLead.count({ where: { companyId, status: "QUALIFIED", email: { not: null }, deletedAt: null } }),
+      db.crmLead.count({ where: { companyId, status: { not: "CONVERTED" }, email: { not: null }, deletedAt: null } }),
+      db.customer.count({ where: { companyId, email: { not: null }, deletedAt: null } }),
+    ])
+    return {
+      success: true,
+      campaigns,
+      audienceCounts: {
+        QUALIFIED_LEADS: qualifiedCount,
+        ALL_LEADS: allLeadsCount,
+        EXISTING_CUSTOMERS: customersCount,
+      }
+    }
   } catch (error: any) {
     return { error: error.message || "Failed to load campaigns." }
   }
