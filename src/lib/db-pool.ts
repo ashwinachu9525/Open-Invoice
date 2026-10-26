@@ -225,6 +225,21 @@ export function createNewPool(databaseUrl: string, maxConnectionsOverride?: numb
  */
 function registerGracefulShutdown() {
   if (poolState.shutdownRegistered) return
+
+  // Do not register process signal handlers during Next.js build or in serverless environments.
+  // Next.js static generation workers use internal SIGINT/SIGTERM for worker coordination;
+  // intercepting these signals during build causes premature pool termination and hangs onBuildComplete.
+  const isBuildOrServerless =
+    Boolean(process.env.VERCEL) ||
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.npm_lifecycle_event === "build" ||
+    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+    process.argv.some((arg) => arg.includes("build"))
+
+  if (isBuildOrServerless) {
+    return
+  }
+
   poolState.shutdownRegistered = true
 
   const shutdownHandler = async (signal: string) => {
@@ -234,8 +249,9 @@ function registerGracefulShutdown() {
     if (poolState.pool) {
       try {
         console.log(`[PostgreSQL Pool] Closing shared pool on ${signal}...`)
-        await poolState.pool.end()
+        const poolToClose = poolState.pool
         poolState.pool = undefined
+        await poolToClose.end()
       } catch (err) {
         console.error("[PostgreSQL Pool] Error during graceful shutdown:", err)
       }
@@ -244,7 +260,6 @@ function registerGracefulShutdown() {
 
   process.once("SIGTERM", () => shutdownHandler("SIGTERM"))
   process.once("SIGINT", () => shutdownHandler("SIGINT"))
-  process.once("beforeExit", () => shutdownHandler("beforeExit"))
 }
 
 /**

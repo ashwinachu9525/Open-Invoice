@@ -69,7 +69,8 @@ const withPWA = withPWAInit({
 })
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // On Vercel, serverless bundling is native; standalone is only needed for Docker container builds
+  output: process.env.VERCEL ? undefined : "standalone",
   allowedDevOrigins: ['192.168.0.4'],
   serverExternalPackages: [
     "@prisma/client",

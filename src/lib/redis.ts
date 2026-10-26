@@ -8,17 +8,31 @@ const globalForRedis = globalThis as unknown as {
   redis: Redis | null | undefined
 }
 
-export const redis =
-  globalForRedis.redis ??
-  (redisUrl ? new Redis(redisUrl, {
-    maxRetriesPerRequest: 1,
-    retryStrategy(times) {
-      // If we can't connect after 3 tries, stop trying so we don't crash the app
-      // and we just fallback to DB (cache misses)
-      if (times > 3) return null;
-      return Math.min(times * 50, 2000);
-    }
-  }) : null)
+function initRedis(): Redis | null {
+  if (!redisUrl) return null
+  try {
+    const client = new Redis(redisUrl, {
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      lazyConnect: true,
+      retryStrategy(times) {
+        if (times > 3) return null
+        return Math.min(times * 50, 2000)
+      },
+    })
+
+    // Attach error listener to prevent unhandled error crashes
+    client.on("error", (err: any) => {
+      // Suppress unhandled error crash when Valkey host is offline
+    })
+
+    return client
+  } catch {
+    return null
+  }
+}
+
+export const redis = globalForRedis.redis ?? initRedis()
 
 if (process.env.NODE_ENV !== "production") globalForRedis.redis = redis
 
