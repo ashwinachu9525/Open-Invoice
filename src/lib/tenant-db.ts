@@ -22,7 +22,11 @@ if (process.env.NODE_ENV !== "production") {
 function getOrCreateCustomClient(companyId: string, url: string): PrismaClient {
   let entry = tenantClientsCache.get(companyId)
   if (!entry) {
-    const client = createPostgresClient(url, process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"])
+    const client = createPostgresClient(
+      url,
+      process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+      2
+    )
     entry = { client, lastUsedAt: Date.now() }
     tenantClientsCache.set(companyId, entry)
   } else {

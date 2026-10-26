@@ -3,6 +3,23 @@ import { PrismaClient } from "@prisma/client"
 import { existsSync, mkdirSync } from "fs"
 import path from "path"
 import { getActiveProvider, getDatabaseUrl, SQLITE_DB_PATH } from "@/lib/database-config"
+import {
+  getSharedPool,
+  createNewPool,
+  getMaxPoolConnections,
+  getPoolMetrics,
+  checkDatabaseHealth,
+  query,
+  withTransaction,
+} from "@/lib/db-pool"
+
+export {
+  getSharedPool,
+  getPoolMetrics,
+  checkDatabaseHealth,
+  query,
+  withTransaction,
+}
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -22,6 +39,11 @@ function createSqliteClient(log: ("error" | "warn")[]): PrismaClient {
   return new PrismaClient({ adapter, log })
 }
 
+/**
+ * Creates a Prisma client backed by a dedicated PostgreSQL pool.
+ * Used for custom tenant databases and connection tests.
+ * Guarantees that calling client.$disconnect() will also drain and close the underlying pg.Pool.
+ */
 export function createPostgresClient(
   databaseUrl: string,
   log: ("error" | "warn")[],
@@ -29,52 +51,12 @@ export function createPostgresClient(
 ): PrismaClient {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PrismaPg } = require("@prisma/adapter-pg") as typeof import("@prisma/adapter-pg")
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { Pool } = require("pg") as typeof import("pg")
-
-  // Cloud providers (Aiven, Supabase, Neon, etc.) require SSL but use custom certificates.
-  // We MUST strip sslmode from the URL and configure ssl on the Pool object directly —
-  // otherwise the pg driver's URL parser fights with our ssl config and rejects the cert.
-  let cleanUrl = databaseUrl
-  try {
-    const urlObj = new URL(databaseUrl)
-    urlObj.searchParams.delete("sslmode")
-    urlObj.searchParams.delete("supa")
-    urlObj.searchParams.delete("pool_mode")
-    urlObj.searchParams.delete("pgbouncer")
-    cleanUrl = urlObj.toString()
-  } catch {
-    cleanUrl = databaseUrl
-      .replace(/[?&]sslmode=[^&]*/g, "")
-      .replace(/[?&]supa=[^&]*/g, "")
-      .replace(/[?&]pool_mode=[^&]*/g, "")
-      .replace(/[?&]pgbouncer=[^&]*/g, "")
-      .replace(/\?$/, "")
-      .replace(/&$/, "")
-  }
-
-  const needsSsl = /^postgres(ql)?s?:\/\//i.test(databaseUrl) ||
-    databaseUrl.includes("sslmode=require") ||
-    databaseUrl.includes("sslmode=prefer") ||
-    databaseUrl.includes("aivencloud.com") ||
-    databaseUrl.includes("supabase.com") ||
-    databaseUrl.includes("neon.tech") ||
-    databaseUrl.includes("aiven.io")
-
-  const envPoolSize = process.env.DATABASE_POOL_SIZE || process.env.DATABASE_MAX_CONNECTIONS
-  const maxConnections = envPoolSize ? parseInt(envPoolSize, 10) : defaultMaxConnections
-
-  const pool = new Pool({
-    connectionString: cleanUrl,
-    ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
-    max: maxConnections,
-    idleTimeoutMillis: 5000, 
-    connectionTimeoutMillis: 5000,
-  })
-
+  
+  const pool = createNewPool(databaseUrl, defaultMaxConnections)
   const adapter = new PrismaPg(pool)
   const provider = getActiveProvider()
   let PrismaClientClass;
+
   if (provider === "sqlite") {
     // Hide from Vercel's strict Turbopack static analysis
     const getPrisma = new Function("return require('@prisma/client-postgres').PrismaClient")
@@ -84,9 +66,28 @@ export function createPostgresClient(
     PrismaClientClass = require("@prisma/client").PrismaClient
   }
 
-  return new PrismaClientClass({ adapter, log }) as any
+  const client = new PrismaClientClass({ adapter, log }) as any
+
+  // Attach pool reference and wrap $disconnect to prevent pool leaks
+  client.__pgPool = pool
+  const originalDisconnect = client.$disconnect.bind(client)
+  client.$disconnect = async () => {
+    try {
+      await originalDisconnect()
+    } finally {
+      await pool.end().catch((err: any) => {
+        console.warn("[PostgreSQL Pool] Error closing tenant pool:", err?.message)
+      })
+    }
+  }
+
+  return client
 }
 
+/**
+ * Creates the primary application Prisma client backed by the process-wide shared pool.
+ * Enforces max 2 connections by default for Aiven Cloud Free PostgreSQL.
+ */
 function createPrismaClient(): PrismaClient {
   const provider = getActiveProvider()
   const databaseUrl = getDatabaseUrl()
@@ -101,7 +102,21 @@ function createPrismaClient(): PrismaClient {
     throw new Error("DATABASE_URL is not configured. Set DATABASE_URL in your environment variables.")
   }
 
-  return createPostgresClient(databaseUrl, log, 10)
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { PrismaPg } = require("@prisma/adapter-pg") as typeof import("@prisma/adapter-pg")
+  
+  // Reuse the single shared pool (max 2 connections by default)
+  const sharedPool = getSharedPool(databaseUrl)
+  const adapter = new PrismaPg(sharedPool)
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { PrismaClient: PrismaClientClass } = require("@prisma/client")
+  const client = new PrismaClientClass({ adapter, log }) as any
+
+  // Attach shared pool reference
+  client.__pgPool = sharedPool
+
+  return client
 }
 
 const currentProvider = getActiveProvider()

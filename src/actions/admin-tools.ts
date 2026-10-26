@@ -901,6 +901,7 @@ export async function getSystemHealthCheck() {
           status: dbStatus,
           latencyMs: dbLatencyMs,
           provider: process.env.DATABASE_PROVIDER || "sqlite",
+          pool: (await import("@/lib/db-pool")).getPoolMetrics(),
         },
         redis: {
           status: redisStatus,
