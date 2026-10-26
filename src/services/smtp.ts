@@ -1,46 +1,48 @@
 import nodemailer from "nodemailer"
 import { prisma } from "@/lib/prisma"
 import { decrypt } from "@/lib/crypto"
+import {
+  buildModernEmailShell,
+  buildModernCampaignEmailHtml,
+  buildModernInvoiceEmailHtml,
+  buildModernQuotationEmailHtml,
+  buildModernPaymentReceiptEmailHtml,
+  escapeHtml,
+} from "./email-templates"
 
-function buildEmailLayout(title: string, bodyContent: string) {
+export {
+  buildModernEmailShell,
+  buildModernCampaignEmailHtml,
+  buildModernInvoiceEmailHtml,
+  buildModernQuotationEmailHtml,
+  buildModernPaymentReceiptEmailHtml,
+}
+
+export function buildEmailLayout(
+  title: string,
+  bodyContent: string,
+  options?: {
+    badgeText?: string
+    badgeColor?: "indigo" | "emerald" | "amber" | "rose" | "slate"
+    companyName?: string
+  }
+) {
   const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 40px 20px; -webkit-font-smoothing: antialiased; line-height: 1.6; color: #111827;">
-  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 48px; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
-    
-    <!-- Header Logo -->
-    <div style="text-align: center; margin-bottom: 32px;">
-      <h2 style="margin: 0; font-size: 28px; font-weight: 800; color: #111827; display: inline-flex; align-items: center; gap: 8px;">
-        <span style="color: #4f46e5; font-size: 24px;">&#9632;</span> ${appName}
-      </h2>
-    </div>
-    
-    <!-- Title -->
-    <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 700; text-align: center; color: #111827;">
-      ${title}
-    </h1>
-
-    <!-- Body -->
-    <div style="font-size: 15px; color: #4b5563; text-align: center;">
-      ${bodyContent}
-    </div>
-
-    <!-- Footer -->
-    <div style="margin-top: 48px; text-align: center;">
-      <hr style="border: none; border-top: 1px solid #e5e7eb; width: 80%; margin: 0 auto 32px auto;" />
-      <p style="margin: 0 0 16px; color: #6b7280; font-size: 14px;">${appName}, an effortless solution with all the features you need.</p>
-      <p style="margin: 0; color: #9ca3af; font-size: 13px;">&copy; ${new Date().getFullYear()} ${appName}. All rights reserved.</p>
-    </div>
-  </div>
-</body>
-</html>
-  `.trim()
+  return buildModernEmailShell({
+    title,
+    badgeText: options?.badgeText || "SYSTEM NOTICE",
+    badgeColor: options?.badgeColor || "indigo",
+    companyName: options?.companyName || appName,
+    appName,
+    contentHtml: `
+      <h1 style="margin: 0 0 20px 0; font-size: 22px; font-weight: 800; color: #0f172a; text-align: center; letter-spacing: -0.3px;">
+        ${escapeHtml(title)}
+      </h1>
+      <div style="font-size: 15px; color: #334155; line-height: 1.7; text-align: left;">
+        ${bodyContent}
+      </div>
+    `,
+  })
 }
 
 export async function sendVerificationEmail(to: string, otp: string) {
@@ -70,14 +72,24 @@ export async function sendVerificationEmail(to: string, otp: string) {
   await transporter.sendMail({
     from,
     to,
-    subject: "Verify your email address",
-    html: buildEmailLayout(`Verify your ${appName} sign-up`, `
-      <p style="margin: 0 0 24px; line-height: 1.6;">We have received a sign-up attempt with the following code. Please enter it in the browser window where you started signing up for ${appName}.</p>
-      <div style="background-color: #f3f4f6; border-radius: 12px; padding: 32px; font-size: 36px; font-weight: 700; color: #111827; letter-spacing: 4px; margin: 0 0 24px;">
+    subject: `Verify your email address - ${appName}`,
+    html: buildEmailLayout(
+      `Verify your ${appName} account`,
+      `
+      <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+        We received a sign-up attempt for your email. Please enter the verification code below in your browser window to complete your registration.
+      </p>
+      
+      <div style="background-color: #eef2ff; border: 1.5px dashed #6366f1; border-radius: 12px; padding: 24px 20px; font-size: 34px; font-weight: 800; color: #312e81; letter-spacing: 8px; font-family: 'SF Mono', Monaco, Consolas, monospace; text-align: center; margin: 24px 0;">
         ${otp}
       </div>
-      <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">If you did not attempt to sign up but received this email, please disregard it. The code will remain active for 24 hours.</p>
-    `),
+
+      <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.6;">
+        If you did not initiate this request, you can safely ignore this email. This verification code is valid for 24 hours.
+      </p>
+      `,
+      { badgeText: "SECURITY VERIFICATION", badgeColor: "indigo" }
+    ),
   })
 }
 
@@ -104,13 +116,23 @@ export async function sendPasswordResetEmail(to: string, otp: string) {
     from,
     to,
     subject: "Reset your password",
-    html: buildEmailLayout(`Reset your password`, `
-      <p style="margin: 0 0 24px; line-height: 1.6;">We received a request to reset your password. Please use the following code to set a new password.</p>
-      <div style="background-color: #f3f4f6; border-radius: 12px; padding: 32px; font-size: 36px; font-weight: 700; color: #111827; letter-spacing: 4px; margin: 0 0 24px;">
+    html: buildEmailLayout(
+      `Reset your password`,
+      `
+      <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+        We received a request to reset your password. Please enter the secure one-time verification code below to set a new password.
+      </p>
+      
+      <div style="background-color: #eef2ff; border: 1.5px dashed #6366f1; border-radius: 12px; padding: 24px 20px; font-size: 34px; font-weight: 800; color: #312e81; letter-spacing: 8px; font-family: 'SF Mono', Monaco, Consolas, monospace; text-align: center; margin: 24px 0;">
         ${otp}
       </div>
-      <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">If you didn't request this, you can safely disregard this email. This code will remain active for 1 hour.</p>
-    `),
+
+      <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.6;">
+        If you did not request a password reset, you can safely ignore this email. This code will expire in 1 hour.
+      </p>
+      `,
+      { badgeText: "PASSWORD RESET", badgeColor: "amber" }
+    ),
   })
 }
 
@@ -140,13 +162,23 @@ export async function sendPasswordResetSuccessEmail(to: string) {
     from,
     to,
     subject: "Password reset successful",
-    html: buildEmailLayout("Password Reset Successful", `
-      <p style="margin: 0 0 24px; line-height: 1.6;">Your password has been successfully reset. You can now log in using your new password.</p>
-      <div style="background-color: #ecfdf5; border-radius: 12px; padding: 24px; font-size: 16px; font-weight: 500; color: #065f46; margin: 0 0 24px; text-align: center;">
-        Your account is fully secure.
+    html: buildEmailLayout(
+      "Password Reset Successful",
+      `
+      <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+        Your account password has been successfully reset. You can now log into your account using your new password.
+      </p>
+      
+      <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 20px; font-size: 15px; font-weight: 600; color: #065f46; margin: 24px 0; text-align: center;">
+        &#10003; Your account credentials have been updated securely.
       </div>
-      <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">If you did not make this change, please contact our support team immediately.</p>
-    `),
+
+      <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.6;">
+        If you did not authorize this change, please contact our support team immediately.
+      </p>
+      `,
+      { badgeText: "SECURITY ALERT", badgeColor: "emerald" }
+    ),
   })
 }
 
@@ -228,27 +260,43 @@ export async function sendSmtpTestEmail(
   await transporter.sendMail({
     from,
     to: toEmail,
-    subject: "✅ SMTP Test Email",
-    html: buildEmailLayout("SMTP Connection Verified", `
-      <p style="margin: 0 0 24px; line-height: 1.6;">Hello ${settings.fromName ?? "Admin"},<br/>Your SMTP settings have been successfully verified.</p>
+    subject: "✅ SMTP Test Email - Connection Verified",
+    html: buildEmailLayout(
+      "SMTP Connection Verified",
+      `
+      <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+        Hello <strong>${escapeHtml(settings.fromName ?? "Admin")}</strong>,<br/>
+        Your SMTP settings have been successfully tested and verified. Outbound email delivery is fully active.
+      </p>
       
-      <div style="background-color: #f3f4f6; border-radius: 12px; padding: 24px; text-align: left; margin: 0 0 24px;">
-        <h3 style="margin: 0 0 16px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #4b5563;">Connection Details</h3>
-        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 12px;">
-          <span style="color: #6b7280; font-size: 14px;">SMTP Host</span>
-          <span style="font-weight: 500; color: #111827; font-size: 14px;">${settings.host}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 12px;">
-          <span style="color: #6b7280; font-size: 14px;">Port</span>
-          <span style="font-weight: 500; color: #111827; font-size: 14px;">${settings.port}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between;">
-          <span style="color: #6b7280; font-size: 14px;">Sender</span>
-          <span style="font-weight: 500; color: #111827; font-size: 14px;">${from.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>
-        </div>
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; text-align: left; margin: 20px 0;">
+        <h3 style="margin: 0 0 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b;">Connection Details</h3>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size: 14px; color: #334155;">
+          <tr>
+            <td style="padding: 6px 0; color: #64748b; border-bottom: 1px solid #f1f5f9;">SMTP Host</td>
+            <td align="right" style="padding: 6px 0; font-weight: 600; font-family: monospace; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${escapeHtml(settings.host)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b; border-bottom: 1px solid #f1f5f9;">Port</td>
+            <td align="right" style="padding: 6px 0; font-weight: 600; font-family: monospace; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${settings.port}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b; border-bottom: 1px solid #f1f5f9;">Sender Identity</td>
+            <td align="right" style="padding: 6px 0; font-weight: 600; color: #0f172a; border-bottom: 1px solid #f1f5f9;">${escapeHtml(from)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b;">Connection Status</td>
+            <td align="right" style="padding: 6px 0; font-weight: 700; color: #059669;">&#10003; Online &amp; Authenticated</td>
+          </tr>
+        </table>
       </div>
-      <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">You are now ready to send invoices and quotations directly from the platform.</p>
-    `),
+
+      <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.6;">
+        You can now dispatch professional invoices, quotations, and marketing campaigns directly to your clients.
+      </p>
+      `,
+      { badgeText: "SMTP ACTIVE", badgeColor: "emerald", companyName: settings.fromName || undefined }
+    ),
   })
 }
 
@@ -269,6 +317,16 @@ export async function sendInvoiceEmail(params: {
   let status = "sent"
   let errorMessage: string | undefined = undefined
 
+  // Ensure HTML is wrapped in a modern shell if caller supplied an unformatted fragment
+  let finalHtml = params.html
+  if (!params.html.includes("<!DOCTYPE") && !params.html.includes("<html")) {
+    finalHtml = buildEmailLayout(params.subject, params.html, {
+      badgeText: "INVOICE",
+      badgeColor: "indigo",
+      companyName: settings.fromName || undefined,
+    })
+  }
+
   try {
     await transporter.sendMail({
       from: settings.fromEmail
@@ -276,7 +334,7 @@ export async function sendInvoiceEmail(params: {
         : settings.username,
       to: params.to,
       subject: params.subject,
-      html: params.html,
+      html: finalHtml,
       attachments: params.attachments,
     })
   } catch (error) {
@@ -315,6 +373,16 @@ export async function sendQuotationEmail(params: {
   let status = "sent"
   let errorMessage: string | undefined = undefined
 
+  // Ensure HTML is wrapped in a modern shell if caller supplied an unformatted fragment
+  let finalHtml = params.html
+  if (!params.html.includes("<!DOCTYPE") && !params.html.includes("<html")) {
+    finalHtml = buildEmailLayout(params.subject, params.html, {
+      badgeText: "QUOTATION",
+      badgeColor: "indigo",
+      companyName: settings.fromName || undefined,
+    })
+  }
+
   try {
     await transporter.sendMail({
       from: settings.fromEmail
@@ -322,7 +390,7 @@ export async function sendQuotationEmail(params: {
         : settings.username,
       to: params.to,
       subject: params.subject,
-      html: params.html,
+      html: finalHtml,
       attachments: params.attachments,
     })
   } catch (error) {
@@ -330,8 +398,6 @@ export async function sendQuotationEmail(params: {
     errorMessage = error instanceof Error ? error.message : String(error)
     throw error // Re-throw so caller knows it failed
   } finally {
-    // Note: We don't have quotationId in EmailLog schema currently. If we want to log it, we could add it to schema, 
-    // or log without linking directly. The schema only has invoiceId. We will just create it without invoiceId or quotationId.
     await prisma.emailLog.create({
       data: {
         companyId: params.companyId,
@@ -466,42 +532,17 @@ export async function sendCrmCampaignEmail(params: {
   const openTrackingUrl = `${appUrl}/api/crm/track/open?logId=${emailLog.id}`
   const clickTrackingUrl = `${appUrl}/api/crm/track/click?logId=${emailLog.id}&target=${encodeURIComponent(resolvedTargetUrl)}`
 
-  // Format HTML body with Dynamic Button and Open Tracking Pixel
-  const safeContent = params.content.replace(/</g, "&lt;").replace(/>/g, "&gt;")
-
-  // Render CTA Button if buttonText is provided
-  const dynamicButtonHtml = resolvedButtonText
-    ? `
-      <div style="margin: 32px 0 28px; text-align: center;">
-        <a href="${clickTrackingUrl}" target="_blank"
-           style="display: inline-block; background-color: #4f46e5; color: #ffffff !important; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px; text-decoration: none; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.35); text-align: center;">
-          ${resolvedButtonText}
-        </a>
-      </div>
-    `
-    : ""
-
-  const formattedHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8"></head>
-    <body style="background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 32px 16px; color: #1f2937; line-height: 1.6;">
-      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 36px; border: 1px solid #e5e7eb; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
-        <h2 style="margin-top: 0; margin-bottom: 20px; font-size: 20px; font-weight: 700; color: #111827;">${params.subject}</h2>
-        <div style="font-size: 15px; color: #374151; white-space: pre-wrap; line-height: 1.7;">
-${safeContent}
-        </div>
-        ${dynamicButtonHtml}
-        <div style="margin-top: 36px; padding-top: 20px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 12px; color: #9ca3af;">
-          <p style="margin: 0 0 4px;">Sent via ${appName} CRM</p>
-          <p style="margin: 0; font-size: 11px; color: #d1d5db;">You are receiving this communication as a registered contact.</p>
-        </div>
-      </div>
-      <!-- Open Tracking Pixel -->
-      <img src="${openTrackingUrl}" width="1" height="1" border="0" alt="" style="display:none !important; width:1px !important; height:1px !important; border:0 !important; visibility:hidden !important; overflow:hidden !important; mso-hide:all;" />
-    </body>
-    </html>
-  `.trim()
+  // Format HTML body with Modern Template, Dynamic CTA Button, and Open Tracking Pixel
+  const formattedHtml = buildModernCampaignEmailHtml({
+    companyName: settings?.fromName || appName,
+    subject: params.subject,
+    content: params.content,
+    recipientName: params.recipientName,
+    buttonText: resolvedButtonText,
+    clickTrackingUrl: resolvedButtonText ? clickTrackingUrl : null,
+    openTrackingUrl,
+    appName,
+  })
 
   try {
     await transporter.sendMail({
@@ -564,20 +605,31 @@ export async function sendWelcomeEmail(to: string, name: string) {
   })
 
   const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
+  const appUrl = (process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "")
 
   await transporter.sendMail({
     from,
     to,
     subject: `Welcome to ${appName}!`,
-    html: buildEmailLayout(`Welcome, ${name}!`, `
-      <p style="margin: 0 0 24px; line-height: 1.6;">We're thrilled to have you on board! ${appName} makes it incredibly simple to manage your invoices, quotations, and customers in one unified workspace.</p>
+    html: buildEmailLayout(
+      `Welcome, ${escapeHtml(name)}!`,
+      `
+      <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155; line-height: 1.7;">
+        We're thrilled to have you join <strong>${appName}</strong>! Your account is active and ready to streamline your invoices, track real-time payments, and run automated CRM email campaigns.
+      </p>
       
-      <div style="text-align: center; margin: 32px 0;">
-        <a href="${process.env.NEXTAUTH_URL || "http://localhost:3000"}/dashboard" style="background-color: #111827; color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block; font-size: 16px;">Go to Dashboard</a>
+      <div style="text-align: center; margin: 32px 0 28px 0;">
+        <a href="${appUrl}/dashboard" style="display: inline-block; background-color: #4f46e5; background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); color: #ffffff !important; padding: 15px 36px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.35);">
+          Launch Dashboard &rarr;
+        </a>
       </div>
 
-      <p style="margin: 0 0 16px; font-size: 14px; color: #6b7280;">If you need help getting started, our support team is just an email away.</p>
-    `),
+      <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.6;">
+        Need any assistance getting started? Our support team is here to help you configure your taxes, payment gateways, and templates.
+      </p>
+      `,
+      { badgeText: "WELCOME ABOARD", badgeColor: "indigo" }
+    ),
   })
 }
 
@@ -603,25 +655,35 @@ export async function sendTrialReminderEmail(to: string, companyName: string, da
     socketTimeout: 5000,
   })
 
-  const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+  const appUrl = (process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "")
 
   await transporter.sendMail({
     from,
     to,
     subject: `Your Free Trial Expires in ${daysLeft} ${daysLeft === 1 ? 'Day' : 'Days'}`,
-    html: buildEmailLayout("Trial Expiration Reminder", `
-      <p style="margin: 0 0 24px; line-height: 1.6;">This is a friendly reminder that the 30-day Free Trial for <strong>${companyName}</strong> will expire in <strong>${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}</strong>.</p>
+    html: buildEmailLayout(
+      "Trial Expiration Notice",
+      `
+      <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+        This is a friendly reminder that the 30-day Free Trial for <strong>${escapeHtml(companyName)}</strong> will expire in <strong>${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}</strong>.
+      </p>
       
-      <div style="background-color: #fef3c7; border-radius: 12px; padding: 24px; color: #92400e; margin: 0 0 32px; text-align: center; font-size: 15px;">
-        To keep enjoying unlimited invoice creation, AI assistant insights, and team collaboration, please upgrade to the Pro plan before your trial ends.
+      <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 20px; color: #92400e; margin: 20px 0; text-align: center; font-size: 14px; line-height: 1.6;">
+        To keep enjoying unlimited invoice creation, automated recurring scheduling, CRM analytics, and team collaboration, upgrade to the Pro plan today.
       </div>
 
-      <div style="text-align: center; margin: 0 0 32px;">
-        <a href="${appUrl}/settings" style="background-color: #111827; color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block; font-size: 16px;">Upgrade to Pro</a>
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="${appUrl}/settings" style="display: inline-block; background-color: #4f46e5; background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); color: #ffffff !important; padding: 15px 36px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.35);">
+          Upgrade to Pro &rarr;
+        </a>
       </div>
 
-      <p style="margin: 0; font-size: 14px; color: #6b7280;">If you have any questions, feel free to reply to this email.</p>
-    `),
+      <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.6;">
+        If you have any questions or require custom enterprise terms, reply directly to this email.
+      </p>
+      `,
+      { badgeText: "SUBSCRIPTION REMINDER", badgeColor: "amber", companyName }
+    ),
   })
 }
 
@@ -647,7 +709,7 @@ export async function sendTeamInviteEmail(params: {
     )
   }
 
-  const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  const appUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "")
   const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
   const inviteUrl = `${appUrl}/invite?token=${params.inviteToken}`
   const roleLabel = params.role === "ADMIN" ? "Admin (Full Access)" : "Staff (Invoices Only)"
@@ -660,54 +722,54 @@ export async function sendTeamInviteEmail(params: {
     from,
     to: params.to,
     subject: `You're invited to join ${params.companyName} on ${appName}`,
-    html: buildEmailLayout(`Join ${params.companyName}`, `
-      <p style="margin: 0 0 16px; line-height: 1.6;">
-        <strong>${params.inviterName}</strong> has invited you to join
-        <strong>${params.companyName}</strong> on ${appName} as
-        <strong>${roleLabel}</strong>.
+    html: buildEmailLayout(
+      `Join ${escapeHtml(params.companyName)}`,
+      `
+      <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+        <strong>${escapeHtml(params.inviterName)}</strong> has invited you to collaborate on
+        <strong>${escapeHtml(params.companyName)}</strong> as
+        <strong style="color: #4f46e5;">${escapeHtml(roleLabel)}</strong>.
       </p>
 
-      <p style="margin: 0 0 32px; font-size: 14px; color: #6b7280; line-height: 1.6;">
-        Click the button below to accept your invitation. You'll be asked to sign in or
-        create a free account if you don't have one yet.
+      <p style="margin: 0 0 24px 0; font-size: 14px; color: #64748b; line-height: 1.6;">
+        Click the button below to accept your invitation and access the organization dashboard.
       </p>
 
-      <div style="text-align: center; margin: 0 0 32px;">
-        <a href="${inviteUrl}"
-          style="background-color: #4f46e5; color: #ffffff; padding: 16px 40px; border-radius: 8px;
-                 text-decoration: none; font-weight: 700; display: inline-block; font-size: 16px;
-                 letter-spacing: 0.3px;">
-          Accept Invitation
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="${inviteUrl}" style="display: inline-block; background-color: #4f46e5; background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); color: #ffffff !important; padding: 15px 40px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 14px 0 rgba(79, 70, 229, 0.35);">
+          Accept Invitation &rarr;
         </a>
       </div>
 
-      <div style="background-color: #f9fafb; border-radius: 10px; padding: 20px; text-align: left; margin: 0 0 24px;">
-        <p style="margin: 0 0 8px; font-size: 13px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.8px;">Details</p>
-        <table style="width: 100%; font-size: 14px; color: #4b5563; border-collapse: collapse;">
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: left; margin: 0 0 24px 0;">
+        <p style="margin: 0 0 10px 0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px;">Invitation Details</p>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size: 13px; color: #334155;">
           <tr>
-            <td style="padding: 6px 0; color: #9ca3af; width: 40%;">Company</td>
-            <td style="padding: 6px 0; font-weight: 500; color: #111827;">${params.companyName}</td>
+            <td style="padding: 5px 0; color: #64748b; width: 40%;">Company</td>
+            <td style="padding: 5px 0; font-weight: 600; color: #0f172a;">${escapeHtml(params.companyName)}</td>
           </tr>
           <tr>
-            <td style="padding: 6px 0; color: #9ca3af;">Your Role</td>
-            <td style="padding: 6px 0; font-weight: 500; color: #111827;">${roleLabel}</td>
+            <td style="padding: 5px 0; color: #64748b;">Assigned Role</td>
+            <td style="padding: 5px 0; font-weight: 600; color: #0f172a;">${escapeHtml(roleLabel)}</td>
           </tr>
           <tr>
-            <td style="padding: 6px 0; color: #9ca3af;">Invited by</td>
-            <td style="padding: 6px 0; font-weight: 500; color: #111827;">${params.inviterName}</td>
+            <td style="padding: 5px 0; color: #64748b;">Invited By</td>
+            <td style="padding: 5px 0; font-weight: 600; color: #0f172a;">${escapeHtml(params.inviterName)}</td>
           </tr>
           <tr>
-            <td style="padding: 6px 0; color: #9ca3af;">Expires</td>
-            <td style="padding: 6px 0; font-weight: 500; color: #111827;">7 days from now</td>
+            <td style="padding: 5px 0; color: #64748b;">Link Validity</td>
+            <td style="padding: 5px 0; font-weight: 600; color: #0f172a;">7 days from issuance</td>
           </tr>
         </table>
       </div>
 
-      <p style="margin: 0; font-size: 13px; color: #9ca3af; line-height: 1.6;">
+      <p style="margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.6;">
         If you weren't expecting this invitation, you can safely ignore this email.<br/>
-        Or copy this link manually: <span style="color: #4f46e5;">${inviteUrl}</span>
+        Direct Link: <a href="${inviteUrl}" style="color: #4f46e5; word-break: break-all;">${inviteUrl}</a>
       </p>
-    `),
+      `,
+      { badgeText: "TEAM INVITATION", badgeColor: "indigo", companyName: params.companyName }
+    ),
   })
 }
 

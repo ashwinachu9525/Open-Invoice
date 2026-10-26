@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getTenantDb } from "@/lib/tenant-db"
 import { InvoiceStatus, RecurringFrequency, ScheduleStatus } from "@prisma/client"
 import { generateInvoicePdf } from "@/services/pdf"
-import { sendInvoiceEmail, sendTrialReminderEmail } from "@/services/smtp"
+import { sendInvoiceEmail, sendTrialReminderEmail, buildModernInvoiceEmailHtml } from "@/services/smtp"
 import { sendWhatsAppMessage } from "@/actions/integrations"
 import { getNextRunDate, getCompanyNow } from "@/lib/date-utils"
 import { createAuditLog } from "@/services/audit"
@@ -90,11 +90,20 @@ export const processRecurringInvoices = inngest.createFunction(
       if (schedule.autoSend && source.customer.email) {
         try {
           const pdf = await generateInvoicePdf(newInvoice.id)
+          const appUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "")
+          const html = buildModernInvoiceEmailHtml({
+            invoice: newInvoice,
+            company: source.company,
+            customer: source.customer,
+            appUrl,
+            customMessage: "This recurring invoice was automatically generated based on your subscription schedule.",
+          })
+
           await sendInvoiceEmail({
             companyId: source.companyId,
             to: source.customer.email,
             subject: `Invoice ${invoiceNumber} from ${source.company.name}`,
-            html: `<p>Please find attached invoice ${invoiceNumber}.</p>`,
+            html,
             attachments: [{ filename: `${invoiceNumber}.pdf`, content: pdf }],
           })
           await tenantDb.invoice.update({
@@ -249,22 +258,21 @@ export const sendPaymentReminders = inngest.createFunction(
       if (shouldSend) {
         try {
           const pdf = await generateInvoicePdf(invoice.id)
-          const customMsg = config.customMessage ? `<p>${config.customMessage}</p>` : ""
-          
+          const appUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "")
+          const html = buildModernInvoiceEmailHtml({
+            invoice,
+            company: invoice.company,
+            customer: invoice.customer,
+            appUrl,
+            customMessage: config.customMessage || `Payment Reminder: This invoice is ${messageType}. We appreciate your prompt payment.`,
+          })
+
           await sendInvoiceEmail({
             companyId: invoice.companyId,
             invoiceId: invoice.id,
             to: invoice.customer.email,
             subject: `Payment Reminder: Invoice ${invoice.invoiceNumber} is ${messageType}`,
-            html: `
-              <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
-                <h2 style="color:#f59e0b;">Payment Reminder: ${messageType}</h2>
-                <p>Hello ${invoice.customer.name},</p>
-                <p>This is a friendly reminder regarding Invoice <strong>${invoice.invoiceNumber}</strong> for <strong>₹${invoice.balanceDue.toLocaleString("en-IN")}</strong>.</p>
-                ${customMsg}
-                <p>Please find the invoice attached to this email. We appreciate your prompt payment.</p>
-              </div>
-            `,
+            html,
             attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: pdf }],
           })
           remindersSent++

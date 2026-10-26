@@ -567,7 +567,7 @@ export async function cloneQuotation(id: string) {
 }
 
 import { generateQuotationPdf } from "@/services/pdf"
-import { sendQuotationEmail } from "@/services/smtp"
+import { sendQuotationEmail, buildModernQuotationEmailHtml } from "@/services/smtp"
 import { sendWhatsAppMessage } from "@/actions/integrations"
 
 export async function sendQuotationToClient(quotationId: string) {
@@ -586,31 +586,20 @@ export async function sendQuotationToClient(quotationId: string) {
 
     const contactPersonName = quotation.customer.name
     const quotationNumber = quotation.quotationNumber
-    const companyEmail = quotation.company.email || "No email provided"
-    const companyPhone = quotation.company.phone || "No phone provided"
-    const companyName = quotation.company.name
+    const appUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "")
 
-    const htmlBody = `
-      <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
-        <p>Hi ${contactPersonName},</p>
-        <p>Please find the attached quotation <b>${quotationNumber}</b> for your reference.</p>
-        <p>If you have any questions or need any clarification regarding this quotation, please feel free to contact us using the details below.</p>
-        <p>
-          <b>Email:</b> ${companyEmail}<br>
-          <b>Contact Number:</b> ${companyPhone}
-        </p>
-        <p>Thank you for considering our services.</p>
-        <p>Best Regards,<br>${companyName}</p>
-        <hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888;"><b>Note:</b> This is a system-generated email. Please do not reply directly to this message.</p>
-      </div>
-    `
+    const htmlBody = buildModernQuotationEmailHtml({
+      quotation,
+      company: quotation.company,
+      customer: quotation.customer,
+      appUrl,
+    })
 
     await sendQuotationEmail({
       companyId: company.id,
       quotationId: quotationId,
       to: quotation.customer.email,
-      subject: `Quotation ${quotationNumber}`,
+      subject: `Quotation ${quotationNumber} from ${quotation.company.name}`,
       html: htmlBody,
       attachments: [{
         filename: `${quotationNumber}.pdf`,

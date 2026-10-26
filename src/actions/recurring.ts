@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache"
 import { getTenantDb } from "@/lib/tenant-db"
 import { getCompanyNow, getNextRunDate } from "@/lib/date-utils"
 import { generateInvoicePdf } from "@/services/pdf"
-import { sendInvoiceEmail } from "@/services/smtp"
+import { sendInvoiceEmail, buildModernInvoiceEmailHtml } from "@/services/smtp"
 import { sendWhatsAppMessage } from "@/actions/integrations"
 import { createAuditLog } from "@/services/audit"
 import { invalidateCachePattern } from "@/lib/redis"
@@ -208,11 +208,21 @@ export async function runRecurringScheduleNow(invoiceId: string) {
     if (schedule.autoSend && source.customer.email) {
       try {
         const pdf = await generateInvoicePdf(newInvoice.id)
+        const appUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "")
+        const html = buildModernInvoiceEmailHtml({
+          invoice: newInvoice,
+          company: source.company,
+          customer: source.customer,
+          appUrl,
+          customMessage: "This recurring invoice was automatically generated based on your subscription schedule.",
+        })
+
         await sendInvoiceEmail({
           companyId: source.companyId,
+          invoiceId: newInvoice.id,
           to: source.customer.email,
           subject: `Invoice ${invoiceNumber} from ${source.company.name}`,
-          html: `<p>Please find attached invoice ${invoiceNumber}.</p>`,
+          html,
           attachments: [{ filename: `${invoiceNumber}.pdf`, content: pdf }],
         })
         await prisma.invoice.update({

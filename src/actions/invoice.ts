@@ -10,7 +10,7 @@ import { requireCompany } from "@/lib/auth-helpers"
 import { revalidatePath } from "next/cache"
 import { InvoiceStatus } from "@prisma/client"
 import { generateInvoicePdf } from "@/services/pdf"
-import { sendInvoiceEmail } from "@/services/smtp"
+import { sendInvoiceEmail, buildModernInvoiceEmailHtml } from "@/services/smtp"
 import { getOrSetCache, invalidateCachePattern } from "@/lib/redis"
 import { sendWhatsAppMessage, sendWhatsAppDocument } from "@/actions/integrations"
 import { getCompanyNow } from "@/lib/date-utils"
@@ -368,35 +368,24 @@ export async function sendInvoiceToClient(invoiceId: string) {
     // 2. Generate PDF Buffer
     const pdfBuffer = await generateInvoicePdf(invoice.id, company.id)
 
-    // 3. Construct Email HTML
-    const contactPersonName = invoice.customer.name // Using customer name as contact person name per approval
+    // 3. Construct Modern Email HTML
+    const contactPersonName = invoice.customer.name
     const invoiceNumber = invoice.invoiceNumber
-    const companyEmail = invoice.company.email || "No email provided"
-    const companyPhone = invoice.company.phone || "No phone provided"
-    const companyName = invoice.company.name
+    const appUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "")
 
-    const htmlBody = `
-      <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
-        <p>Hi ${contactPersonName},</p>
-        <p>Please find the attached invoice <b>${invoiceNumber}</b> for your reference.</p>
-        <p>If you have any questions or need any clarification regarding this invoice, please feel free to contact us using the details below.</p>
-        <p>
-          <b>Email:</b> ${companyEmail}<br>
-          <b>Contact Number:</b> ${companyPhone}
-        </p>
-        <p>Thank you for your business and continued support.</p>
-        <p>Best Regards,<br>${companyName}</p>
-        <hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888;"><b>Note:</b> This is a system-generated email. Please do not reply directly to this message.</p>
-      </div>
-    `
+    const htmlBody = buildModernInvoiceEmailHtml({
+      invoice,
+      company: invoice.company,
+      customer: invoice.customer,
+      appUrl,
+    })
 
     // 4. Send Email
     await sendInvoiceEmail({
       companyId: company.id,
       invoiceId: invoiceId,
       to: invoice.customer.email,
-      subject: `Invoice ${invoiceNumber}`,
+      subject: `Invoice ${invoiceNumber} from ${invoice.company.name}`,
       html: htmlBody,
       attachments: [{
         filename: `${invoiceNumber}.pdf`,

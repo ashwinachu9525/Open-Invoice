@@ -1385,33 +1385,59 @@ export function CampaignsView({
 
             <div className="space-y-4 py-2">
               {/* Simulated Email Client Preview */}
-              <div className="rounded-xl border border-white/10 overflow-hidden bg-background/80">
-                <div className="p-3 border-b border-white/10 bg-white/5 space-y-1">
+              <div className="rounded-xl border border-white/10 overflow-hidden bg-slate-950/60 shadow-xl">
+                {/* Email Client Header Bar */}
+                <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400" />
+                <div className="p-3.5 border-b border-white/10 bg-white/5 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-5 w-5 rounded bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center">
+                        CRM
+                      </div>
+                      <span className="text-[11px] font-semibold text-slate-300">Broadcast Preview</span>
+                    </div>
+                    <Badge variant="outline" className="text-[9px] bg-indigo-500/10 text-indigo-400 border-indigo-500/20 uppercase tracking-wider">
+                      Live Template
+                    </Badge>
+                  </div>
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="text-muted-foreground">Subject:</span>
-                    <span className="font-semibold text-foreground">
+                    <span className="text-muted-foreground text-[11px]">Subject:</span>
+                    <span className="font-bold text-foreground">
                       {(previewCampaign.subject || "").replace(/\{\{name\}\}/gi, "Aarav Sharma")}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span>To:</span>
+                    <span>Recipient:</span>
                     <span className="font-mono text-emerald-400">aarav.sharma@example.com</span>
                   </div>
                 </div>
-                <div className="p-4 text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed">
-                  {(previewCampaign.content || "No message body provided.")
-                    .replace(/\{\{name\}\}/gi, "Aarav Sharma")}
-                </div>
-                {previewCampaign.buttonText && (
-                  <div className="pt-2 pb-4 text-center border-t border-white/5 bg-white/2">
-                    <div className="inline-block px-5 py-2 rounded-lg bg-indigo-600 text-white font-semibold text-xs shadow-md">
-                      {previewCampaign.buttonText}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground mt-1.5 font-mono">
-                      Target Link: {previewCampaign.buttonUrl || "Application URL"}
-                    </div>
+
+                {/* Email Body Card */}
+                <div className="p-5 bg-card/40 space-y-4">
+                  <h3 className="text-sm font-bold text-foreground">
+                    {(previewCampaign.subject || "").replace(/\{\{name\}\}/gi, "Aarav Sharma")}
+                  </h3>
+                  <div className="text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed font-sans">
+                    {(previewCampaign.content || "No message body provided.")
+                      .replace(/\{\{name\}\}/gi, "Aarav Sharma")}
                   </div>
-                )}
+
+                  {previewCampaign.buttonText && (
+                    <div className="pt-2 pb-2 text-center">
+                      <div className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/30">
+                        <span>{previewCampaign.buttonText}</span>
+                        <span>&rarr;</span>
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-2 font-mono">
+                        Target Link: {previewCampaign.buttonUrl || "Application URL"}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t border-white/5 text-center text-[10px] text-muted-foreground">
+                    Sent via Open Invoice CRM &bull; You are receiving this communication as a valued contact.
+                  </div>
+                </div>
               </div>
 
               {/* Delivery Metrics */}
