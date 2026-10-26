@@ -1092,7 +1092,9 @@ model CrmEmailLog {
   status        String       // "SENT" | "FAILED"
   error         String?
   openedAt      DateTime?
+  lastOpenedAt  DateTime?
   clickedAt     DateTime?
+  lastClickedAt DateTime?
   openCount     Int          @default(0)
   clickCount    Int          @default(0)
   sentAt        DateTime     @default(now())

@@ -29,11 +29,12 @@ describe("CRM Email Open and Click Tracking Engine", () => {
   })
 
   describe("GET /api/crm/track/open", () => {
-    it("should return a 200 transparent GIF and increment openCount", async () => {
+    it("should return a 200 transparent GIF and increment openCount on first open", async () => {
       ;(prisma.crmEmailLog.findUnique as any).mockResolvedValue({
         id: "log_123",
         campaignId: "camp_456",
         openedAt: null,
+        lastOpenedAt: null,
       })
 
       const req = new Request("http://localhost:3000/api/crm/track/open?logId=log_123")
@@ -57,6 +58,25 @@ describe("CRM Email Open and Click Tracking Engine", () => {
       )
     })
 
+    it("should deduplicate rapid double-fetch (e.g. Gmail Image Proxy within 10s)", async () => {
+      // Simulate recent open 1 second ago
+      const recentOpen = new Date(Date.now() - 1000)
+      ;(prisma.crmEmailLog.findUnique as any).mockResolvedValue({
+        id: "log_123",
+        campaignId: "camp_456",
+        openedAt: recentOpen,
+        lastOpenedAt: recentOpen,
+      })
+
+      const req = new Request("http://localhost:3000/api/crm/track/open?logId=log_123")
+      const res = await getTrackOpen(req)
+
+      expect(res.status).toBe(200)
+      // Should NOT update email log or campaign because of 10s debounce window
+      expect(prisma.crmEmailLog.update).not.toHaveBeenCalled()
+      expect(prisma.crmCampaign.updateMany).not.toHaveBeenCalled()
+    })
+
     it("should still return 200 GIF even if logId is missing", async () => {
       const req = new Request("http://localhost:3000/api/crm/track/open")
       const res = await getTrackOpen(req)
@@ -71,6 +91,7 @@ describe("CRM Email Open and Click Tracking Engine", () => {
         id: "log_123",
         campaignId: "camp_456",
         clickedAt: null,
+        lastClickedAt: null,
       })
 
       const targetUrl = "https://example.com/special-offer"
@@ -95,6 +116,26 @@ describe("CRM Email Open and Click Tracking Engine", () => {
           data: { clickCount: { increment: 1 } },
         })
       )
+    })
+
+    it("should deduplicate rapid double-clicks (within 5s)", async () => {
+      const recentClick = new Date(Date.now() - 1000)
+      ;(prisma.crmEmailLog.findUnique as any).mockResolvedValue({
+        id: "log_123",
+        campaignId: "camp_456",
+        clickedAt: recentClick,
+        lastClickedAt: recentClick,
+      })
+
+      const targetUrl = "https://example.com/special-offer"
+      const req = new Request(
+        `http://localhost:3000/api/crm/track/click?logId=log_123&target=${encodeURIComponent(targetUrl)}`
+      )
+      const res = await getTrackClick(req)
+
+      expect(res.status).toBe(302)
+      // Redirect still works, but database update is debounced
+      expect(prisma.crmEmailLog.update).not.toHaveBeenCalled()
     })
 
     it("should fallback to application URL if target is empty", async () => {

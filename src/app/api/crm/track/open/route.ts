@@ -10,6 +10,10 @@ const TRANSPARENT_GIF_BUFFER = Buffer.from(
   "base64"
 )
 
+// 10-second deduplication threshold to filter out proxy double-fetches
+// (e.g. Gmail googleimageproxy, Apple Mail Privacy Protection, or antivirus scanners)
+const DEBOUNCE_WINDOW_MS = 10_000
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url)
@@ -20,21 +24,41 @@ export async function GET(request: Request) {
       await withDbRetry(async () => {
         const log = await prisma.crmEmailLog.findUnique({
           where: { id: logId },
-          select: { id: true, campaignId: true, openedAt: true },
+          select: {
+            id: true,
+            campaignId: true,
+            openedAt: true,
+            lastOpenedAt: true,
+            openCount: true,
+          },
         })
 
         if (log) {
+          const now = new Date()
           const isFirstOpen = !log.openedAt
+          const lastHit = log.lastOpenedAt || log.openedAt
+          const timeSinceLastHit = lastHit ? now.getTime() - new Date(lastHit).getTime() : Infinity
+
+          // Deduplicate: If an open request arrives within 10 seconds of a previous hit,
+          // it is a duplicate proxy fetch from the same open session (e.g. Google Image Proxy).
+          if (!isFirstOpen && timeSinceLastHit < DEBOUNCE_WINDOW_MS) {
+            return
+          }
+
+          // Update individual recipient log
           await prisma.crmEmailLog.update({
             where: { id: logId },
             data: {
               openCount: { increment: 1 },
-              ...(isFirstOpen && { openedAt: new Date() }),
+              ...(isFirstOpen && { openedAt: now }),
+              lastOpenedAt: now,
             },
           })
 
+          // Update Campaign: Track UNIQUE OPENS
+          // Only increment campaign open count on the recipient's first open
           const targetCampaignId = log.campaignId || campaignId
-          if (targetCampaignId) {
+          if (targetCampaignId && isFirstOpen) {
             await prisma.crmCampaign.updateMany({
               where: { id: targetCampaignId },
               data: {
