@@ -192,6 +192,7 @@ export function createNewPool(databaseUrl: string, maxConnectionsOverride?: numb
 
   // Connection Leak Detection: Alert if a connection is checked out for >15s without release
   pool.on("acquire", (client: any) => {
+    if (!client) return
     client.__checkoutTimestamp = Date.now()
     client.__leakWarningTimer = setTimeout(() => {
       const duration = Date.now() - (client.__checkoutTimestamp || 0)
@@ -201,15 +202,17 @@ export function createNewPool(databaseUrl: string, maxConnectionsOverride?: numb
       )
     }, 15000)
 
-    if (client.__leakWarningTimer.unref) {
+    if (client.__leakWarningTimer && client.__leakWarningTimer.unref) {
       client.__leakWarningTimer.unref()
     }
   })
 
-  pool.on("release", (client: any) => {
-    if (client.__leakWarningTimer) {
-      clearTimeout(client.__leakWarningTimer)
-      client.__leakWarningTimer = undefined
+  // In pg-pool, the event signature is emit('release', err, client)
+  pool.on("release", (err: any, client: any) => {
+    const targetClient = client || (err && typeof err === "object" && !("message" in err) ? err : undefined)
+    if (targetClient && targetClient.__leakWarningTimer) {
+      clearTimeout(targetClient.__leakWarningTimer)
+      targetClient.__leakWarningTimer = undefined
     }
   })
 

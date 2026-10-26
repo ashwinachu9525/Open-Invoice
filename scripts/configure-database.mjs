@@ -3,22 +3,19 @@ import { existsSync, readFileSync, writeFileSync } from "fs"
 import path from "path"
 import {
   ROOT,
-  CONFIG_PATH,
   getDatabaseConfig,
   getDatabaseUrl,
-  saveDatabaseConfig,
 } from "./database-config.mjs"
 
-const args = process.argv.slice(2)
-const providerArg = args.find((a) => a.startsWith("--provider="))?.split("=")[1]
-
-if (providerArg === "sqlite" || providerArg === "postgresql" || providerArg === "postgres") {
-  const normProvider = providerArg === "postgres" ? "postgresql" : providerArg
-  const existing = getDatabaseConfig()
-  saveDatabaseConfig({
-    provider: normProvider,
-    postgresqlUrl: existing.postgresqlUrl,
-  })
+function maskDatabaseUrl(url) {
+  if (!url || url.startsWith("file:")) return url
+  try {
+    const parsed = new URL(url)
+    if (parsed.password) parsed.password = "******"
+    return parsed.toString()
+  } catch {
+    return url.replace(/:([^@/]+)@/, ":******@")
+  }
 }
 
 const config = getDatabaseConfig()
@@ -35,7 +32,7 @@ schema = schema.replace(/datasource db \{[^}]+\}/s, datasource)
 writeFileSync(schemaPath, schema)
 
 console.log(`Database provider: ${config.provider}`)
-console.log(`Database URL: ${databaseUrl}`)
+console.log(`Database URL: ${maskDatabaseUrl(databaseUrl)}`)
 
 execSync("npx prisma generate", {
   cwd: ROOT,
@@ -78,8 +75,4 @@ try {
   })
 } catch {
   console.warn("db push skipped or failed — run manually if needed")
-}
-
-if (!existsSync(CONFIG_PATH)) {
-  saveDatabaseConfig(config)
 }
