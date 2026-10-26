@@ -350,10 +350,25 @@ export async function sendCrmCampaignEmail(params: {
   recipientName?: string
   subject: string
   content: string
+  buttonText?: string | null
+  buttonUrl?: string | null
   campaignId?: string
   leadId?: string
   customerId?: string
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{ success: boolean; error?: string; logId?: string }> {
+  const appUrl = (
+    process.env.NEXTAUTH_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "http://localhost:3000"
+  ).replace(/\/$/, "")
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
+
+  // Resolve dynamic button & target link
+  const rawButtonText = params.buttonText?.trim() || null
+  const rawButtonUrl = params.buttonUrl?.trim() || null
+  const resolvedTargetUrl = rawButtonUrl && rawButtonUrl.length > 0 ? rawButtonUrl : appUrl
+  const resolvedButtonText = rawButtonText
+
   const settings = await prisma.emailSetting.findUnique({
     where: { companyId: params.companyId },
   })
@@ -400,7 +415,7 @@ export async function sendCrmCampaignEmail(params: {
   if (!transporter) {
     const errMsg = "SMTP not configured. Please configure your email sender settings under Settings > Email Settings."
     try {
-      await prisma.crmEmailLog.create({
+      const failedLog = await prisma.crmEmailLog.create({
         data: {
           companyId: params.companyId,
           campaignId: params.campaignId || null,
@@ -410,46 +425,23 @@ export async function sendCrmCampaignEmail(params: {
           recipientName: params.recipientName || null,
           subject: params.subject,
           bodyPreview: params.content.slice(0, 300),
+          buttonText: resolvedButtonText,
+          buttonUrl: resolvedButtonText ? resolvedTargetUrl : null,
           status: "FAILED",
           error: errMsg,
-        }
+        },
       })
+      return { success: false, error: errMsg, logId: failedLog.id }
     } catch (logErr) {
       console.warn("Failed to write CRM email log:", logErr)
     }
     return { success: false, error: errMsg }
   }
 
-  // Format HTML body
-  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
-  const formattedHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8"></head>
-    <body style="background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 32px 16px; color: #1f2937; line-height: 1.6;">
-      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 36px; border: 1px solid #e5e7eb; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
-        <h2 style="margin-top: 0; margin-bottom: 20px; font-size: 20px; font-weight: 700; color: #111827;">${params.subject}</h2>
-        <div style="font-size: 15px; color: #374151; white-space: pre-wrap; line-height: 1.7;">
-${params.content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
-        </div>
-        <div style="margin-top: 36px; padding-top: 20px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 12px; color: #9ca3af;">
-          <p style="margin: 0;">Sent via ${appName} CRM</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `.trim()
-
+  // Create pending CrmEmailLog first so we have the unique ID for open/click tracking
+  let emailLog: any
   try {
-    await transporter.sendMail({
-      from,
-      to: params.to,
-      subject: params.subject,
-      text: params.content,
-      html: formattedHtml,
-    })
-
-    await prisma.crmEmailLog.create({
+    emailLog = await prisma.crmEmailLog.create({
       data: {
         companyId: params.companyId,
         campaignId: params.campaignId || null,
@@ -459,36 +451,93 @@ ${params.content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
         recipientName: params.recipientName || null,
         subject: params.subject,
         bodyPreview: params.content.slice(0, 300),
-        status: "SENT",
+        buttonText: resolvedButtonText,
+        buttonUrl: resolvedButtonText ? resolvedTargetUrl : null,
+        status: "SENDING",
         error: null,
-      }
+      },
+    })
+  } catch (err: any) {
+    console.warn("Failed to create pre-dispatch CRM email log:", err)
+    return { success: false, error: "Failed to initialize email tracking log." }
+  }
+
+  // Tracking URLs
+  const openTrackingUrl = `${appUrl}/api/crm/track/open?logId=${emailLog.id}`
+  const clickTrackingUrl = `${appUrl}/api/crm/track/click?logId=${emailLog.id}&target=${encodeURIComponent(resolvedTargetUrl)}`
+
+  // Format HTML body with Dynamic Button and Open Tracking Pixel
+  const safeContent = params.content.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
+  // Render CTA Button if buttonText is provided
+  const dynamicButtonHtml = resolvedButtonText
+    ? `
+      <div style="margin: 32px 0 28px; text-align: center;">
+        <a href="${clickTrackingUrl}" target="_blank"
+           style="display: inline-block; background-color: #4f46e5; color: #ffffff !important; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px; text-decoration: none; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.35); text-align: center;">
+          ${resolvedButtonText}
+        </a>
+      </div>
+    `
+    : ""
+
+  const formattedHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 32px 16px; color: #1f2937; line-height: 1.6;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 36px; border: 1px solid #e5e7eb; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+        <h2 style="margin-top: 0; margin-bottom: 20px; font-size: 20px; font-weight: 700; color: #111827;">${params.subject}</h2>
+        <div style="font-size: 15px; color: #374151; white-space: pre-wrap; line-height: 1.7;">
+${safeContent}
+        </div>
+        ${dynamicButtonHtml}
+        <div style="margin-top: 36px; padding-top: 20px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 12px; color: #9ca3af;">
+          <p style="margin: 0 0 4px;">Sent via ${appName} CRM</p>
+          <p style="margin: 0; font-size: 11px; color: #d1d5db;">You are receiving this communication as a registered contact.</p>
+        </div>
+      </div>
+      <!-- Open Tracking Pixel -->
+      <img src="${openTrackingUrl}" width="1" height="1" border="0" alt="" style="display:none !important; width:1px !important; height:1px !important; border:0 !important; visibility:hidden !important; overflow:hidden !important; mso-hide:all;" />
+    </body>
+    </html>
+  `.trim()
+
+  try {
+    await transporter.sendMail({
+      from,
+      to: params.to,
+      subject: params.subject,
+      text: params.content + (resolvedButtonText ? `\n\n${resolvedButtonText}: ${resolvedTargetUrl}` : ""),
+      html: formattedHtml,
     })
 
-    return { success: true }
+    await prisma.crmEmailLog.update({
+      where: { id: emailLog.id },
+      data: {
+        status: "SENT",
+        error: null,
+      },
+    })
+
+    return { success: true, logId: emailLog.id }
   } catch (sendErr: any) {
     const errorDetail = sendErr?.message || String(sendErr)
     console.error("sendCrmCampaignEmail dispatch error:", sendErr)
 
     try {
-      await prisma.crmEmailLog.create({
+      await prisma.crmEmailLog.update({
+        where: { id: emailLog.id },
         data: {
-          companyId: params.companyId,
-          campaignId: params.campaignId || null,
-          leadId: params.leadId || null,
-          customerId: params.customerId || null,
-          toEmail: params.to,
-          recipientName: params.recipientName || null,
-          subject: params.subject,
-          bodyPreview: params.content.slice(0, 300),
           status: "FAILED",
           error: errorDetail,
-        }
+        },
       })
     } catch (logErr) {
       console.warn("Failed to write CRM email failure log:", logErr)
     }
 
-    return { success: false, error: errorDetail }
+    return { success: false, error: errorDetail, logId: emailLog.id }
   }
 }
 

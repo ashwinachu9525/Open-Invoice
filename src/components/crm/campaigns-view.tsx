@@ -51,6 +51,8 @@ import {
   Check,
   XCircle,
   Filter,
+  MousePointerClick,
+  ExternalLink,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -75,8 +77,14 @@ interface CrmEmailLogItem {
   recipientName?: string | null
   subject: string
   bodyPreview?: string | null
+  buttonText?: string | null
+  buttonUrl?: string | null
   status: string
   error?: string | null
+  openCount?: number
+  clickCount?: number
+  openedAt?: string | Date | null
+  clickedAt?: string | Date | null
   sentAt: string | Date
   campaign?: { id: string; name: string } | null
 }
@@ -92,6 +100,8 @@ const STARTER_TEMPLATES = [
     name: "Exclusive B2B Proposal",
     subject: "Exclusive business growth proposal for {{name}}",
     targetAudience: "QUALIFIED_LEADS",
+    buttonText: "View Proposal",
+    buttonUrl: "",
     content:
       "Hi {{name}},\n\nWe noticed your requirements and have prepared an exclusive proposal tailored for your operations. Would you be open for a brief 10-minute discovery call this Thursday?\n\nWarm regards,\nSales Team",
   },
@@ -99,6 +109,8 @@ const STARTER_TEMPLATES = [
     name: "Prospect Follow-up & Demo",
     subject: "Following up on your requirements, {{name}}",
     targetAudience: "ALL_LEADS",
+    buttonText: "Schedule Walkthrough",
+    buttonUrl: "",
     content:
       "Hi {{name}},\n\nJust checking in following our earlier interaction. We've introduced several new capabilities that address your workflow challenges. Let us know if you'd like a personalized walkthrough!\n\nBest regards,\nAccount Team",
   },
@@ -106,6 +118,8 @@ const STARTER_TEMPLATES = [
     name: "Customer Appreciation & Upsell",
     subject: "Valued client update for {{name}}",
     targetAudience: "EXISTING_CUSTOMERS",
+    buttonText: "Explore Upgrades",
+    buttonUrl: "",
     content:
       "Dear {{name}},\n\nThank you for choosing us as your partner. As an existing client, you now have access to exclusive enterprise upgrades with preferred pricing.\n\nWarmly,\nCustomer Success",
   },
@@ -139,6 +153,8 @@ export function CampaignsView({
     subject: "",
     targetAudience: "QUALIFIED_LEADS",
     content: "",
+    buttonText: "",
+    buttonUrl: "",
     scheduledAt: "",
   })
 
@@ -162,6 +178,8 @@ export function CampaignsView({
       subject: "",
       targetAudience: "QUALIFIED_LEADS",
       content: "",
+      buttonText: "",
+      buttonUrl: typeof window !== "undefined" ? window.location.origin : "",
       scheduledAt: "",
     })
     setIsLaunchImmediate(launchNow)
@@ -176,6 +194,8 @@ export function CampaignsView({
       subject: camp.subject || "",
       targetAudience: camp.targetAudience || "QUALIFIED_LEADS",
       content: camp.content || "",
+      buttonText: camp.buttonText || "",
+      buttonUrl: camp.buttonUrl || "",
       scheduledAt: camp.scheduledAt ? new Date(camp.scheduledAt).toISOString().slice(0, 16) : "",
     })
     setIsLaunchImmediate(false)
@@ -191,6 +211,8 @@ export function CampaignsView({
       subject: tmpl.subject,
       targetAudience: tmpl.targetAudience,
       content: tmpl.content,
+      buttonText: tmpl.buttonText || "",
+      buttonUrl: typeof window !== "undefined" ? window.location.origin : "",
       scheduledAt: "",
     })
     setIsLaunchImmediate(true)
@@ -247,7 +269,7 @@ export function CampaignsView({
 
       setOpenModal(false)
       setIsEditingId(null)
-      setForm({ name: "", type: "EMAIL", subject: "", targetAudience: "QUALIFIED_LEADS", content: "", scheduledAt: "" })
+      setForm({ name: "", type: "EMAIL", subject: "", targetAudience: "QUALIFIED_LEADS", content: "", buttonText: "", buttonUrl: "", scheduledAt: "" })
       router.refresh()
     } catch (err: any) {
       toast.error(err.message || "Failed to process campaign")
@@ -639,6 +661,13 @@ export function CampaignsView({
                             <span>Scheduled: {new Date(camp.scheduledAt).toLocaleDateString("en-IN")}</span>
                           </div>
                         )}
+
+                        {camp.buttonText && (
+                          <div className="flex items-center gap-1.5 text-indigo-400 text-[11px]">
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">CTA Button: <strong>{camp.buttonText}</strong></span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Delivery Metrics Bar */}
@@ -798,6 +827,7 @@ export function CampaignsView({
                     <th className="py-2.5 px-4">Status</th>
                     <th className="py-2.5 px-4">Recipient</th>
                     <th className="py-2.5 px-4">Subject Line</th>
+                    <th className="py-2.5 px-4">Engagement (Opens / Clicks)</th>
                     <th className="py-2.5 px-4">Campaign</th>
                     <th className="py-2.5 px-4">Sent At</th>
                     <th className="py-2.5 px-4 text-right">Actions</th>
@@ -806,7 +836,7 @@ export function CampaignsView({
                 <tbody className="divide-y divide-white/5">
                   {filteredLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-10 text-center text-xs text-muted-foreground">
+                      <td colSpan={7} className="py-10 text-center text-xs text-muted-foreground">
                         <Mail className="h-8 w-8 mx-auto mb-2 opacity-40 text-muted-foreground" />
                         No email delivery logs found matching your criteria.
                       </td>
@@ -847,6 +877,23 @@ export function CampaignsView({
                                 Error: {log.error}
                               </div>
                             )}
+                          </td>
+
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <div className="flex flex-col gap-1 text-[11px]">
+                              <div className="flex items-center gap-1.5">
+                                <Eye className={cn("h-3 w-3", (log.openCount || 0) > 0 ? "text-emerald-400" : "text-muted-foreground")} />
+                                <span className={cn((log.openCount || 0) > 0 ? "text-emerald-400 font-semibold" : "text-muted-foreground")}>
+                                  {(log.openCount || 0) > 0 ? `${log.openCount} open${(log.openCount || 0) > 1 ? "s" : ""}` : "Unopened"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <MousePointerClick className={cn("h-3 w-3", (log.clickCount || 0) > 0 ? "text-blue-400" : "text-muted-foreground")} />
+                                <span className={cn((log.clickCount || 0) > 0 ? "text-blue-400 font-semibold" : "text-muted-foreground")}>
+                                  {(log.clickCount || 0) > 0 ? `${log.clickCount} click${(log.clickCount || 0) > 1 ? "s" : ""}` : "No clicks"}
+                                </span>
+                              </div>
+                            </div>
                           </td>
 
                           <td className="py-3 px-4">
@@ -952,6 +999,51 @@ export function CampaignsView({
                   </div>
                 )}
               </div>
+
+              {/* Engagement Metrics (Opens & Clicks) */}
+              <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-white/5 border border-white/10 text-xs">
+                <div>
+                  <span className="text-[10px] text-muted-foreground block flex items-center gap-1">
+                    <Eye className="h-3 w-3 text-emerald-400" />
+                    Email Opens
+                  </span>
+                  <span className={cn("font-bold text-sm", (selectedLog.openCount || 0) > 0 ? "text-emerald-400" : "text-muted-foreground")}>
+                    {(selectedLog.openCount || 0) > 0 ? `${selectedLog.openCount} open${(selectedLog.openCount || 0) > 1 ? "s" : ""}` : "Unopened"}
+                  </span>
+                  {selectedLog.openedAt && (
+                    <span className="text-[10px] text-muted-foreground block mt-0.5 font-mono">
+                      First: {new Date(selectedLog.openedAt).toLocaleString("en-IN")}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground block flex items-center gap-1">
+                    <MousePointerClick className="h-3 w-3 text-blue-400" />
+                    Link / CTA Clicks
+                  </span>
+                  <span className={cn("font-bold text-sm", (selectedLog.clickCount || 0) > 0 ? "text-blue-400" : "text-muted-foreground")}>
+                    {(selectedLog.clickCount || 0) > 0 ? `${selectedLog.clickCount} click${(selectedLog.clickCount || 0) > 1 ? "s" : ""}` : "No clicks"}
+                  </span>
+                  {selectedLog.clickedAt && (
+                    <span className="text-[10px] text-muted-foreground block mt-0.5 font-mono">
+                      First: {new Date(selectedLog.clickedAt).toLocaleString("en-IN")}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {selectedLog.buttonText && (
+                <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs space-y-1">
+                  <span className="font-semibold text-indigo-300 block flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    Configured CTA Button:
+                  </span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="font-bold text-foreground">{selectedLog.buttonText}</span>
+                    <span className="text-[11px] font-mono text-indigo-400 truncate max-w-xs">{selectedLog.buttonUrl || "Application URL"}</span>
+                  </div>
+                </div>
+              )}
 
               {selectedLog.error && (
                 <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs space-y-1">
@@ -1079,14 +1171,66 @@ export function CampaignsView({
               />
             </div>
 
+            {/* Dynamic CTA Button & Link */}
+            <div className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/15 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                  Dynamic CTA Button & Link Tracking
+                </Label>
+                <span className="text-[10px] text-muted-foreground">Optional</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-slate-300 font-medium">Button Label</Label>
+                  <Input
+                    placeholder="e.g. View Proposal / Book Demo"
+                    value={form.buttonText}
+                    onChange={(e) => setForm({ ...form, buttonText: e.target.value })}
+                    className="text-xs glass border-white/10"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] text-slate-300 font-medium">Dynamic Link</Label>
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, buttonUrl: typeof window !== "undefined" ? window.location.origin : "" })}
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300 hover:underline"
+                    >
+                      Use App URL
+                    </button>
+                  </div>
+                  <Input
+                    placeholder="Defaults to Application Link"
+                    value={form.buttonUrl}
+                    onChange={(e) => setForm({ ...form, buttonUrl: e.target.value })}
+                    className="text-xs glass border-white/10"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Both email opens and button clicks are automatically tracked in your CRM Campaign analytics.
+              </p>
+            </div>
+
             {/* Live Token Preview */}
-            <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-[11px] text-muted-foreground space-y-1">
+            <div className="p-3 rounded-xl bg-white/5 border border-white/5 text-[11px] text-muted-foreground space-y-2">
               <span className="font-semibold text-foreground block">
                 Live Preview (Sample Lead: Ramesh Kumar):
               </span>
               <p className="italic text-foreground/80">
                 Subject: {form.subject ? form.subject.replace(/\{\{name\}\}/gi, "Ramesh Kumar") : "—"}
               </p>
+              {form.buttonText && (
+                <div className="pt-1 text-center">
+                  <div className="inline-block px-4 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold text-xs shadow-sm">
+                    {form.buttonText} ➔ {form.buttonUrl || "Application URL"}
+                  </div>
+                </div>
+              )}
             </div>
 
             <DialogFooter className="pt-2 flex flex-col sm:flex-row gap-2">
@@ -1195,6 +1339,16 @@ export function CampaignsView({
                   {(previewCampaign.content || "No message body provided.")
                     .replace(/\{\{name\}\}/gi, "Aarav Sharma")}
                 </div>
+                {previewCampaign.buttonText && (
+                  <div className="pt-2 pb-4 text-center border-t border-white/5 bg-white/2">
+                    <div className="inline-block px-5 py-2 rounded-lg bg-indigo-600 text-white font-semibold text-xs shadow-md">
+                      {previewCampaign.buttonText}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-1.5 font-mono">
+                      Target Link: {previewCampaign.buttonUrl || "Application URL"}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Delivery Metrics */}

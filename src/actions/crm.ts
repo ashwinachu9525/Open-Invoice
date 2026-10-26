@@ -1197,6 +1197,8 @@ export async function createCrmCampaign(input: {
   subject?: string
   content?: string
   targetAudience?: string
+  buttonText?: string | null
+  buttonUrl?: string | null
   scheduledAt?: string | null
 }) {
   return withDbRetry(async () => {
@@ -1210,6 +1212,8 @@ export async function createCrmCampaign(input: {
           subject: input.subject || null,
           content: input.content || null,
           targetAudience: input.targetAudience || "ALL_LEADS",
+          buttonText: input.buttonText?.trim() || null,
+          buttonUrl: input.buttonUrl?.trim() || null,
           status: input.scheduledAt ? "SCHEDULED" : "DRAFT",
           scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
         }
@@ -1268,13 +1272,15 @@ export async function launchCrmCampaign(campaignId: string) {
           const personalizedSubject = (campaign.subject || "Outreach").replace(/\{\{name\}\}/gi, rec.name)
           const personalizedContent = (campaign.content || "").replace(/\{\{name\}\}/gi, rec.name)
 
-          // 1. Dispatch actual email via SMTP
+          // 1. Dispatch actual email via SMTP with open/click tracking & CTA button
           const sendResult = await sendCrmCampaignEmail({
             companyId,
             to: rec.email,
             recipientName: rec.name,
             subject: personalizedSubject,
             content: personalizedContent,
+            buttonText: campaign.buttonText,
+            buttonUrl: campaign.buttonUrl,
             campaignId: campaign.id,
             leadId: rec.type === "LEAD" ? rec.id : undefined,
             customerId: rec.type === "CUSTOMER" ? rec.id : undefined,
@@ -1390,6 +1396,8 @@ export async function resendCrmEmailLog(logId: string) {
         recipientName: log.recipientName || undefined,
         subject: log.subject,
         content: log.bodyPreview || log.subject,
+        buttonText: log.buttonText,
+        buttonUrl: log.buttonUrl,
         campaignId: log.campaignId || undefined,
         leadId: log.leadId || undefined,
         customerId: log.customerId || undefined,
@@ -1415,6 +1423,8 @@ export async function updateCrmCampaign(
     subject?: string
     content?: string
     targetAudience?: string
+    buttonText?: string | null
+    buttonUrl?: string | null
     status?: string
     scheduledAt?: string | null
   }
@@ -1430,6 +1440,8 @@ export async function updateCrmCampaign(
           ...(input.subject !== undefined && { subject: input.subject }),
           ...(input.content !== undefined && { content: input.content }),
           ...(input.targetAudience !== undefined && { targetAudience: input.targetAudience }),
+          ...(input.buttonText !== undefined && { buttonText: input.buttonText?.trim() || null }),
+          ...(input.buttonUrl !== undefined && { buttonUrl: input.buttonUrl?.trim() || null }),
           ...(input.status !== undefined && { status: input.status }),
           ...(input.scheduledAt !== undefined && {
             scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,

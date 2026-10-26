@@ -1061,6 +1061,8 @@ model CrmCampaign {
   subject        String?
   content        String?
   targetAudience String?   @default("ALL_LEADS") // ALL_LEADS, QUALIFIED_LEADS, EXISTING_CUSTOMERS
+  buttonText     String?   // Dynamic button label (e.g. "View Proposal", "Get Started")
+  buttonUrl      String?   // Dynamic link destination (defaults to application link)
   sentCount      Int       @default(0)
   openCount      Int       @default(0)
   clickCount     Int       @default(0)
@@ -1085,8 +1087,14 @@ model CrmEmailLog {
   recipientName String?
   subject       String
   bodyPreview   String?
+  buttonText    String?
+  buttonUrl     String?
   status        String       // "SENT" | "FAILED"
   error         String?
+  openedAt      DateTime?
+  clickedAt     DateTime?
+  openCount     Int          @default(0)
+  clickCount    Int          @default(0)
   sentAt        DateTime     @default(now())
 
   company       Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1096,6 +1104,8 @@ model CrmEmailLog {
   @@index([campaignId])
   @@index([status])
   @@index([sentAt])
+  @@index([openedAt])
+  @@index([clickedAt])
 }
 
 model CrmWorkflow {
