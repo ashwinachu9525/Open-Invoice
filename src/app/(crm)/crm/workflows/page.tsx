@@ -1,4 +1,4 @@
-import { getCrmWorkflows } from "@/actions/crm"
+import { getCrmWorkflows, getCrmTeamMembers } from "@/actions/crm"
 import { WorkflowStudio } from "@/components/crm/workflow-studio"
 
 export const dynamic = "force-dynamic"
@@ -9,8 +9,12 @@ export const metadata = {
 }
 
 export default async function WorkflowsPage() {
-  const result = await getCrmWorkflows()
-  const workflows = result.workflows || []
+  const [wfResult, teamResult] = await Promise.all([
+    getCrmWorkflows(),
+    getCrmTeamMembers(),
+  ])
+  const workflows = wfResult.workflows || []
+  const teamMembers = teamResult.members || []
 
   return (
     <div className="space-y-6">
@@ -23,7 +27,7 @@ export default async function WorkflowsPage() {
         </div>
       </div>
 
-      <WorkflowStudio initialWorkflows={workflows} />
+      <WorkflowStudio initialWorkflows={workflows} teamMembers={teamMembers} />
     </div>
   )
 }

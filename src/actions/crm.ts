@@ -741,17 +741,47 @@ export async function getCrmActivities(filters?: { type?: string; status?: strin
       orderBy: { createdAt: "desc" }
     })
 
-    return { success: true, activities }
+    const normalized = activities.map((act: any, idx: number) => {
+      let status = act.status
+      if (status === "PENDING") status = "TODO"
+      if (status === "COMPLETED") status = "DONE"
+      return {
+        ...act,
+        status,
+        jiraKey: act.jiraKey || `CRM-${activities.length - idx}`,
+        priority: act.priority || "MEDIUM",
+        comments: Array.isArray(act.comments) ? act.comments : [],
+      }
+    })
+
+    return { success: true, activities: normalized }
   } catch (error: any) {
     console.error("getCrmActivities error:", error)
     return { error: error.message || "Failed to load activities." }
   }
 }
 
+export async function getCrmTeamMembers() {
+  try {
+    const { companyId, db } = await requireUserAndTenant()
+    const members = await db.user.findMany({
+      where: { companyId },
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: "asc" }
+    })
+    return { success: true, members }
+  } catch (error: any) {
+    return { error: error.message || "Failed to load team members.", members: [] }
+  }
+}
+
 export async function createCrmActivity(input: {
-  type: "CALL" | "EMAIL" | "MEETING" | "NOTE" | "TASK"
+  type?: "CALL" | "EMAIL" | "MEETING" | "NOTE" | "TASK"
   title: string
   description?: string
+  priority?: "HIGHEST" | "HIGH" | "MEDIUM" | "LOW" | "LOWEST"
+  status?: "BACKLOG" | "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "DONE" | "PENDING" | "COMPLETED"
+  jiraKey?: string
   dueDate?: string | null
   assignedToId?: string
   customerId?: string
@@ -760,18 +790,28 @@ export async function createCrmActivity(input: {
 }) {
   try {
     const { user, companyId, db } = await requireUserAndTenant()
+    const count = await db.crmActivity.count({ where: { companyId } })
+    const jiraKey = input.jiraKey || `CRM-${count + 1}`
+    const priority = input.priority || "MEDIUM"
+    let status = input.status || (input.type === "NOTE" ? "DONE" : "TODO")
+    if (status === "PENDING") status = "TODO"
+    if (status === "COMPLETED") status = "DONE"
+
     const activity = await db.crmActivity.create({
       data: {
         companyId,
         type: input.type || "TASK",
         title: input.title,
         description: input.description || null,
+        status,
+        priority,
+        jiraKey,
+        comments: [],
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
         assignedToId: input.assignedToId || user.id,
         customerId: input.customerId || null,
         dealId: input.dealId || null,
         leadId: input.leadId || null,
-        status: input.type === "NOTE" ? "COMPLETED" : "PENDING",
       },
       include: { assignedTo: true, customer: true, deal: true, lead: true }
     })
@@ -782,6 +822,81 @@ export async function createCrmActivity(input: {
   } catch (error: any) {
     console.error("createCrmActivity error:", error)
     return { error: error.message || "Failed to create activity." }
+  }
+}
+
+export async function updateActivityDetails(id: string, data: {
+  title?: string
+  description?: string
+  status?: string
+  priority?: string
+  dueDate?: string | null
+  assignedToId?: string | null
+}) {
+  try {
+    const { companyId, db } = await requireUserAndTenant()
+    const updateData: any = {}
+    if (data.title !== undefined) updateData.title = data.title
+    if (data.description !== undefined) updateData.description = data.description
+    if (data.status !== undefined) {
+      updateData.status = data.status
+      if (data.status === "DONE" || data.status === "COMPLETED") {
+        updateData.completedAt = new Date()
+      } else {
+        updateData.completedAt = null
+      }
+    }
+    if (data.priority !== undefined) updateData.priority = data.priority
+    if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null
+    if (data.assignedToId !== undefined) updateData.assignedToId = data.assignedToId
+
+    const updated = await db.crmActivity.update({
+      where: { id, companyId },
+      data: updateData,
+      include: { assignedTo: true, customer: true, deal: true, lead: true }
+    })
+    revalidatePath("/crm/activities")
+    revalidatePath("/crm/dashboard")
+    return { success: true, activity: updated }
+  } catch (error: any) {
+    return { error: error.message || "Failed to update activity details." }
+  }
+}
+
+export async function addActivityComment(activityId: string, input: {
+  heading: string
+  text: string
+}) {
+  try {
+    const { user, companyId, db } = await requireUserAndTenant()
+    const activity = await db.crmActivity.findUnique({
+      where: { id: activityId, companyId }
+    })
+    if (!activity) return { error: "Activity not found" }
+
+    const existingComments: any[] = Array.isArray(activity.comments) ? activity.comments : []
+    const newComment = {
+      id: "comm_" + Math.random().toString(36).substring(2, 9),
+      heading: input.heading.trim() || "Status Update",
+      text: input.text.trim(),
+      authorId: user.id,
+      authorName: user.name || user.email || "Team Member",
+      authorEmail: user.email,
+      createdAt: new Date().toISOString(),
+    }
+
+    const updated = await db.crmActivity.update({
+      where: { id: activityId, companyId },
+      data: {
+        comments: [...existingComments, newComment]
+      },
+      include: { assignedTo: true, customer: true, deal: true, lead: true }
+    })
+
+    revalidatePath("/crm/activities")
+    return { success: true, activity: updated, comment: newComment }
+  } catch (error: any) {
+    return { error: error.message || "Failed to add comment." }
   }
 }
 
@@ -1014,7 +1129,11 @@ export async function triggerWorkflowsForEvent(
       for (const action of actions) {
         try {
           if (action.actionType === "ASSIGN_USER") {
-            const userId = action.config.userId
+            let userId = action.config?.userId
+            if (!userId) {
+              const defaultUser = await db.user.findFirst({ where: { companyId: event.companyId } })
+              userId = defaultUser?.id
+            }
             if (userId) {
               if (event.entityType === "LEAD") {
                 await db.crmLead.update({ where: { id: event.entityId }, data: { assignedToId: userId } })

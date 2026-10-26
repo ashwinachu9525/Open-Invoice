@@ -1022,7 +1022,10 @@ model CrmActivity {
   type         String    @default("TASK") // CALL, EMAIL, MEETING, NOTE, TASK
   title        String
   description  String?
-  status       String    @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  status       String    @default("TODO") // BACKLOG, TODO, IN_PROGRESS, IN_REVIEW, DONE, COMPLETED
+  priority     String    @default("MEDIUM") // HIGHEST, HIGH, MEDIUM, LOW, LOWEST
+  jiraKey      String?   // e.g. CRM-42
+  comments     Json?     // Array of { id, authorName, heading, text, createdAt }
   dueDate      DateTime?
   completedAt  DateTime?
   assignedToId String?

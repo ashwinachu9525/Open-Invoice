@@ -1,4 +1,4 @@
-import { getCrmActivities } from "@/actions/crm"
+import { getCrmActivities, getCrmTeamMembers } from "@/actions/crm"
 import { ActivitiesView } from "@/components/crm/activities-view"
 
 export const dynamic = "force-dynamic"
@@ -9,8 +9,12 @@ export const metadata = {
 }
 
 export default async function ActivitiesPage() {
-  const result = await getCrmActivities()
-  const activities = result.activities || []
+  const [actResult, teamResult] = await Promise.all([
+    getCrmActivities(),
+    getCrmTeamMembers(),
+  ])
+  const activities = actResult.activities || []
+  const teamMembers = teamResult.members || []
 
   return (
     <div className="space-y-6">
@@ -18,12 +22,12 @@ export default async function ActivitiesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Activities & Task Center</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Manage your daily calls, client meetings, follow-up emails, and action items.
+            Jira-style task board, sprint backlogs, and communication records.
           </p>
         </div>
       </div>
 
-      <ActivitiesView initialActivities={activities} />
+      <ActivitiesView initialActivities={activities} teamMembers={teamMembers} />
     </div>
   )
 }
