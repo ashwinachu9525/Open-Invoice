@@ -177,6 +177,7 @@ model Company {
   teamInvitations TeamInvitation[]
   apiKeys        ApiKey[]
   testimonials   Testimonial[]
+  backups        CompanyBackup[]
   
   slug              String?   @unique
   tagline           String?
@@ -886,3 +887,21 @@ model TestCertificate {
   @@index([invoiceId])
   @@index([certificateNumber])
 }
+
+model CompanyBackup {
+  id         String   @id @default(cuid())
+  companyId  String
+  fileName   String
+  backupType String   @default("COMPLETE") // COMPLETE or MODULE_WISE
+  modules    String   // JSON array of modules
+  counts     String   // JSON object of counts
+  fileSize   Int      @default(0)
+  payload    String   // Full JSON backup payload stored in database
+  createdAt  DateTime @default(now())
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([createdAt])
+}
+

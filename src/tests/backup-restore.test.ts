@@ -79,6 +79,12 @@ vi.mock("@/lib/prisma", () => ({
     aISettings: {
       findUnique: vi.fn(),
     },
+    companyBackup: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      deleteMany: vi.fn(),
+    },
   },
 }))
 
@@ -376,8 +382,51 @@ describe("Customer-Specific Backup & Restore Engine", () => {
   })
 
   // ── 7. Path Traversal & Security Isolation ──────────────────────────────────
-  it("should prevent path traversal when requesting server backups", async () => {
-    await expect(getServerBackup(companyAId, "../../etc/passwd")).rejects.toThrow()
-    await expect(deleteServerBackup(companyAId, "../../../config")).rejects.toThrow()
+  it("should prevent unauthorized or malicious path requests when requesting server backups", async () => {
+    ;(prisma.companyBackup.findFirst as any).mockResolvedValue(null)
+    ;(prisma.companyBackup.deleteMany as any).mockResolvedValue({ count: 0 })
+
+    await expect(getServerBackup(companyAId, "../../etc/passwd")).rejects.toThrow("Backup file not found or access denied.")
+    await expect(deleteServerBackup(companyAId, "../../../config")).rejects.toThrow("Backup file not found or access denied.")
+  })
+
+  // ── 8. Vercel Serverless Database Storage ───────────────────────────────────
+  it("should save and list backups directly in PostgreSQL without local disk access", async () => {
+    const backup = await createCompanyBackup(companyAId)
+
+    const mockDbRecord = {
+      id: "backup_test_123",
+      companyId: companyAId,
+      fileName: "backup_complete_test.json",
+      backupType: "COMPLETE",
+      modules: JSON.stringify(["customers", "invoices"]),
+      counts: JSON.stringify({ customers: 1, invoices: 1 }),
+      fileSize: 1024,
+      payload: JSON.stringify(backup),
+      createdAt: new Date(),
+    }
+
+    ;(prisma.companyBackup.create as any).mockResolvedValue(mockDbRecord)
+    ;(prisma.companyBackup.findMany as any).mockResolvedValue([mockDbRecord])
+    ;(prisma.companyBackup.findFirst as any).mockResolvedValue(mockDbRecord)
+
+    const saved = await saveServerBackup(companyAId, backup)
+    expect(saved.id).toBe("backup_test_123")
+    expect(prisma.companyBackup.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          companyId: companyAId,
+          backupType: "COMPLETE",
+        }),
+      })
+    )
+
+    const list = await listServerBackups(companyAId)
+    expect(list.length).toBe(1)
+    expect(list[0].id).toBe("backup_test_123")
+
+    const retrieved = await getServerBackup(companyAId, "backup_test_123")
+    expect(retrieved.metadata.version).toBe("2.0.0")
+    expect(retrieved.metadata.companyId).toBe(companyAId)
   })
 })

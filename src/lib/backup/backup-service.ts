@@ -1,6 +1,4 @@
 import crypto from "crypto"
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync, statSync } from "fs"
-import path from "path"
 import { prisma } from "@/lib/prisma"
 import {
   ALL_BACKUP_MODULES,
@@ -14,22 +12,6 @@ import {
   RestoreStrategy,
   ServerBackupRecord,
 } from "./types"
-
-const BACKUPS_ROOT = path.join(process.cwd(), "data", "backups")
-
-function getCompanyBackupDir(companyId: string): string {
-  // Prevent any directory traversal in companyId
-  const safeCompanyId = companyId.replace(/[^a-zA-Z0-9_-]/g, "")
-  const dir = path.join(BACKUPS_ROOT, safeCompanyId)
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true })
-  }
-  return dir
-}
-
-function sanitizeBackupFileName(fileName: string): string {
-  return path.basename(fileName).replace(/[^a-zA-Z0-9_.-]/g, "")
-}
 
 function computeChecksum(data: any): string {
   return crypto.createHash("sha256").update(JSON.stringify(data)).digest("hex")
@@ -269,102 +251,127 @@ export async function createCompanyBackup(
 }
 
 /**
- * Saves a backup file to server storage under the tenant's isolated directory.
+ * Saves a backup record into PostgreSQL via Prisma, ensuring full compatibility with
+ * serverless environments like Vercel where local file systems are strictly read-only.
  */
 export async function saveServerBackup(
   companyId: string,
   payload: BackupPayload,
   labelPrefix = "backup"
 ): Promise<ServerBackupRecord> {
-  const dir = getCompanyBackupDir(companyId)
   const dateStr = new Date().toISOString().replace(/[:.]/g, "-")
   const typeTag = payload.metadata.backupType.toLowerCase()
   const randomSuffix = crypto.randomBytes(3).toString("hex")
   const fileName = `${labelPrefix}_${typeTag}_${dateStr}_${randomSuffix}.json`
-  const filePath = path.join(dir, fileName)
 
-  const content = JSON.stringify(payload, null, 2)
-  writeFileSync(filePath, content, "utf-8")
-  const stat = statSync(filePath)
+  const serialized = JSON.stringify(payload)
+  const fileSize = Buffer.byteLength(serialized, "utf-8")
+
+  const record = await prisma.companyBackup.create({
+    data: {
+      companyId,
+      fileName,
+      backupType: payload.metadata.backupType,
+      modules: JSON.stringify(payload.metadata.modules),
+      counts: JSON.stringify(payload.metadata.counts),
+      fileSize,
+      payload: serialized,
+    },
+  })
 
   return {
-    id: fileName,
-    fileName,
-    fileSize: stat.size,
-    createdAt: payload.metadata.createdAt,
-    backupType: payload.metadata.backupType,
-    modules: payload.metadata.modules,
-    counts: payload.metadata.counts,
-    companyId,
+    id: record.id,
+    fileName: record.fileName,
+    fileSize: record.fileSize,
+    createdAt: record.createdAt.toISOString(),
+    backupType: record.backupType as any,
+    modules: typeof record.modules === "string" ? JSON.parse(record.modules) : (record.modules || []),
+    counts: typeof record.counts === "string" ? JSON.parse(record.counts) : (record.counts || {}),
+    companyId: record.companyId,
   }
 }
 
 /**
- * Lists backups for the authenticated customer only.
+ * Lists backups for the authenticated customer only from PostgreSQL.
  */
 export async function listServerBackups(companyId: string): Promise<ServerBackupRecord[]> {
-  const dir = getCompanyBackupDir(companyId)
-  if (!existsSync(dir)) return []
+  try {
+    const records = await prisma.companyBackup.findMany({
+      where: { companyId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        fileName: true,
+        fileSize: true,
+        createdAt: true,
+        backupType: true,
+        modules: true,
+        counts: true,
+        companyId: true,
+      },
+    })
 
-  const files = readdirSync(dir).filter((f) => f.endsWith(".json"))
-  const records: ServerBackupRecord[] = []
+    return records.map((r) => {
+      let modules: BackupModule[] = []
+      let counts: Record<BackupModule, number> = {} as any
+      try {
+        modules = typeof r.modules === "string" ? JSON.parse(r.modules) : (r.modules || [])
+      } catch {}
+      try {
+        counts = typeof r.counts === "string" ? JSON.parse(r.counts) : (r.counts || {})
+      } catch {}
 
-  for (const file of files) {
-    try {
-      const filePath = path.join(dir, file)
-      const stat = statSync(filePath)
-      const raw = readFileSync(filePath, "utf-8")
-      const parsed = JSON.parse(raw) as BackupPayload
-
-      if (parsed?.metadata?.version) {
-        records.push({
-          id: file,
-          fileName: file,
-          fileSize: stat.size,
-          createdAt: parsed.metadata.createdAt || stat.mtime.toISOString(),
-          backupType: parsed.metadata.backupType || "MODULE_WISE",
-          modules: parsed.metadata.modules || [],
-          counts: parsed.metadata.counts || ({} as any),
-          companyId,
-        })
+      return {
+        id: r.id,
+        fileName: r.fileName,
+        fileSize: r.fileSize,
+        createdAt: r.createdAt.toISOString(),
+        backupType: r.backupType as any,
+        modules,
+        counts,
+        companyId: r.companyId,
       }
-    } catch (e) {
-      console.warn(`[BackupService] Skipping invalid backup file: ${file}`, e)
-    }
+    })
+  } catch (err) {
+    console.warn("[BackupService] listServerBackups error:", err)
+    return []
   }
-
-  return records.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 }
 
 /**
  * Retrieves a server backup file ensuring strict tenant isolation.
  */
 export async function getServerBackup(companyId: string, backupId: string): Promise<BackupPayload> {
-  const safeFileName = sanitizeBackupFileName(backupId)
-  const dir = getCompanyBackupDir(companyId)
-  const filePath = path.join(dir, safeFileName)
+  const record = await prisma.companyBackup.findFirst({
+    where: {
+      companyId,
+      OR: [{ id: backupId }, { fileName: backupId }],
+    },
+    select: { payload: true },
+  })
 
-  if (!existsSync(filePath)) {
+  if (!record || !record.payload) {
     throw new Error("Backup file not found or access denied.")
   }
 
-  const raw = readFileSync(filePath, "utf-8")
-  return validateBackupFile(raw)
+  return validateBackupFile(record.payload)
 }
 
 /**
  * Deletes a server backup file ensuring strict tenant isolation.
  */
 export async function deleteServerBackup(companyId: string, backupId: string): Promise<boolean> {
-  const safeFileName = sanitizeBackupFileName(backupId)
-  const dir = getCompanyBackupDir(companyId)
-  const filePath = path.join(dir, safeFileName)
+  const result = await prisma.companyBackup.deleteMany({
+    where: {
+      companyId,
+      OR: [{ id: backupId }, { fileName: backupId }],
+    },
+  })
 
-  if (!existsSync(filePath)) {
+  if (result.count === 0) {
     throw new Error("Backup file not found or access denied.")
   }
 
-  unlinkSync(filePath)
   return true
 }
 

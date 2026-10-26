@@ -89,7 +89,11 @@ export async function createBackupAction(
 
     let serverRecord: ServerBackupRecord | undefined = undefined
     if (saveOnServer) {
-      serverRecord = await saveServerBackup(companyId, payload)
+      try {
+        serverRecord = await saveServerBackup(companyId, payload)
+      } catch (saveErr: any) {
+        console.warn("[BackupAction] Could not archive backup to database:", saveErr?.message)
+      }
     }
 
     return {
