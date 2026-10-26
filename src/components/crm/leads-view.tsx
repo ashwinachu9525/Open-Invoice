@@ -29,9 +29,12 @@ import {
   Star,
   Loader2,
   Filter,
+  Trash2,
+  AlertTriangle,
+  ShieldAlert,
 } from "lucide-react"
 import { toast } from "sonner"
-import { convertLead, createLead, updateLead } from "@/actions/crm"
+import { convertLead, createLead, updateLead, deleteLead } from "@/actions/crm"
 
 interface LeadsViewProps {
   initialLeads: any[]
@@ -39,6 +42,7 @@ interface LeadsViewProps {
 
 export function LeadsView({ initialLeads }: LeadsViewProps) {
   const router = useRouter()
+  const [leads, setLeads] = React.useState<any[]>(initialLeads)
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("ALL")
   const [regionFilter, setRegionFilter] = React.useState("ALL")
@@ -47,8 +51,17 @@ export function LeadsView({ initialLeads }: LeadsViewProps) {
   const [dealValue, setDealValue] = React.useState("")
   const [loading, setLoading] = React.useState(false)
 
+  // Lead Delete states
+  const [leadToDelete, setLeadToDelete] = React.useState<any | null>(null)
+  const [deleteReason, setDeleteReason] = React.useState("")
+  const [deleting, setDeleting] = React.useState(false)
+
+  React.useEffect(() => {
+    setLeads(initialLeads)
+  }, [initialLeads])
+
   // Filter leads locally for instant interaction
-  const filtered = initialLeads.filter((lead) => {
+  const filtered = leads.filter((lead) => {
     const matchesSearch =
       !search ||
       lead.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -99,6 +112,24 @@ export function LeadsView({ initialLeads }: LeadsViewProps) {
       router.refresh()
     } catch (err: any) {
       toast.error(err.message || "Failed to update status")
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!leadToDelete) return
+    setDeleting(true)
+    try {
+      const res = await deleteLead(leadToDelete.id, deleteReason)
+      if (res.error) throw new Error(res.error)
+      toast.success(`Lead "${leadToDelete.name}" deleted and recorded in security audit logs`)
+      setLeads((prev) => prev.filter((l) => l.id !== leadToDelete.id))
+      setLeadToDelete(null)
+      setDeleteReason("")
+      router.refresh()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete lead")
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -153,7 +184,7 @@ export function LeadsView({ initialLeads }: LeadsViewProps) {
           <Target className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
           <h3 className="text-base font-semibold text-foreground">No leads found</h3>
           <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-            {initialLeads.length === 0
+            {leads.length === 0
               ? "Start capturing inbound prospects by clicking the '+ New' button in the header."
               : "No leads matched your search and filter criteria."}
           </p>
@@ -171,31 +202,47 @@ export function LeadsView({ initialLeads }: LeadsViewProps) {
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <CardTitle className="text-sm font-bold text-foreground hover:underline cursor-pointer">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-sm font-bold text-foreground hover:underline cursor-pointer truncate">
                         {lead.name}
                       </CardTitle>
                       {lead.companyName && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <Building className="h-3 w-3" />
-                          <span>{lead.companyName}</span>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
+                          <Building className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{lead.companyName}</span>
                         </p>
                       )}
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                        lead.status === "QUALIFIED"
-                          ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                          : lead.status === "CONVERTED"
-                          ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                          : lead.status === "NEW"
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                          : "bg-white/5 text-muted-foreground"
-                      }`}
-                    >
-                      {lead.status}
-                    </Badge>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          lead.status === "QUALIFIED"
+                            ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                            : lead.status === "CONVERTED"
+                            ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                            : lead.status === "NEW"
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                            : "bg-white/5 text-muted-foreground"
+                        }`}
+                      >
+                        {lead.status}
+                      </Badge>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setLeadToDelete(lead)
+                          setDeleteReason("")
+                        }}
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                        title="Delete lead (Logged to audit trail)"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
 
@@ -325,6 +372,94 @@ export function LeadsView({ initialLeads }: LeadsViewProps) {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Lead & Audit Confirmation Dialog ── */}
+      <Dialog open={!!leadToDelete} onOpenChange={(open) => !open && setLeadToDelete(null)}>
+        <DialogContent className="sm:max-w-md glass border-white/10 rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-red-400">
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+              Delete Lead: {leadToDelete?.name}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Are you sure you want to delete this prospect? This action will remove the lead from active views and create an immutable record in your security audit logs.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Prospect:</span>
+                <span className="font-semibold text-foreground">{leadToDelete?.name}</span>
+              </div>
+              {leadToDelete?.companyName && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Company:</span>
+                  <span className="text-foreground">{leadToDelete.companyName}</span>
+                </div>
+              )}
+              {leadToDelete?.email && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Email:</span>
+                  <span className="font-mono text-slate-300">{leadToDelete.email}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Status:</span>
+                <span className="font-semibold text-emerald-400">{leadToDelete?.status}</span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px] font-semibold text-slate-300">
+                Reason for deletion (Recorded in Audit Logs):
+              </Label>
+              <Input
+                placeholder="e.g. Duplicate prospect, No longer interested, Invalid contact"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                className="text-xs glass border-white/10"
+              />
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-[11px] flex items-start gap-2">
+              <ShieldAlert className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+              <span>
+                <b>Audit Trail Notice:</b> Your user ID, timestamp, lead details, and deletion reason will be permanently recorded in the company audit log.
+              </span>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2 flex flex-row justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setLeadToDelete(null)}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={deleting}
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold gap-1.5 shadow-md shadow-red-600/20"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>Deleting...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete Lead</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

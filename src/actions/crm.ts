@@ -447,6 +447,107 @@ export async function updateLead(id: string, data: any) {
   }
 }
 
+export async function deleteLead(leadId: string, reason?: string) {
+  return withDbRetry(async () => {
+    try {
+      const { user, companyId, db } = await requireUserAndTenant()
+
+      const lead = await db.crmLead.findUnique({
+        where: { id: leadId, companyId },
+        include: {
+          assignedTo: { select: { id: true, name: true, email: true } },
+        },
+      })
+      if (!lead) return { error: "Lead not found." }
+
+      // 1. Soft-delete the lead
+      await db.crmLead.update({
+        where: { id: leadId },
+        data: { deletedAt: new Date() },
+      })
+
+      // 2. Security Audit Log
+      await createAuditLog({
+        companyId,
+        userId: user.id,
+        action: "LEAD_DELETE",
+        entity: "CrmLead",
+        entityId: lead.id,
+        details: {
+          leadName: lead.name,
+          companyName: lead.companyName || null,
+          email: lead.email || null,
+          phone: lead.phone || null,
+          status: lead.status,
+          score: lead.score,
+          estimatedValue: lead.estimatedValue,
+          region: lead.region,
+          assignedTo: lead.assignedTo?.name || null,
+          reason: reason?.trim() || "User deleted lead from CRM dashboard",
+        },
+        db,
+      })
+
+      // 3. CRM Activity Timeline entry
+      await db.crmActivity.create({
+        data: {
+          companyId,
+          type: "NOTE",
+          title: `Lead Deleted: ${lead.name}`,
+          description: `Lead was soft-deleted by ${user.name || user.email}.${reason?.trim() ? ` Reason: ${reason.trim()}` : ""}`,
+          status: "COMPLETED",
+          leadId: lead.id,
+          assignedToId: user.id,
+        },
+      })
+
+      revalidatePath("/crm/leads")
+      revalidatePath("/crm/dashboard")
+      revalidatePath("/crm/campaigns")
+      return { success: true, leadName: lead.name }
+    } catch (error: any) {
+      console.error("deleteLead error:", error)
+      return { error: error.message || "Failed to delete lead." }
+    }
+  })
+}
+
+export async function restoreLead(leadId: string) {
+  return withDbRetry(async () => {
+    try {
+      const { user, companyId, db } = await requireUserAndTenant()
+      const lead = await db.crmLead.findUnique({
+        where: { id: leadId, companyId },
+      })
+      if (!lead) return { error: "Lead not found." }
+
+      await db.crmLead.update({
+        where: { id: leadId },
+        data: { deletedAt: null },
+      })
+
+      await createAuditLog({
+        companyId,
+        userId: user.id,
+        action: "LEAD_RESTORE",
+        entity: "CrmLead",
+        entityId: lead.id,
+        details: {
+          leadName: lead.name,
+          restoredBy: user.name || user.email,
+        },
+        db,
+      })
+
+      revalidatePath("/crm/leads")
+      revalidatePath("/crm/dashboard")
+      return { success: true }
+    } catch (error: any) {
+      return { error: error.message || "Failed to restore lead." }
+    }
+  })
+}
+
 export async function convertLead(leadId: string, options: {
   createDeal?: boolean
   dealTitle?: string
