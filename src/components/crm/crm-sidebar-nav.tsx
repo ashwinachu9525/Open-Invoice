@@ -41,6 +41,7 @@ export function CrmDesktopNavLinks() {
           <Link
             key={item.href}
             href={item.href}
+            prefetch={false}
             className={cn(
               "group flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:translate-x-0.5",
               isActive
@@ -96,6 +97,7 @@ export function CrmMobileNavLinks() {
             render={
               <Link
                 href={item.href}
+                prefetch={false}
                 className={cn(
                   "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
                   isActive

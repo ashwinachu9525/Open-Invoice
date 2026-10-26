@@ -11,6 +11,7 @@ import {
   checkDatabaseHealth,
   query,
   withTransaction,
+  withDbRetry,
 } from "@/lib/db-pool"
 
 export {
@@ -19,6 +20,7 @@ export {
   checkDatabaseHealth,
   query,
   withTransaction,
+  withDbRetry,
 }
 
 const globalForPrisma = globalThis as unknown as {

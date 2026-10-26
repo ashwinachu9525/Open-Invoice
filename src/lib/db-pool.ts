@@ -130,7 +130,8 @@ export function buildSslConfig(rawDatabaseUrl: string): SslConfigResult {
 
 /**
  * Returns the configured maximum pool connections.
- * Defaults strictly to 2 to stay well within Aiven Free tier's 20-connection cap.
+ * In serverless environments (e.g. Vercel), each Lambda container executes one request at a time;
+ * enforcing max 1 connection prevents concurrent lambdas from exceeding Aiven's 20-connection cap.
  */
 export function getMaxPoolConnections(): number {
   const envVal =
@@ -145,7 +146,16 @@ export function getMaxPoolConnections(): number {
     }
   }
 
-  // Strict default of 2 connections per backend instance
+  const isServerless =
+    Boolean(process.env.VERCEL) ||
+    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+    Boolean(process.env.NETLIFY)
+
+  if (isServerless) {
+    return 1
+  }
+
+  // Strict default of 2 connections per backend instance for long-running processes
   return 2
 }
 
@@ -167,7 +177,15 @@ export function createNewPool(databaseUrl: string, maxConnectionsOverride?: numb
   const { ssl, cleanUrl } = buildSslConfig(databaseUrl)
   const max = maxConnectionsOverride ?? getMaxPoolConnections()
 
-  const idleTimeoutMillis = parseInt(process.env.DATABASE_IDLE_TIMEOUT_MS || "2000", 10)
+  const isServerless =
+    Boolean(process.env.VERCEL) ||
+    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+    Boolean(process.env.NETLIFY)
+
+  const idleTimeoutMillis = parseInt(
+    process.env.DATABASE_IDLE_TIMEOUT_MS || (isServerless ? "1000" : "2000"),
+    10
+  )
   const connectionTimeoutMillis = parseInt(process.env.DATABASE_CONNECT_TIMEOUT_MS || "5000", 10)
   const statementTimeout = parseInt(process.env.DATABASE_STATEMENT_TIMEOUT_MS || "20000", 10)
 
@@ -176,7 +194,7 @@ export function createNewPool(databaseUrl: string, maxConnectionsOverride?: numb
     ssl,
     max,
     min: 0, // Never keep idle connections pinned when inactive
-    idleTimeoutMillis, // Reclaim idle connection after 2s of inactivity
+    idleTimeoutMillis, // Reclaim idle connection rapidly (1s in serverless)
     connectionTimeoutMillis, // Fail fast (5s) if connection cannot be established
     statement_timeout: statementTimeout, // Prevent runaway queries from occupying pool slots
     allowExitOnIdle: true,
@@ -366,6 +384,41 @@ export async function withTransaction<T>(
     // Absolute guarantee that connection is returned to pool
     client.release()
   }
+}
+
+/**
+ * Executes a database operation with automatic retry on transient connection limit errors (P2037 / TooManyConnections).
+ * Uses exponential backoff to allow busy Aiven connection slots to be released.
+ */
+export async function withDbRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries = 2,
+  delayMs = 600
+): Promise<T> {
+  let lastError: any
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation()
+    } catch (err: any) {
+      lastError = err
+      const isConnectionError =
+        err?.message?.includes("remaining connection slots") ||
+        err?.message?.includes("Too many database connections") ||
+        err?.message?.includes("TooManyConnections") ||
+        err?.code === "P2037" ||
+        err?.code === "P1001"
+
+      if (isConnectionError && attempt < maxRetries) {
+        console.warn(
+          `[DB Retry] Transient connection pool limit reached. Retrying attempt ${attempt + 1}/${maxRetries} after ${delayMs}ms...`
+        )
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+        continue
+      }
+      throw err
+    }
+  }
+  throw lastError
 }
 
 // ==============================================================================
