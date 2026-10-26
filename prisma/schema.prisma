@@ -192,6 +192,7 @@ model Company {
   crmWorkflows    CrmWorkflow[]
   crmWorkflowLogs CrmWorkflowLog[]
   crmCampaigns    CrmCampaign[]
+  crmEmailLogs    CrmEmailLog[]
   
   slug              String?   @unique
   tagline           String?
@@ -1068,9 +1069,33 @@ model CrmCampaign {
   updatedAt      DateTime  @updatedAt
 
   company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emailLogs      CrmEmailLog[]
 
   @@index([companyId])
   @@index([status])
+}
+
+model CrmEmailLog {
+  id            String       @id @default(cuid())
+  companyId     String
+  campaignId    String?
+  leadId        String?
+  customerId    String?
+  toEmail       String
+  recipientName String?
+  subject       String
+  bodyPreview   String?
+  status        String       // "SENT" | "FAILED"
+  error         String?
+  sentAt        DateTime     @default(now())
+
+  company       Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  campaign      CrmCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([sentAt])
 }
 
 model CrmWorkflow {

@@ -344,6 +344,154 @@ export async function sendQuotationEmail(params: {
   }
 }
 
+export async function sendCrmCampaignEmail(params: {
+  companyId: string
+  to: string
+  recipientName?: string
+  subject: string
+  content: string
+  campaignId?: string
+  leadId?: string
+  customerId?: string
+}): Promise<{ success: boolean; error?: string }> {
+  const settings = await prisma.emailSetting.findUnique({
+    where: { companyId: params.companyId },
+  })
+
+  let transporter: nodemailer.Transporter | null = null
+  let from = ""
+
+  if (settings) {
+    try {
+      const password = decrypt(settings.passwordEncrypted, params.companyId)
+      transporter = nodemailer.createTransport({
+        host: settings.host,
+        port: settings.port,
+        secure: settings.secure,
+        auth: { user: settings.username, pass: password },
+        connectionTimeout: 10000,
+      })
+      from = settings.fromEmail
+        ? `"${settings.fromName ?? "Sales Team"}" <${settings.fromEmail}>`
+        : settings.username
+    } catch (e: any) {
+      console.warn("Failed to initialize company SMTP transporter:", e.message)
+    }
+  }
+
+  // Fallback to system APP_SMTP_* if company SMTP is not configured or failed
+  if (!transporter) {
+    const host = process.env.APP_SMTP_HOST
+    const user = process.env.APP_SMTP_USER
+    const pass = process.env.APP_SMTP_PASS
+    const port = Number(process.env.APP_SMTP_PORT) || 587
+    if (host && user && pass) {
+      transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+        connectionTimeout: 10000,
+      })
+      from = process.env.APP_SMTP_FROM || user
+    }
+  }
+
+  if (!transporter) {
+    const errMsg = "SMTP not configured. Please configure your email sender settings under Settings > Email Settings."
+    try {
+      await prisma.crmEmailLog.create({
+        data: {
+          companyId: params.companyId,
+          campaignId: params.campaignId || null,
+          leadId: params.leadId || null,
+          customerId: params.customerId || null,
+          toEmail: params.to,
+          recipientName: params.recipientName || null,
+          subject: params.subject,
+          bodyPreview: params.content.slice(0, 300),
+          status: "FAILED",
+          error: errMsg,
+        }
+      })
+    } catch (logErr) {
+      console.warn("Failed to write CRM email log:", logErr)
+    }
+    return { success: false, error: errMsg }
+  }
+
+  // Format HTML body
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open Invoice"
+  const formattedHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 32px 16px; color: #1f2937; line-height: 1.6;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 36px; border: 1px solid #e5e7eb; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+        <h2 style="margin-top: 0; margin-bottom: 20px; font-size: 20px; font-weight: 700; color: #111827;">${params.subject}</h2>
+        <div style="font-size: 15px; color: #374151; white-space: pre-wrap; line-height: 1.7;">
+${params.content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+        </div>
+        <div style="margin-top: 36px; padding-top: 20px; border-top: 1px solid #f3f4f6; text-align: center; font-size: 12px; color: #9ca3af;">
+          <p style="margin: 0;">Sent via ${appName} CRM</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `.trim()
+
+  try {
+    await transporter.sendMail({
+      from,
+      to: params.to,
+      subject: params.subject,
+      text: params.content,
+      html: formattedHtml,
+    })
+
+    await prisma.crmEmailLog.create({
+      data: {
+        companyId: params.companyId,
+        campaignId: params.campaignId || null,
+        leadId: params.leadId || null,
+        customerId: params.customerId || null,
+        toEmail: params.to,
+        recipientName: params.recipientName || null,
+        subject: params.subject,
+        bodyPreview: params.content.slice(0, 300),
+        status: "SENT",
+        error: null,
+      }
+    })
+
+    return { success: true }
+  } catch (sendErr: any) {
+    const errorDetail = sendErr?.message || String(sendErr)
+    console.error("sendCrmCampaignEmail dispatch error:", sendErr)
+
+    try {
+      await prisma.crmEmailLog.create({
+        data: {
+          companyId: params.companyId,
+          campaignId: params.campaignId || null,
+          leadId: params.leadId || null,
+          customerId: params.customerId || null,
+          toEmail: params.to,
+          recipientName: params.recipientName || null,
+          subject: params.subject,
+          bodyPreview: params.content.slice(0, 300),
+          status: "FAILED",
+          error: errorDetail,
+        }
+      })
+    } catch (logErr) {
+      console.warn("Failed to write CRM email failure log:", logErr)
+    }
+
+    return { success: false, error: errorDetail }
+  }
+}
+
 export async function sendWelcomeEmail(to: string, name: string) {
   const host = process.env.APP_SMTP_HOST
   const port = Number(process.env.APP_SMTP_PORT) || 587

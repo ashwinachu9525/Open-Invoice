@@ -46,6 +46,11 @@ import {
   Edit3,
   MoreVertical,
   AlertTriangle,
+  RotateCw,
+  Search,
+  Check,
+  XCircle,
+  Filter,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -53,8 +58,10 @@ import {
   updateCrmCampaign,
   launchCrmCampaign,
   deleteCrmCampaign,
+  resendCrmEmailLog,
 } from "@/actions/crm"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
 
 interface AudienceCounts {
   QUALIFIED_LEADS: number
@@ -62,9 +69,22 @@ interface AudienceCounts {
   EXISTING_CUSTOMERS: number
 }
 
+interface CrmEmailLogItem {
+  id: string
+  toEmail: string
+  recipientName?: string | null
+  subject: string
+  bodyPreview?: string | null
+  status: string
+  error?: string | null
+  sentAt: string | Date
+  campaign?: { id: string; name: string } | null
+}
+
 interface CampaignsViewProps {
   initialCampaigns: any[]
   audienceCounts?: AudienceCounts
+  initialLogs?: CrmEmailLogItem[]
 }
 
 const STARTER_TEMPLATES = [
@@ -94,8 +114,10 @@ const STARTER_TEMPLATES = [
 export function CampaignsView({
   initialCampaigns,
   audienceCounts = { QUALIFIED_LEADS: 0, ALL_LEADS: 0, EXISTING_CUSTOMERS: 0 },
+  initialLogs = [],
 }: CampaignsViewProps) {
   const router = useRouter()
+  const [activeTab, setActiveTab] = React.useState<"campaigns" | "logs">("campaigns")
   const [openModal, setOpenModal] = React.useState(false)
   const [isEditingId, setIsEditingId] = React.useState<string | null>(null)
   const [isLaunchImmediate, setIsLaunchImmediate] = React.useState(true)
@@ -104,6 +126,12 @@ export function CampaignsView({
   const [launchingId, setLaunchingId] = React.useState<string | null>(null)
   const [previewCampaign, setPreviewCampaign] = React.useState<any | null>(null)
   const [campaignToDelete, setCampaignToDelete] = React.useState<any | null>(null)
+
+  // Mail Log states
+  const [logSearch, setLogSearch] = React.useState("")
+  const [logStatusFilter, setLogStatusFilter] = React.useState("ALL")
+  const [selectedLog, setSelectedLog] = React.useState<CrmEmailLogItem | null>(null)
+  const [resendingLogId, setResendingLogId] = React.useState<string | null>(null)
 
   const [form, setForm] = React.useState({
     name: "",
@@ -120,6 +148,8 @@ export function CampaignsView({
       const params = new URLSearchParams(window.location.search)
       if (params.get("action") === "launch" || params.get("action") === "new") {
         handleOpenCreate(true)
+      } else if (params.get("tab") === "logs") {
+        setActiveTab("logs")
       }
     }
   }, [])
@@ -181,12 +211,15 @@ export function CampaignsView({
         if (res.error) throw new Error(res.error)
 
         if (launchImmediately) {
-          toast.info("Changes saved! Dispatching broadcast outreach...")
+          toast.info("Changes saved! Dispatching live emails via SMTP...")
           const launchRes = await launchCrmCampaign(isEditingId)
           if (launchRes.error) {
-            toast.warning(`Campaign updated, but dispatch returned: ${launchRes.error}`)
+            toast.error(launchRes.error, {
+              duration: 6000,
+              description: "Check your SMTP sender settings under Settings > Email Settings.",
+            })
           } else {
-            toast.success(`🚀 Broadcast dispatched successfully to ${launchRes.sentCount} recipients!`)
+            toast.success(`🚀 Broadcast sent to ${launchRes.sentCount} recipients via SMTP!`)
           }
         } else {
           toast.success("Campaign updated successfully!")
@@ -197,12 +230,15 @@ export function CampaignsView({
         if (res.error) throw new Error(res.error)
 
         if (launchImmediately && res.campaign?.id) {
-          toast.info("Campaign created! Dispatching broadcast outreach...")
+          toast.info("Campaign created! Dispatching live emails via SMTP...")
           const launchRes = await launchCrmCampaign(res.campaign.id)
           if (launchRes.error) {
-            toast.warning(`Campaign saved, but broadcast had an issue: ${launchRes.error}`)
+            toast.error(launchRes.error, {
+              duration: 6000,
+              description: "Check your SMTP sender settings under Settings > Email Settings.",
+            })
           } else {
-            toast.success(`🚀 Broadcast dispatched successfully to ${launchRes.sentCount} recipients!`)
+            toast.success(`🚀 Broadcast sent to ${launchRes.sentCount} recipients via SMTP!`)
           }
         } else {
           toast.success("Campaign saved as draft!")
@@ -224,13 +260,25 @@ export function CampaignsView({
     setLaunchingId(campaignId)
     try {
       const res = await launchCrmCampaign(campaignId)
-      if (res.error) throw new Error(res.error)
-      toast.success(`🚀 Broadcast dispatched to ${res.sentCount} recipients!`)
+      if (res.error) {
+        toast.error(res.error, {
+          duration: 7000,
+          description: "Ensure SMTP settings are configured under Settings > Email Settings.",
+        })
+        return
+      }
+
+      if (res.warning) {
+        toast.warning(res.warning, { duration: 6000 })
+      } else {
+        toast.success(`🚀 Broadcast dispatched successfully to ${res.sentCount} recipients via SMTP!`)
+      }
+
       if (previewCampaign?.id === campaignId) {
         setPreviewCampaign({
           ...previewCampaign,
           status: "ACTIVE",
-          sentCount: (previewCampaign.sentCount || 0) + res.sentCount,
+          sentCount: (previewCampaign.sentCount || 0) + (res.sentCount || 0),
         })
       }
       router.refresh()
@@ -260,6 +308,20 @@ export function CampaignsView({
     }
   }
 
+  const handleResendLog = async (logId: string) => {
+    setResendingLogId(logId)
+    try {
+      const res = await resendCrmEmailLog(logId)
+      if (res.error) throw new Error(res.error)
+      toast.success("Email re-dispatched via SMTP successfully!")
+      router.refresh()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to resend email")
+    } finally {
+      setResendingLogId(null)
+    }
+  }
+
   const currentAudienceCount =
     form.targetAudience === "QUALIFIED_LEADS"
       ? audienceCounts.QUALIFIED_LEADS
@@ -268,6 +330,22 @@ export function CampaignsView({
       : audienceCounts.ALL_LEADS
 
   const totalDispatched = initialCampaigns.reduce((sum, c) => sum + (c.sentCount || 0), 0)
+
+  // Filtered mail logs
+  const filteredLogs = initialLogs.filter((log) => {
+    const matchesSearch =
+      !logSearch ||
+      log.toEmail.toLowerCase().includes(logSearch.toLowerCase()) ||
+      (log.recipientName && log.recipientName.toLowerCase().includes(logSearch.toLowerCase())) ||
+      log.subject.toLowerCase().includes(logSearch.toLowerCase())
+
+    const matchesStatus = logStatusFilter === "ALL" || log.status === logStatusFilter
+    return matchesSearch && matchesStatus
+  })
+
+  const totalLogsSent = initialLogs.filter((l) => l.status === "SENT").length
+  const totalLogsFailed = initialLogs.filter((l) => l.status === "FAILED").length
+  const deliveryRate = initialLogs.length > 0 ? Math.round((totalLogsSent / initialLogs.length) * 100) : 100
 
   return (
     <div className="space-y-6">
@@ -280,7 +358,7 @@ export function CampaignsView({
           </span>
           <h2 className="text-xl font-bold text-foreground mt-1">Outbound Broadcasts & Lead Nurturing</h2>
           <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-            Dispatch personalized email blasts to qualified prospects, re-engage cold leads, and nurture high-intent contacts into closed deals with dynamic token replacement.
+            Dispatch personalized email blasts to qualified prospects, re-engage cold leads, and nurture high-intent contacts into closed deals with SMTP delivery and mail tracking.
           </p>
         </div>
 
@@ -311,299 +389,610 @@ export function CampaignsView({
         </div>
       </div>
 
-      {/* ── Audience Reach Stats ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground font-medium">Total Dispatched</span>
-            <Send className="h-4 w-4 text-emerald-400" />
-          </div>
-          <p className="text-xl font-bold text-foreground mt-1">{totalDispatched}</p>
-          <span className="text-[10px] text-muted-foreground">Outreach emails sent</span>
-        </div>
+      {/* ── Main Tab Switcher: Campaigns vs Mail Delivery Logs ── */}
+      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("campaigns")}
+          className={cn(
+            "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2",
+            activeTab === "campaigns"
+              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm"
+              : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+          )}
+        >
+          <Megaphone className="h-3.5 w-3.5" />
+          <span>Campaigns & Sequences ({initialCampaigns.length})</span>
+        </button>
 
-        <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground font-medium">Qualified Leads</span>
-            <Users className="h-4 w-4 text-teal-400" />
-          </div>
-          <p className="text-xl font-bold text-teal-400 mt-1">{audienceCounts.QUALIFIED_LEADS}</p>
-          <span className="text-[10px] text-muted-foreground">High-intent contacts</span>
-        </div>
-
-        <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground font-medium">All Leads</span>
-            <Users className="h-4 w-4 text-blue-400" />
-          </div>
-          <p className="text-xl font-bold text-blue-400 mt-1">{audienceCounts.ALL_LEADS}</p>
-          <span className="text-[10px] text-muted-foreground">Active sales pipeline</span>
-        </div>
-
-        <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground font-medium">Existing Customers</span>
-            <Users className="h-4 w-4 text-purple-400" />
-          </div>
-          <p className="text-xl font-bold text-purple-400 mt-1">{audienceCounts.EXISTING_CUSTOMERS}</p>
-          <span className="text-[10px] text-muted-foreground">Upsell & recurring clients</span>
-        </div>
+        <button
+          type="button"
+          onClick={() => setActiveTab("logs")}
+          className={cn(
+            "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2",
+            activeTab === "logs"
+              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm"
+              : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+          )}
+        >
+          <Mail className="h-3.5 w-3.5" />
+          <span>Mail Delivery Logs ({initialLogs.length})</span>
+        </button>
       </div>
 
-      {/* ── Empty State: Show 1-Click Starter Broadcasts ── */}
-      {initialCampaigns.length === 0 ? (
-        <div className="space-y-4">
-          <Card className="glass border-white/10 p-8 sm:p-10 text-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-            <div className="max-w-md mx-auto">
-              <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-3">
-                <Send className="h-6 w-6" />
+      {/* ═════════════════════════════════════════════════════════════
+          TAB 1: CAMPAIGNS & SEQUENCES
+          ═════════════════════════════════════════════════════════════ */}
+      {activeTab === "campaigns" && (
+        <div className="space-y-6">
+          {/* Audience Reach Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground font-medium">Total Dispatched</span>
+                <Send className="h-4 w-4 text-emerald-400" />
               </div>
-              <h3 className="text-lg font-bold text-foreground">Launch Your First Email Broadcast</h3>
-              <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                Reach your prospects directly. Choose an audience segment, personalize with{" "}
-                <code>&#123;&#123;name&#125;&#125;</code>, and dispatch right away.
-              </p>
-
-              <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
-                <Button
-                  onClick={() => handleOpenCreate(true)}
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold gap-2 px-4 shadow-lg shadow-emerald-500/20"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  <span>Launch & Send Broadcast</span>
-                </Button>
-                <Button
-                  onClick={() => handleOpenCreate(false)}
-                  variant="outline"
-                  className="glass border-white/10 text-xs"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  <span>Save Draft Campaign</span>
-                </Button>
-              </div>
+              <p className="text-xl font-bold text-foreground mt-1">{totalDispatched}</p>
+              <span className="text-[10px] text-muted-foreground">Emails sent via SMTP</span>
             </div>
-          </Card>
 
-          {/* 1-Click Starter Templates */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1 mb-2">
-              Or Launch from a Ready-to-Use Template:
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {STARTER_TEMPLATES.map((tmpl) => (
-                <div
-                  key={tmpl.name}
-                  onClick={() => handleApplyTemplate(tmpl)}
-                  className="p-4 rounded-xl glass border border-white/10 hover:border-emerald-500/40 bg-white/5 hover:bg-emerald-500/5 cursor-pointer transition-all flex flex-col justify-between group"
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-foreground group-hover:text-emerald-400 transition-colors">
-                        {tmpl.name}
-                      </span>
-                      <Badge variant="outline" className="text-[9px] bg-white/5 border-white/10">
-                        {tmpl.targetAudience.replace(/_/g, " ")}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-1 italic">
-                      Subject: {tmpl.subject}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
-                      {tmpl.content}
-                    </p>
+            <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground font-medium">Qualified Leads</span>
+                <Users className="h-4 w-4 text-teal-400" />
+              </div>
+              <p className="text-xl font-bold text-teal-400 mt-1">{audienceCounts.QUALIFIED_LEADS}</p>
+              <span className="text-[10px] text-muted-foreground">High-intent contacts</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground font-medium">All Leads</span>
+                <Users className="h-4 w-4 text-blue-400" />
+              </div>
+              <p className="text-xl font-bold text-blue-400 mt-1">{audienceCounts.ALL_LEADS}</p>
+              <span className="text-[10px] text-muted-foreground">Active sales pipeline</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground font-medium">Existing Customers</span>
+                <Users className="h-4 w-4 text-purple-400" />
+              </div>
+              <p className="text-xl font-bold text-purple-400 mt-1">{audienceCounts.EXISTING_CUSTOMERS}</p>
+              <span className="text-[10px] text-muted-foreground">Upsell & recurring clients</span>
+            </div>
+          </div>
+
+          {/* Empty State vs Campaigns Grid */}
+          {initialCampaigns.length === 0 ? (
+            <div className="space-y-4">
+              <Card className="glass border-white/10 p-8 sm:p-10 text-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+                <div className="max-w-md mx-auto">
+                  <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-3">
+                    <Send className="h-6 w-6" />
                   </div>
+                  <h3 className="text-lg font-bold text-foreground">Launch Your First Email Broadcast</h3>
+                  <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                    Reach your prospects directly. Choose an audience segment, personalize with{" "}
+                    <code>&#123;&#123;name&#125;&#125;</code>, and dispatch right away.
+                  </p>
 
-                  <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 mt-3 pt-2 border-t border-white/5">
-                    <Send className="h-3 w-3" />
-                    <span>Use & Launch Broadcast</span>
-                    <ArrowRight className="h-3 w-3 ml-auto group-hover:translate-x-1 transition-transform" />
+                  <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+                    <Button
+                      onClick={() => handleOpenCreate(true)}
+                      className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold gap-2 px-4 shadow-lg shadow-emerald-500/20"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      <span>Launch & Send Broadcast</span>
+                    </Button>
+                    <Button
+                      onClick={() => handleOpenCreate(false)}
+                      variant="outline"
+                      className="glass border-white/10 text-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      <span>Save Draft Campaign</span>
+                    </Button>
                   </div>
                 </div>
-              ))}
+              </Card>
+
+              {/* 1-Click Starter Templates */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1 mb-2">
+                  Or Launch from a Ready-to-Use Template:
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {STARTER_TEMPLATES.map((tmpl) => (
+                    <div
+                      key={tmpl.name}
+                      onClick={() => handleApplyTemplate(tmpl)}
+                      className="p-4 rounded-xl glass border border-white/10 hover:border-emerald-500/40 bg-white/5 hover:bg-emerald-500/5 cursor-pointer transition-all flex flex-col justify-between group"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-foreground group-hover:text-emerald-400 transition-colors">
+                            {tmpl.name}
+                          </span>
+                          <Badge variant="outline" className="text-[9px] bg-white/5 border-white/10">
+                            {tmpl.targetAudience.replace(/_/g, " ")}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-1 italic">
+                          Subject: {tmpl.subject}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
+                          {tmpl.content}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 mt-3 pt-2 border-t border-white/5">
+                        <Send className="h-3 w-3" />
+                        <span>Use & Launch Broadcast</span>
+                        <ArrowRight className="h-3 w-3 ml-auto group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Campaigns Grid */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {initialCampaigns.map((camp) => {
+                const targetCount =
+                  camp.targetAudience === "QUALIFIED_LEADS"
+                    ? audienceCounts.QUALIFIED_LEADS
+                    : camp.targetAudience === "EXISTING_CUSTOMERS"
+                    ? audienceCounts.EXISTING_CUSTOMERS
+                    : audienceCounts.ALL_LEADS
+
+                return (
+                  <Card
+                    key={camp.id}
+                    className="glass border-white/10 shadow-sm hover:border-white/20 transition-all flex flex-col justify-between"
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-sm font-bold text-foreground line-clamp-1">
+                            {camp.name}
+                          </CardTitle>
+                          <CardDescription className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                            Subject: {camp.subject}
+                          </CardDescription>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                              camp.status === "ACTIVE" || camp.status === "COMPLETED"
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                : camp.status === "SCHEDULED"
+                                ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                            }`}
+                          >
+                            {camp.status}
+                          </Badge>
+
+                          {/* Dropdown Menu for Edit / Delete / Preview */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger className="h-7 w-7 rounded-lg inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors">
+                              <MoreVertical className="h-3.5 w-3.5" />
+                              <span className="sr-only">Campaign options</span>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-44 glass border-white/10 p-1 rounded-xl">
+                              <DropdownMenuItem
+                                onClick={() => handleStartEdit(camp)}
+                                className="text-xs flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded-lg p-2"
+                              >
+                                <Edit3 className="h-3.5 w-3.5 text-blue-400" />
+                                <span>Edit Campaign</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setPreviewCampaign(camp)}
+                                className="text-xs flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded-lg p-2"
+                              >
+                                <Eye className="h-3.5 w-3.5 text-teal-400" />
+                                <span>Preview Details</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleLaunch(camp.id)}
+                                className="text-xs flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded-lg p-2 text-emerald-400"
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                                <span>Launch Broadcast</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-white/10" />
+                              <DropdownMenuItem
+                                onClick={() => setCampaignToDelete(camp)}
+                                className="text-xs flex items-center gap-2 cursor-pointer hover:bg-red-500/10 text-red-400 rounded-lg p-2"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span>Delete Campaign</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="space-y-3 pt-1">
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5 text-emerald-400" />
+                            <span>Audience: <strong>{camp.targetAudience.replace(/_/g, " ")}</strong></span>
+                          </div>
+                          <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                            {targetCount} leads
+                          </span>
+                        </div>
+
+                        {camp.scheduledAt && (
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span>Scheduled: {new Date(camp.scheduledAt).toLocaleDateString("en-IN")}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Delivery Metrics Bar */}
+                      <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-white/5 text-center text-xs pt-2 border border-white/5">
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block">Dispatched</span>
+                          <span className="font-bold text-foreground text-sm">{camp.sentCount || 0}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block">Opens</span>
+                          <span className="font-bold text-emerald-400 text-sm">{camp.openCount || 0}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block">Clicks</span>
+                          <span className="font-bold text-blue-400 text-sm">{camp.clickCount || 0}</span>
+                        </div>
+                      </div>
+
+                      {/* Actions: Launch, Edit, Preview, Delete */}
+                      <div className="space-y-2 pt-1">
+                        <Button
+                          onClick={() => handleLaunch(camp.id)}
+                          disabled={launchingId === camp.id}
+                          size="sm"
+                          className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs gap-1.5 h-8 font-bold shadow-md shadow-emerald-500/20"
+                        >
+                          {launchingId === camp.id ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <span>Sending Live Emails via SMTP...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-3.5 w-3.5" />
+                              <span>Launch & Send Broadcast</span>
+                            </>
+                          )}
+                        </Button>
+
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStartEdit(camp)}
+                            className="h-7 text-xs glass border-white/10 hover:bg-white/10 hover:text-blue-400 gap-1 px-2"
+                            title="Edit campaign"
+                          >
+                            <Edit3 className="h-3 w-3" />
+                            <span>Edit</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPreviewCampaign(camp)}
+                            className="h-7 text-xs glass border-white/10 hover:bg-white/10 hover:text-teal-400 gap-1 px-2"
+                            title="Preview details"
+                          >
+                            <Eye className="h-3 w-3" />
+                            <span>Preview</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCampaignToDelete(camp)}
+                            className="h-7 text-xs glass border-white/10 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 gap-1 px-2 text-muted-foreground"
+                            title="Delete campaign"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>Delete</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════════
+          TAB 2: CRM MAIL DELIVERY LOGS (NEW)
+          ═════════════════════════════════════════════════════════════ */}
+      {activeTab === "logs" && (
+        <div className="space-y-4">
+          {/* Stat Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
+              <span className="text-[11px] text-muted-foreground font-medium">Total Emails Logged</span>
+              <p className="text-xl font-bold text-foreground mt-1">{initialLogs.length}</p>
+              <span className="text-[10px] text-muted-foreground">All outreach dispatches</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
+              <span className="text-[11px] text-muted-foreground font-medium">Delivered (Sent)</span>
+              <p className="text-xl font-bold text-emerald-400 mt-1">{totalLogsSent}</p>
+              <span className="text-[10px] text-muted-foreground">Verified SMTP transmissions</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
+              <span className="text-[11px] text-muted-foreground font-medium">Delivery Failures</span>
+              <p className="text-xl font-bold text-red-400 mt-1">{totalLogsFailed}</p>
+              <span className="text-[10px] text-muted-foreground">SMTP or address errors</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl glass border border-white/10 bg-white/5">
+              <span className="text-[11px] text-muted-foreground font-medium">Delivery Success Rate</span>
+              <p className="text-xl font-bold text-teal-400 mt-1">{deliveryRate}%</p>
+              <span className="text-[10px] text-muted-foreground">Effective transmission</span>
+            </div>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl glass border border-white/10">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search recipient email, name, subject..."
+                value={logSearch}
+                onChange={(e) => setLogSearch(e.target.value)}
+                className="text-xs h-8 pl-8 glass border-white/10"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+              <select
+                value={logStatusFilter}
+                onChange={(e) => setLogStatusFilter(e.target.value)}
+                className="text-xs h-8 bg-background/50 border border-white/10 rounded-lg px-2 text-foreground"
+              >
+                <option value="ALL">All Delivery Statuses</option>
+                <option value="SENT">Delivered / Sent</option>
+                <option value="FAILED">Failed</option>
+              </select>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.refresh()}
+                className="h-8 text-xs glass border-white/10 gap-1.5"
+                title="Refresh logs"
+              >
+                <RotateCw className="h-3 w-3" />
+                <span>Refresh</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Logs Table */}
+          <div className="rounded-2xl glass border border-white/10 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-white/10 text-muted-foreground font-semibold bg-white/2">
+                    <th className="py-2.5 px-4">Status</th>
+                    <th className="py-2.5 px-4">Recipient</th>
+                    <th className="py-2.5 px-4">Subject Line</th>
+                    <th className="py-2.5 px-4">Campaign</th>
+                    <th className="py-2.5 px-4">Sent At</th>
+                    <th className="py-2.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-10 text-center text-xs text-muted-foreground">
+                        <Mail className="h-8 w-8 mx-auto mb-2 opacity-40 text-muted-foreground" />
+                        No email delivery logs found matching your criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLogs.map((log) => {
+                      const isSent = log.status === "SENT"
+                      return (
+                        <tr key={log.id} className="hover:bg-white/5 transition-colors">
+                          <td className="py-3 px-4">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1",
+                                isSent
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                  : "bg-red-500/10 text-red-400 border-red-500/20"
+                              )}
+                            >
+                              {isSent ? <Check className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                              <span>{log.status}</span>
+                            </Badge>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-foreground">
+                              {log.recipientName || "Contact"}
+                            </div>
+                            <div className="text-[11px] font-mono text-muted-foreground">
+                              {log.toEmail}
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-4 max-w-xs">
+                            <div className="font-medium text-foreground truncate">{log.subject}</div>
+                            {log.error && (
+                              <div className="text-[10px] text-red-400 truncate mt-0.5" title={log.error}>
+                                Error: {log.error}
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4">
+                            {log.campaign ? (
+                              <Badge variant="outline" className="text-[10px] bg-white/5 border-white/10 font-normal">
+                                {log.campaign.name}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-[11px]">Direct Outreach</span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">
+                            {new Date(log.sentAt).toLocaleString("en-IN", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </td>
+
+                          <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedLog(log)}
+                              className="h-7 text-[11px] glass border-white/10 hover:bg-white/10 gap-1 px-2"
+                            >
+                              <Eye className="h-3 w-3" />
+                              <span>View</span>
+                            </Button>
+
+                            {!isSent && (
+                              <Button
+                                size="sm"
+                                disabled={resendingLogId === log.id}
+                                onClick={() => handleResendLog(log.id)}
+                                className="h-7 text-[11px] bg-indigo-600 hover:bg-indigo-500 text-white gap-1 px-2"
+                              >
+                                {resendingLogId === log.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <RotateCw className="h-3 w-3" />
+                                )}
+                                <span>Retry</span>
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
-      ) : (
-        /* ── Campaigns Grid ── */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {initialCampaigns.map((camp) => {
-            const targetCount =
-              camp.targetAudience === "QUALIFIED_LEADS"
-                ? audienceCounts.QUALIFIED_LEADS
-                : camp.targetAudience === "EXISTING_CUSTOMERS"
-                ? audienceCounts.EXISTING_CUSTOMERS
-                : audienceCounts.ALL_LEADS
+      )}
 
-            return (
-              <Card
-                key={camp.id}
-                className="glass border-white/10 shadow-sm hover:border-white/20 transition-all flex flex-col justify-between"
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-sm font-bold text-foreground line-clamp-1">
-                        {camp.name}
-                      </CardTitle>
-                      <CardDescription className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                        Subject: {camp.subject}
-                      </CardDescription>
-                    </div>
+      {/* ── View Single Email Log Modal ── */}
+      {selectedLog && (
+        <Dialog open={Boolean(selectedLog)} onOpenChange={(open) => !open && setSelectedLog(null)}>
+          <DialogContent className="sm:max-w-lg glass border-white/10 rounded-2xl p-6">
+            <DialogHeader>
+              <div className="flex items-center justify-between gap-2">
+                <DialogTitle className="text-base font-bold text-foreground">
+                  Email Delivery Log Details
+                </DialogTitle>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[10px] font-bold px-2 py-0.5",
+                    selectedLog.status === "SENT"
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : "bg-red-500/10 text-red-400 border-red-500/20"
+                  )}
+                >
+                  {selectedLog.status}
+                </Badge>
+              </div>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Dispatched on {new Date(selectedLog.sentAt).toLocaleString("en-IN")}
+              </DialogDescription>
+            </DialogHeader>
 
-                    <div className="flex items-center gap-1.5">
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                          camp.status === "ACTIVE" || camp.status === "COMPLETED"
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                            : camp.status === "SCHEDULED"
-                            ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                            : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                        }`}
-                      >
-                        {camp.status}
-                      </Badge>
-
-                      {/* Dropdown Menu for Edit / Delete / Preview */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger className="h-7 w-7 rounded-lg inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors">
-                          <MoreVertical className="h-3.5 w-3.5" />
-                          <span className="sr-only">Campaign options</span>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44 glass border-white/10 p-1 rounded-xl">
-                          <DropdownMenuItem
-                            onClick={() => handleStartEdit(camp)}
-                            className="text-xs flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded-lg p-2"
-                          >
-                            <Edit3 className="h-3.5 w-3.5 text-blue-400" />
-                            <span>Edit Campaign</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => setPreviewCampaign(camp)}
-                            className="text-xs flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded-lg p-2"
-                          >
-                            <Eye className="h-3.5 w-3.5 text-teal-400" />
-                            <span>Preview Details</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleLaunch(camp.id)}
-                            className="text-xs flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded-lg p-2 text-emerald-400"
-                          >
-                            <Send className="h-3.5 w-3.5" />
-                            <span>Launch Broadcast</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator className="bg-white/10" />
-                          <DropdownMenuItem
-                            onClick={() => setCampaignToDelete(camp)}
-                            className="text-xs flex items-center gap-2 cursor-pointer hover:bg-red-500/10 text-red-400 rounded-lg p-2"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span>Delete Campaign</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+            <div className="space-y-3 py-2 text-xs">
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1">
+                <div>
+                  <span className="text-muted-foreground">To: </span>
+                  <span className="font-semibold text-foreground">
+                    {selectedLog.recipientName ? `${selectedLog.recipientName} ` : ""}
+                    &lt;{selectedLog.toEmail}&gt;
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Subject: </span>
+                  <span className="font-semibold text-foreground">{selectedLog.subject}</span>
+                </div>
+                {selectedLog.campaign && (
+                  <div>
+                    <span className="text-muted-foreground">Campaign: </span>
+                    <span className="text-emerald-400 font-medium">{selectedLog.campaign.name}</span>
                   </div>
-                </CardHeader>
+                )}
+              </div>
 
-                <CardContent className="space-y-3 pt-1">
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Users className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>Audience: <strong>{camp.targetAudience.replace(/_/g, " ")}</strong></span>
-                      </div>
-                      <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                        {targetCount} leads
-                      </span>
-                    </div>
+              {selectedLog.error && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs space-y-1">
+                  <span className="font-bold flex items-center gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Delivery Error:
+                  </span>
+                  <p className="font-mono text-[11px] leading-relaxed">{selectedLog.error}</p>
+                </div>
+              )}
 
-                    {camp.scheduledAt && (
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>Scheduled: {new Date(camp.scheduledAt).toLocaleDateString("en-IN")}</span>
-                      </div>
-                    )}
-                  </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground uppercase font-semibold">
+                  Dispatched Email Body:
+                </Label>
+                <div className="p-3 rounded-xl border border-white/10 bg-black/40 text-foreground/90 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto font-sans text-xs">
+                  {selectedLog.bodyPreview || selectedLog.subject}
+                </div>
+              </div>
+            </div>
 
-                  {/* Delivery Metrics Bar */}
-                  <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-white/5 text-center text-xs pt-2 border border-white/5">
-                    <div>
-                      <span className="text-[10px] text-muted-foreground block">Dispatched</span>
-                      <span className="font-bold text-foreground text-sm">{camp.sentCount || 0}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-muted-foreground block">Opens</span>
-                      <span className="font-bold text-emerald-400 text-sm">{camp.openCount || 0}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-muted-foreground block">Clicks</span>
-                      <span className="font-bold text-blue-400 text-sm">{camp.clickCount || 0}</span>
-                    </div>
-                  </div>
-
-                  {/* Primary & Secondary Action Row with visible Edit and Delete buttons */}
-                  <div className="space-y-2 pt-1">
-                    {/* Launch CTA */}
-                    <Button
-                      onClick={() => handleLaunch(camp.id)}
-                      disabled={launchingId === camp.id}
-                      size="sm"
-                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs gap-1.5 h-8 font-bold shadow-md shadow-emerald-500/20"
-                    >
-                      {launchingId === camp.id ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          <span>Dispatching Outreach...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send className="h-3.5 w-3.5" />
-                          <span>Launch & Send Broadcast</span>
-                        </>
-                      )}
-                    </Button>
-
-                    {/* Secondary Actions: Edit, Preview, Delete */}
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleStartEdit(camp)}
-                        className="h-7 text-xs glass border-white/10 hover:bg-white/10 hover:text-blue-400 gap-1 px-2"
-                        title="Edit campaign"
-                      >
-                        <Edit3 className="h-3 w-3" />
-                        <span>Edit</span>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPreviewCampaign(camp)}
-                        className="h-7 text-xs glass border-white/10 hover:bg-white/10 hover:text-teal-400 gap-1 px-2"
-                        title="Preview details"
-                      >
-                        <Eye className="h-3 w-3" />
-                        <span>Preview</span>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCampaignToDelete(camp)}
-                        className="h-7 text-xs glass border-white/10 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 gap-1 px-2 text-muted-foreground"
-                        title="Delete campaign"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        <span>Delete</span>
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+            <DialogFooter className="flex flex-row justify-between">
+              <Button variant="ghost" onClick={() => setSelectedLog(null)} className="text-xs">
+                Close
+              </Button>
+              {selectedLog.status !== "SENT" && (
+                <Button
+                  onClick={() => {
+                    const id = selectedLog.id
+                    setSelectedLog(null)
+                    handleResendLog(id)
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold"
+                >
+                  <RotateCw className="h-3.5 w-3.5" />
+                  <span>Retry Dispatch</span>
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* ── Create / Edit Campaign Modal ── */}
@@ -623,7 +1012,7 @@ export function CampaignsView({
             <DialogDescription className="text-xs text-muted-foreground">
               {isEditingId
                 ? "Update campaign message, audience targeting, or schedule settings."
-                : "Configure targeted messaging and dispatch directly to leads or customers."}
+                : "Configure targeted messaging and dispatch live emails directly via SMTP."}
             </DialogDescription>
           </DialogHeader>
 
@@ -727,7 +1116,7 @@ export function CampaignsView({
                 {loading ? (
                   <>
                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    <span>Processing Broadcast...</span>
+                    <span>Dispatching via SMTP...</span>
                   </>
                 ) : (
                   <>
@@ -856,7 +1245,7 @@ export function CampaignsView({
                 {launchingId === previewCampaign.id ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Dispatching Outreach...</span>
+                    <span>Dispatching live emails via SMTP...</span>
                   </>
                 ) : (
                   <>

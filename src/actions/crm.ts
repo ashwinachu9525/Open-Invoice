@@ -5,6 +5,7 @@ import { getTenantDb } from "@/lib/tenant-db"
 import { auth } from "@/auth"
 import { revalidatePath } from "next/cache"
 import { createAuditLog } from "@/services/audit"
+import { sendCrmCampaignEmail } from "@/services/smtp"
 
 async function requireUserAndTenant() {
   const session = await auth()
@@ -1259,27 +1260,50 @@ export async function launchCrmCampaign(campaignId: string) {
       }
 
       let sentCount = 0
+      let failedCount = 0
+      let lastErrorMessage = ""
+
       for (const rec of recipients) {
         try {
           const personalizedSubject = (campaign.subject || "Outreach").replace(/\{\{name\}\}/gi, rec.name)
           const personalizedContent = (campaign.content || "").replace(/\{\{name\}\}/gi, rec.name)
 
-          await db.crmActivity.create({
-            data: {
-              companyId,
-              type: "EMAIL",
-              title: `Campaign Outreach: ${personalizedSubject}`,
-              description: personalizedContent,
-              status: "COMPLETED",
-              completedAt: new Date(),
-              assignedToId: user.id,
-              leadId: rec.type === "LEAD" ? rec.id : null,
-              customerId: rec.type === "CUSTOMER" ? rec.id : null,
-            }
+          // 1. Dispatch actual email via SMTP
+          const sendResult = await sendCrmCampaignEmail({
+            companyId,
+            to: rec.email,
+            recipientName: rec.name,
+            subject: personalizedSubject,
+            content: personalizedContent,
+            campaignId: campaign.id,
+            leadId: rec.type === "LEAD" ? rec.id : undefined,
+            customerId: rec.type === "CUSTOMER" ? rec.id : undefined,
           })
-          sentCount++
-        } catch (sendErr) {
-          console.warn("Failed to dispatch campaign activity:", sendErr)
+
+          if (sendResult.success) {
+            sentCount++
+            // 2. Log activity in CRM timeline
+            await db.crmActivity.create({
+              data: {
+                companyId,
+                type: "EMAIL",
+                title: `Campaign Outreach: ${personalizedSubject}`,
+                description: personalizedContent,
+                status: "COMPLETED",
+                completedAt: new Date(),
+                assignedToId: user.id,
+                leadId: rec.type === "LEAD" ? rec.id : null,
+                customerId: rec.type === "CUSTOMER" ? rec.id : null,
+              }
+            })
+          } else {
+            failedCount++
+            lastErrorMessage = sendResult.error || "Email delivery failed"
+          }
+        } catch (sendErr: any) {
+          failedCount++
+          lastErrorMessage = sendErr?.message || "Delivery error"
+          console.warn("Failed to dispatch campaign outreach:", sendErr)
         }
       }
 
@@ -1294,9 +1318,91 @@ export async function launchCrmCampaign(campaignId: string) {
       revalidatePath("/crm/campaigns")
       revalidatePath("/crm/activities")
       revalidatePath("/crm/dashboard")
-      return { success: true, campaign: updated, sentCount }
+
+      if (sentCount === 0 && failedCount > 0) {
+        return {
+          error: `Email sending failed: ${lastErrorMessage}. Check Email Settings or Mail Logs for details.`,
+        }
+      }
+
+      return {
+        success: true,
+        campaign: updated,
+        sentCount,
+        failedCount,
+        warning: failedCount > 0 ? `${sentCount} sent, ${failedCount} failed (${lastErrorMessage})` : undefined,
+      }
     } catch (error: any) {
       return { error: error.message || "Failed to launch campaign." }
+    }
+  })
+}
+
+export async function getCrmEmailLogs(filters?: { campaignId?: string; status?: string; search?: string }) {
+  return withDbRetry(async () => {
+    try {
+      const { companyId, db } = await requireUserAndTenant()
+      const where: any = { companyId }
+
+      if (filters?.campaignId && filters.campaignId !== "ALL") {
+        where.campaignId = filters.campaignId
+      }
+      if (filters?.status && filters.status !== "ALL") {
+        where.status = filters.status
+      }
+      if (filters?.search) {
+        where.OR = [
+          { toEmail: { contains: filters.search } },
+          { recipientName: { contains: filters.search } },
+          { subject: { contains: filters.search } },
+        ]
+      }
+
+      const logs = await db.crmEmailLog.findMany({
+        where,
+        include: {
+          campaign: { select: { id: true, name: true } },
+        },
+        orderBy: { sentAt: "desc" },
+        take: 150,
+      })
+
+      return { success: true, logs }
+    } catch (error: any) {
+      console.error("getCrmEmailLogs error:", error)
+      return { error: error.message || "Failed to load CRM email logs.", logs: [] }
+    }
+  })
+}
+
+export async function resendCrmEmailLog(logId: string) {
+  return withDbRetry(async () => {
+    try {
+      const { companyId, db } = await requireUserAndTenant()
+      const log = await db.crmEmailLog.findUnique({
+        where: { id: logId, companyId },
+      })
+      if (!log) return { error: "Email log not found" }
+
+      const sendResult = await sendCrmCampaignEmail({
+        companyId,
+        to: log.toEmail,
+        recipientName: log.recipientName || undefined,
+        subject: log.subject,
+        content: log.bodyPreview || log.subject,
+        campaignId: log.campaignId || undefined,
+        leadId: log.leadId || undefined,
+        customerId: log.customerId || undefined,
+      })
+
+      if (!sendResult.success) {
+        return { error: sendResult.error || "Retry send failed." }
+      }
+
+      revalidatePath("/crm/campaigns")
+      return { success: true }
+    } catch (error: any) {
+      return { error: error.message || "Failed to resend email." }
     }
   })
 }

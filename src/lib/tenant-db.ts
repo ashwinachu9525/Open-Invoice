@@ -122,6 +122,7 @@ const MODEL_DATE_FIELDS: Record<string, { hasCreatedAt: boolean; hasUpdatedAt: b
   CrmCampaign: { hasCreatedAt: true, hasUpdatedAt: true },
   CrmWorkflow: { hasCreatedAt: true, hasUpdatedAt: true },
   CrmWorkflowLog: { hasCreatedAt: true, hasUpdatedAt: false },
+  CrmEmailLog: { hasCreatedAt: false, hasUpdatedAt: false },
 }
 
 // Extends a PrismaClient to automatically scope all data operations to a specific companyId

@@ -1,4 +1,4 @@
-import { getCrmCampaigns } from "@/actions/crm"
+import { getCrmCampaigns, getCrmEmailLogs } from "@/actions/crm"
 import { CampaignsView } from "@/components/crm/campaigns-view"
 
 export const dynamic = "force-dynamic"
@@ -9,13 +9,17 @@ export const metadata = {
 }
 
 export default async function CampaignsPage() {
-  const result = await getCrmCampaigns()
+  const [result, logsResult] = await Promise.all([
+    getCrmCampaigns(),
+    getCrmEmailLogs(),
+  ])
   const campaigns = result.campaigns || []
   const audienceCounts = (result as any).audienceCounts || {
     QUALIFIED_LEADS: 0,
     ALL_LEADS: 0,
     EXISTING_CUSTOMERS: 0,
   }
+  const emailLogs = logsResult.logs || []
 
   return (
     <div className="space-y-6">
@@ -28,7 +32,11 @@ export default async function CampaignsPage() {
         </div>
       </div>
 
-      <CampaignsView initialCampaigns={campaigns} audienceCounts={audienceCounts} />
+      <CampaignsView
+        initialCampaigns={campaigns}
+        audienceCounts={audienceCounts}
+        initialLogs={emailLogs}
+      />
     </div>
   )
 }
