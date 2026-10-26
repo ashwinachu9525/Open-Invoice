@@ -11,11 +11,15 @@ interface CachedTenantClient {
 // Global cache map to persist Prisma Clients across hot-reloads and requests
 const globalForTenantClients = globalThis as unknown as {
   tenantClientsCache: Map<string, CachedTenantClient> | undefined
+  scopedClientsCache: Map<string, any> | undefined
 }
 
 const tenantClientsCache = globalForTenantClients.tenantClientsCache ?? new Map<string, CachedTenantClient>()
+const scopedClientsCache = globalForTenantClients.scopedClientsCache ?? new Map<string, any>()
+
 if (process.env.NODE_ENV !== "production") {
   globalForTenantClients.tenantClientsCache = tenantClientsCache
+  globalForTenantClients.scopedClientsCache = scopedClientsCache
 }
 
 // Instantiate or retrieve a cached client for a custom database URL
@@ -125,8 +129,7 @@ function scopeClientToCompany(client: any, companyId: string) {
           const isWrite = ["create", "createMany", "update", "updateMany", "upsert"].includes(operation)
           
           if (isWrite) {
-            const tz = await getCachedCompanyTimezone(companyId)
-            const dbNow = await getDbNow(client, tz)
+            const dbNow = new Date()
             const typedArgs = args as any
 
             if (operation === "create") {
@@ -251,6 +254,11 @@ function scopeClientToCompany(client: any, companyId: string) {
  * Resolves the tenant's custom database if configured, falling back to the default database.
  */
 export async function getTenantDb(companyId: string) {
+  const cached = scopedClientsCache.get(companyId)
+  if (cached) {
+    return cached
+  }
+
   let targetClient: any = prisma
 
   try {
@@ -281,5 +289,7 @@ export async function getTenantDb(companyId: string) {
   }
 
   // Return the client wrapped with multi-tenant query row security
-  return scopeClientToCompany(targetClient, companyId)
+  const scoped = scopeClientToCompany(targetClient, companyId)
+  scopedClientsCache.set(companyId, scoped)
+  return scoped
 }

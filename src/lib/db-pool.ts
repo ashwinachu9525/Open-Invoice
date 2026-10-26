@@ -167,7 +167,7 @@ export function createNewPool(databaseUrl: string, maxConnectionsOverride?: numb
   const { ssl, cleanUrl } = buildSslConfig(databaseUrl)
   const max = maxConnectionsOverride ?? getMaxPoolConnections()
 
-  const idleTimeoutMillis = parseInt(process.env.DATABASE_IDLE_TIMEOUT_MS || "10000", 10)
+  const idleTimeoutMillis = parseInt(process.env.DATABASE_IDLE_TIMEOUT_MS || "2000", 10)
   const connectionTimeoutMillis = parseInt(process.env.DATABASE_CONNECT_TIMEOUT_MS || "5000", 10)
   const statementTimeout = parseInt(process.env.DATABASE_STATEMENT_TIMEOUT_MS || "20000", 10)
 
@@ -176,9 +176,10 @@ export function createNewPool(databaseUrl: string, maxConnectionsOverride?: numb
     ssl,
     max,
     min: 0, // Never keep idle connections pinned when inactive
-    idleTimeoutMillis, // Reclaim idle connection after 10s of inactivity
+    idleTimeoutMillis, // Reclaim idle connection after 2s of inactivity
     connectionTimeoutMillis, // Fail fast (5s) if connection cannot be established
     statement_timeout: statementTimeout, // Prevent runaway queries from occupying pool slots
+    allowExitOnIdle: true,
     application_name: "open-invoice-app",
   })
 

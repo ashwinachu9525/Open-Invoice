@@ -35,30 +35,19 @@ export async function ensureDefaultStages(companyId: string, db: any) {
   if (existingStages.length > 0) return existingStages
 
   const defaults = [
-    { name: "Discovery", order: 1, probability: 20, color: "#3b82f6", isWon: false, isLost: false },
-    { name: "Qualified", order: 2, probability: 40, color: "#8b5cf6", isWon: false, isLost: false },
-    { name: "Proposal Sent", order: 3, probability: 60, color: "#eab308", isWon: false, isLost: false },
-    { name: "Negotiation", order: 4, probability: 80, color: "#f97316", isWon: false, isLost: false },
-    { name: "Closed Won", order: 5, probability: 100, color: "#10b981", isWon: true, isLost: false },
-    { name: "Closed Lost", order: 6, probability: 0, color: "#ef4444", isWon: false, isLost: true },
+    { companyId, name: "Discovery", order: 1, probability: 20, color: "#3b82f6", isWon: false, isLost: false },
+    { companyId, name: "Qualified", order: 2, probability: 40, color: "#8b5cf6", isWon: false, isLost: false },
+    { companyId, name: "Proposal Sent", order: 3, probability: 60, color: "#eab308", isWon: false, isLost: false },
+    { companyId, name: "Negotiation", order: 4, probability: 80, color: "#f97316", isWon: false, isLost: false },
+    { companyId, name: "Closed Won", order: 5, probability: 100, color: "#10b981", isWon: true, isLost: false },
+    { companyId, name: "Closed Lost", order: 6, probability: 0, color: "#ef4444", isWon: false, isLost: true },
   ]
 
-  const created = []
-  for (const s of defaults) {
-    const stage = await db.crmStage.create({
-      data: {
-        companyId,
-        name: s.name,
-        order: s.order,
-        probability: s.probability,
-        color: s.color,
-        isWon: s.isWon,
-        isLost: s.isLost,
-      }
-    })
-    created.push(stage)
-  }
-  return created
+  await db.crmStage.createMany({ data: defaults })
+  return await db.crmStage.findMany({
+    where: { companyId },
+    orderBy: { order: "asc" }
+  })
 }
 
 // ─────────────────────────────────────────────────────────────
