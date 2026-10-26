@@ -53,6 +53,7 @@ import {
   Filter,
   MousePointerClick,
   ExternalLink,
+  ShieldCheck,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -85,6 +86,10 @@ interface CrmEmailLogItem {
   clickCount?: number
   openedAt?: string | Date | null
   clickedAt?: string | Date | null
+  ipAddress?: string | null
+  userAgent?: string | null
+  openEvents?: Array<{ timestamp: string; ip: string; clientType?: string; userAgent?: string }> | any
+  clickEvents?: Array<{ timestamp: string; ip: string; clientType?: string; target?: string }> | any
   sentAt: string | Date
   campaign?: { id: string; name: string } | null
 }
@@ -886,6 +891,11 @@ export function CampaignsView({
                                 <span className={cn((log.openCount || 0) > 0 ? "text-emerald-400 font-semibold" : "text-muted-foreground")}>
                                   {(log.openCount || 0) > 0 ? `${log.openCount} open${(log.openCount || 0) > 1 ? "s" : ""}` : "Unopened"}
                                 </span>
+                                {log.ipAddress && (
+                                  <span className="text-[9px] font-mono text-slate-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded" title={`Tracked Client IP: ${log.ipAddress}`}>
+                                    {log.ipAddress}
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <MousePointerClick className={cn("h-3 w-3", (log.clickCount || 0) > 0 ? "text-blue-400" : "text-muted-foreground")} />
@@ -1031,6 +1041,59 @@ export function CampaignsView({
                   )}
                 </div>
               </div>
+
+              {/* Verified Client IP & Device */}
+              {selectedLog.ipAddress && (
+                <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                      Client IP Address:
+                    </span>
+                    <span className="font-mono text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[11px]">
+                      {selectedLog.ipAddress}
+                    </span>
+                  </div>
+                  {selectedLog.userAgent && (
+                    <div className="text-[11px] text-muted-foreground truncate" title={selectedLog.userAgent}>
+                      Client Device: <span className="text-slate-300 font-mono text-[10px]">{selectedLog.userAgent}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Open Events Audit Log */}
+              {Array.isArray(selectedLog.openEvents) && selectedLog.openEvents.length > 0 && (
+                <div className="p-3 rounded-xl bg-black/40 border border-white/10 text-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-200 flex items-center gap-1">
+                      <Eye className="h-3.5 w-3.5 text-emerald-400" />
+                      Verified Physical Open Sessions ({selectedLog.openEvents.length})
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                      IP-Debounced
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {selectedLog.openEvents.map((evt: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded bg-white/5 text-[11px]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-emerald-400 font-mono font-semibold">{evt.ip || "Unknown IP"}</span>
+                          <span className="text-muted-foreground text-[10px]">({evt.clientType || "Client"})</span>
+                        </div>
+                        <span className="text-muted-foreground font-mono text-[10px]">
+                          {new Date(evt.timestamp).toLocaleString("en-IN", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {selectedLog.buttonText && (
                 <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs space-y-1">

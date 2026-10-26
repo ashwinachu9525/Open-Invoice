@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withDbRetry } from "@/lib/db-pool"
+import { getClientIp, parseClientDevice, isDuplicateSession } from "@/lib/tracking-utils"
 
 export const dynamic = "force-dynamic"
 
-// 5-second debounce window to prevent accidental double-clicks or bot pre-clicks
-const DEBOUNCE_CLICK_MS = 5_000
+// 10-minute deduplication window per unique IP address for clicks
+const IP_CLICK_WINDOW_MS = 10 * 60 * 1000
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const logId = url.searchParams.get("logId") || url.searchParams.get("id")
   const campaignId = url.searchParams.get("campaignId") || url.searchParams.get("cid")
   const targetParam = url.searchParams.get("target") || url.searchParams.get("url")
+
+  const clientIp = getClientIp(request)
+  const userAgent = request.headers.get("user-agent") || ""
+  const clientType = parseClientDevice(userAgent)
+  const now = new Date()
 
   const appUrl = (
     process.env.NEXTAUTH_URL ||
@@ -43,21 +49,31 @@ export async function GET(request: Request) {
             id: true,
             campaignId: true,
             clickedAt: true,
-            lastClickedAt: true,
             clickCount: true,
+            clickEvents: true,
           },
         })
 
         if (log) {
-          const now = new Date()
-          const isFirstClick = !log.clickedAt
-          const lastHit = log.lastClickedAt || log.clickedAt
-          const timeSinceLastHit = lastHit ? now.getTime() - new Date(lastHit).getTime() : Infinity
+          const isFirstClick = !log.clickedAt || log.clickCount === 0
+          const existingEvents: Array<{ ip: string; timestamp: string }> = Array.isArray(log.clickEvents)
+            ? (log.clickEvents as any)
+            : []
 
-          // Debounce: Skip duplicate click within 5 seconds
-          if (!isFirstClick && timeSinceLastHit < DEBOUNCE_CLICK_MS) {
+          // IP Deduplication: Skip double-clicks from the same IP within 10 minutes
+          if (!isFirstClick && isDuplicateSession(existingEvents, clientIp, IP_CLICK_WINDOW_MS)) {
             return
           }
+
+          const newEvent = {
+            timestamp: now.toISOString(),
+            ip: clientIp,
+            clientType,
+            target: destination,
+            userAgent: userAgent.slice(0, 150),
+          }
+
+          const updatedEvents = [...existingEvents.slice(-49), newEvent]
 
           await prisma.crmEmailLog.update({
             where: { id: logId },
@@ -65,10 +81,13 @@ export async function GET(request: Request) {
               clickCount: { increment: 1 },
               ...(isFirstClick && { clickedAt: now }),
               lastClickedAt: now,
+              ipAddress: clientIp,
+              userAgent: userAgent.slice(0, 250),
+              clickEvents: updatedEvents,
             },
           })
 
-          // On Campaign level, track UNIQUE CLICKS
+          // On Campaign level, track UNIQUE RECIPIENT CLICKS
           const targetCampaignId = log.campaignId || campaignId
           if (targetCampaignId && isFirstClick) {
             await prisma.crmCampaign.updateMany({

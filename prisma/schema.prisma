@@ -1095,6 +1095,10 @@ model CrmEmailLog {
   lastOpenedAt  DateTime?
   clickedAt     DateTime?
   lastClickedAt DateTime?
+  ipAddress     String?
+  userAgent     String?
+  openEvents    Json?        @default("[]")
+  clickEvents   Json?        @default("[]")
   openCount     Int          @default(0)
   clickCount    Int          @default(0)
   sentAt        DateTime     @default(now())
@@ -1108,6 +1112,7 @@ model CrmEmailLog {
   @@index([sentAt])
   @@index([openedAt])
   @@index([clickedAt])
+  @@index([ipAddress])
 }
 
 model CrmWorkflow {

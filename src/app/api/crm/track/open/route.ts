@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withDbRetry } from "@/lib/db-pool"
+import { getClientIp, parseClientDevice, isDuplicateSession } from "@/lib/tracking-utils"
 
 export const dynamic = "force-dynamic"
 
@@ -10,15 +11,19 @@ const TRANSPARENT_GIF_BUFFER = Buffer.from(
   "base64"
 )
 
-// 10-second deduplication threshold to filter out proxy double-fetches
-// (e.g. Gmail googleimageproxy, Apple Mail Privacy Protection, or antivirus scanners)
-const DEBOUNCE_WINDOW_MS = 10_000
+// 1-hour deduplication window per unique IP address
+const IP_SESSION_WINDOW_MS = 60 * 60 * 1000
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url)
     const logId = url.searchParams.get("logId") || url.searchParams.get("id")
     const campaignId = url.searchParams.get("campaignId") || url.searchParams.get("cid")
+
+    const clientIp = getClientIp(request)
+    const userAgent = request.headers.get("user-agent") || ""
+    const clientType = parseClientDevice(userAgent)
+    const now = new Date()
 
     if (logId) {
       await withDbRetry(async () => {
@@ -28,35 +33,50 @@ export async function GET(request: Request) {
             id: true,
             campaignId: true,
             openedAt: true,
-            lastOpenedAt: true,
             openCount: true,
+            ipAddress: true,
+            openEvents: true,
           },
         })
 
         if (log) {
-          const now = new Date()
-          const isFirstOpen = !log.openedAt
-          const lastHit = log.lastOpenedAt || log.openedAt
-          const timeSinceLastHit = lastHit ? now.getTime() - new Date(lastHit).getTime() : Infinity
+          const isFirstOpen = !log.openedAt || log.openCount === 0
+          const existingEvents: Array<{ ip: string; timestamp: string }> = Array.isArray(log.openEvents)
+            ? (log.openEvents as any)
+            : []
 
-          // Deduplicate: If an open request arrives within 10 seconds of a previous hit,
-          // it is a duplicate proxy fetch from the same open session (e.g. Google Image Proxy).
-          if (!isFirstOpen && timeSinceLastHit < DEBOUNCE_WINDOW_MS) {
+          // Session-based IP Deduplication:
+          // If the same IP address pinged this email within the last 1 hour, ignore it!
+          // This stops proxy pre-fetches, double-hits, and email re-renders from inflating open counts.
+          if (!isFirstOpen && isDuplicateSession(existingEvents, clientIp, IP_SESSION_WINDOW_MS)) {
             return
           }
 
-          // Update individual recipient log
+          const newEvent = {
+            timestamp: now.toISOString(),
+            ip: clientIp,
+            clientType,
+            userAgent: userAgent.slice(0, 150),
+          }
+
+          // Keep up to 50 historical open events
+          const updatedEvents = [...existingEvents.slice(-49), newEvent]
+
+          // Increment recipient's open count and save IP & audit log
           await prisma.crmEmailLog.update({
             where: { id: logId },
             data: {
               openCount: { increment: 1 },
               ...(isFirstOpen && { openedAt: now }),
               lastOpenedAt: now,
+              ipAddress: clientIp,
+              userAgent: userAgent.slice(0, 250),
+              openEvents: updatedEvents,
             },
           })
 
-          // Update Campaign: Track UNIQUE OPENS
-          // Only increment campaign open count on the recipient's first open
+          // On Campaign level, track UNIQUE RECIPIENT OPENS
+          // Strictly increments ONCE per recipient so campaign open rate is never inflated
           const targetCampaignId = log.campaignId || campaignId
           if (targetCampaignId && isFirstOpen) {
             await prisma.crmCampaign.updateMany({
@@ -69,6 +89,7 @@ export async function GET(request: Request) {
         }
       })
     } else if (campaignId) {
+      // Direct campaign fallback
       await withDbRetry(async () => {
         await prisma.crmCampaign.updateMany({
           where: { id: campaignId },
