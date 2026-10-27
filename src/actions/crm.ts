@@ -1585,7 +1585,7 @@ export interface WorkflowCondition {
 }
 
 export interface WorkflowAction {
-  actionType: "ASSIGN_USER" | "CREATE_TASK" | "DRAFT_EMAIL" | "UPDATE_STATUS" | "CREATE_INVOICE_DRAFT"
+  actionType: "ASSIGN_USER" | "CREATE_TASK" | "DRAFT_EMAIL" | "UPDATE_STATUS" | "CREATE_INVOICE_DRAFT" | "SEND_WHATSAPP" | "AI_REPLY_WHATSAPP"
   config: Record<string, any>
 }
 
@@ -1779,6 +1779,104 @@ export async function triggerWorkflowsForEvent(
             if (newStatus && event.entityType === "LEAD") {
               await db.crmLead.update({ where: { id: event.entityId }, data: { status: newStatus } })
               executedActionResults.push({ action: "UPDATE_STATUS", status: "SUCCESS", newStatus })
+            }
+          } else if (action.actionType === "SEND_WHATSAPP") {
+            let recipientPhone = action.config?.phone || event.data?.phone
+            if (!recipientPhone && event.entityType === "LEAD") {
+              const lead = await db.crmLead.findUnique({ where: { id: event.entityId }, select: { phone: true } })
+              recipientPhone = lead?.phone
+            } else if (!recipientPhone && event.entityType === "CUSTOMER") {
+              const cust = await db.customer.findUnique({ where: { id: event.entityId }, select: { phone: true } })
+              recipientPhone = cust?.phone
+            }
+
+            if (recipientPhone) {
+              const cleanPhone = recipientPhone.replace(/\D/g, "")
+              const chatId = `${cleanPhone}@c.us`
+              const message = action.config?.message || "Hello! Thank you for contacting us. How can we assist you today?"
+              const { getWhatsAppProvider } = await import("@/services/whatsapp/factory")
+              const provider = await getWhatsAppProvider(event.companyId)
+              const waResult = await provider.sendMessage({
+                chatId,
+                message,
+                extra: { companyId: event.companyId },
+              })
+
+              if (event.entityType === "CUSTOMER") {
+                await db.customerInteraction.create({
+                  data: {
+                    customerId: event.entityId,
+                    type: "WHATSAPP",
+                    content: `[Workflow WhatsApp] ${message}`,
+                  },
+                }).catch(() => {})
+              }
+
+              executedActionResults.push({
+                action: "SEND_WHATSAPP",
+                status: waResult.success ? "SUCCESS" : "FAILED",
+                recipientPhone,
+                error: waResult.error,
+              })
+            } else {
+              executedActionResults.push({ action: "SEND_WHATSAPP", status: "SKIPPED", reason: "No recipient phone" })
+            }
+          } else if (action.actionType === "AI_REPLY_WHATSAPP") {
+            const recipientPhone = event.data?.phone
+            const userInquiry = event.data?.body || event.data?.notes || "Customer inquiry"
+
+            if (recipientPhone) {
+              const cleanPhone = recipientPhone.replace(/\D/g, "")
+              const chatId = `${cleanPhone}@c.us`
+
+              const { generateChat } = await import("@/ai/orchestrator")
+              const company = await db.company.findUnique({
+                where: { id: event.companyId },
+                select: { name: true, email: true, phone: true },
+              })
+
+              const systemPrompt = `You are a polite, helpful AI assistant representing ${company?.name || "our company"}.
+The customer sent a message via WhatsApp. Respond concisely (1-3 sentences) in a warm, professional manner.`
+
+              let aiReplyText = "Thank you for reaching out! Our team has received your message and will assist you shortly."
+              try {
+                aiReplyText = await generateChat({
+                  companyId: event.companyId,
+                  messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userInquiry },
+                  ],
+                })
+              } catch (aiErr) {
+                console.warn("AI generation failed for WhatsApp workflow:", aiErr)
+              }
+
+              const { getWhatsAppProvider } = await import("@/services/whatsapp/factory")
+              const provider = await getWhatsAppProvider(event.companyId)
+              const waResult = await provider.sendMessage({
+                chatId,
+                message: aiReplyText,
+                extra: { companyId: event.companyId },
+              })
+
+              if (event.entityType === "CUSTOMER") {
+                await db.customerInteraction.create({
+                  data: {
+                    customerId: event.entityId,
+                    type: "WHATSAPP",
+                    content: `[Workflow AI Reply] ${aiReplyText}`,
+                  },
+                }).catch(() => {})
+              }
+
+              executedActionResults.push({
+                action: "AI_REPLY_WHATSAPP",
+                status: waResult.success ? "SUCCESS" : "FAILED",
+                reply: aiReplyText,
+                error: waResult.error,
+              })
+            } else {
+              executedActionResults.push({ action: "AI_REPLY_WHATSAPP", status: "SKIPPED", reason: "No recipient phone" })
             }
           }
         } catch (actErr: any) {

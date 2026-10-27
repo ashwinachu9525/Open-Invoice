@@ -9,6 +9,7 @@ import { getTenantDb } from "@/lib/tenant-db"
 import { inngest } from "@/lib/inngest/client"
 import { generateReceiptPdf } from "@/services/pdf"
 import { sendInvoiceEmail, buildModernPaymentReceiptEmailHtml } from "@/services/smtp"
+import { sendWhatsAppMessage, sendWhatsAppDocument } from "@/actions/integrations"
 
 const paymentSchema = z.object({
   invoiceId: z.string(),
@@ -126,6 +127,27 @@ export async function recordPayment(data: unknown) {
           })
         } catch (emailErr) {
           console.error("Failed to auto-send receipt email:", emailErr)
+        }
+      }
+
+      // Send WhatsApp payment confirmation if enabled
+      if (company.openWaEnabled && invoice.customer.phone) {
+        try {
+          const contactPersonName = invoice.customer.name || "Customer"
+          const appUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "")
+          const waMessage = `Hi ${contactPersonName}, we have received your payment of ₹${parsed.data.amount.toLocaleString("en-IN")} for Invoice ${invoice.invoiceNumber}. Remaining balance: ₹${balanceDue.toLocaleString("en-IN")}. View invoice: ${appUrl}/invoices/${invoice.id}`
+          await sendWhatsAppMessage(invoice.customerId, waMessage)
+
+          const receiptPdfBuffer = await generateReceiptPdf(invoice.id)
+          const base64Pdf = Buffer.from(receiptPdfBuffer).toString("base64")
+          await sendWhatsAppDocument(
+            invoice.customerId,
+            base64Pdf,
+            `Receipt-${invoice.invoiceNumber}.pdf`,
+            `Payment Receipt for Invoice ${invoice.invoiceNumber}`
+          )
+        } catch (waErr) {
+          console.error("Failed to auto-send WhatsApp payment receipt:", waErr)
         }
       }
     }

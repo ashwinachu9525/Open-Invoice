@@ -5,6 +5,7 @@ export const APPROVED_TRIGGERS = [
   { id: "DEAL_STAGE_CHANGED", label: "Deal Stage Changed", entity: "DEAL" },
   { id: "DEAL_WON", label: "Deal Won", entity: "DEAL" },
   { id: "ACTIVITY_OVERDUE", label: "Activity Overdue", entity: "ACTIVITY" },
+  { id: "WHATSAPP_MESSAGE_RECEIVED", label: "WhatsApp Message Received", entity: "CUSTOMER" },
   { id: "MANUAL", label: "Manual Trigger", entity: "ALL" },
 ] as const
 
@@ -16,6 +17,8 @@ export const APPROVED_ACTIONS = [
   { id: "DRAFT_EMAIL", label: "Draft Welcome / Follow-up Email", requiresConfirmation: false },
   { id: "UPDATE_STATUS", label: "Update Status / Stage", requiresConfirmation: true },
   { id: "CREATE_INVOICE_DRAFT", label: "Create Invoice Draft in Invoicing App", requiresConfirmation: true },
+  { id: "SEND_WHATSAPP", label: "Send WhatsApp Message", requiresConfirmation: false },
+  { id: "AI_REPLY_WHATSAPP", label: "Generate & Send AI WhatsApp Reply", requiresConfirmation: false },
 ] as const
 
 export interface WorkflowCondition {
@@ -25,7 +28,7 @@ export interface WorkflowCondition {
 }
 
 export interface WorkflowAction {
-  actionType: "ASSIGN_USER" | "CREATE_TASK" | "DRAFT_EMAIL" | "UPDATE_STATUS" | "CREATE_INVOICE_DRAFT"
+  actionType: "ASSIGN_USER" | "CREATE_TASK" | "DRAFT_EMAIL" | "UPDATE_STATUS" | "CREATE_INVOICE_DRAFT" | "SEND_WHATSAPP" | "AI_REPLY_WHATSAPP"
   config: Record<string, any>
 }
 
@@ -38,7 +41,7 @@ export interface ProposedAIWorkflow {
   }
   conditions: WorkflowCondition[]
   actions: Array<{
-    actionType: "ASSIGN_USER" | "CREATE_TASK" | "DRAFT_EMAIL" | "UPDATE_STATUS" | "CREATE_INVOICE_DRAFT"
+    actionType: "ASSIGN_USER" | "CREATE_TASK" | "DRAFT_EMAIL" | "UPDATE_STATUS" | "CREATE_INVOICE_DRAFT" | "SEND_WHATSAPP" | "AI_REPLY_WHATSAPP"
     label: string
     config: Record<string, any>
     requiresConfirmation: boolean

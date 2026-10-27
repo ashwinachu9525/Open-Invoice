@@ -63,6 +63,9 @@ export async function updateOpenWaSettings(data: {
   enabled: boolean
   url?: string
   token?: string
+  aiAutoReply?: boolean
+  autoCreateLeads?: boolean
+  webhookSecret?: string
 }) {
   try {
     const user = await requireUser()
@@ -73,10 +76,7 @@ export async function updateOpenWaSettings(data: {
     const cleanToken = data.token?.trim()
     data = { ...data, url: cleanUrl, token: cleanToken }
 
-    let finalToken = data.token || null
-    // Note: We intentionally skip auto-scoped key creation as it can produce
-    // restricted keys that cannot list or access existing sessions.
-    // Always store the token exactly as provided by the user.
+    const finalToken = data.token || null
 
     await prisma.company.update({
       where: { id: user.companyId },
@@ -84,8 +84,23 @@ export async function updateOpenWaSettings(data: {
         openWaEnabled: data.enabled,
         openWaUrl: data.url || null,
         openWaToken: finalToken,
+        whatsappAiAutoReply: data.aiAutoReply !== undefined ? data.aiAutoReply : undefined,
+        whatsappAutoCreateLeads: data.autoCreateLeads !== undefined ? data.autoCreateLeads : undefined,
+        whatsappWebhookSecret: data.webhookSecret !== undefined ? data.webhookSecret : undefined,
       },
     })
+
+    // If enabled, auto-register webhook with OpenWA gateway
+    if (data.enabled && data.url) {
+      const gatewayUrl = data.url.replace(/\/$/, "")
+      const sessionName = user.companyId
+      const sessionId = await findSessionIdByName(gatewayUrl, sessionName, finalToken)
+      if (sessionId) {
+        const appUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "")
+        const webhookUrl = `${appUrl}/api/webhooks/whatsapp?session=${user.companyId}`
+        await registerOpenWaWebhook(gatewayUrl, sessionId, finalToken, webhookUrl, data.webhookSecret)
+      }
+    }
 
     revalidatePath("/settings")
     return { success: true }
@@ -352,23 +367,85 @@ export async function restartWhatsAppSession() {
 
 async function createWahaSession(gatewayUrl: string, name: string, token: string | null) {
   try {
+    const appUrl = (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "")
+    const webhookUrl = `${appUrl}/api/webhooks/whatsapp?session=${name}`
+
     const response = await fetch(`${gatewayUrl}/api/sessions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { "X-API-Key": token } : {}),
       },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({
+        name,
+        config: {
+          webhooks: [
+            {
+              url: webhookUrl,
+              events: ["message", "message.ack", "session.status"],
+            },
+          ],
+        },
+      }),
       signal: AbortSignal.timeout(10000),
     })
     if (response.ok) {
       const data = await response.json()
       if (data.id) {
         await startWahaSession(gatewayUrl, data.id, token)
+        // Ensure webhook is active
+        await registerOpenWaWebhook(gatewayUrl, data.id, token, webhookUrl)
       }
     }
   } catch (e) {
     console.error("Failed to create OpenWA session:", e)
+  }
+}
+
+async function registerOpenWaWebhook(
+  gatewayUrl: string,
+  sessionId: string,
+  token: string | null,
+  webhookUrl: string,
+  secret?: string | null
+) {
+  try {
+    // 1. Try WAHA session webhooks endpoint
+    await fetch(`${gatewayUrl}/api/sessions/${sessionId}/webhooks`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "X-API-Key": token } : {}),
+      },
+      body: JSON.stringify({
+        url: webhookUrl,
+        events: ["message", "message.ack", "session.status"],
+        hmac: secret ? { key: secret } : undefined,
+      }),
+      signal: AbortSignal.timeout(5000),
+    }).catch(() => {})
+
+    // 2. Also try updating session config with webhooks
+    await fetch(`${gatewayUrl}/api/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "X-API-Key": token } : {}),
+      },
+      body: JSON.stringify({
+        config: {
+          webhooks: [
+            {
+              url: webhookUrl,
+              events: ["message", "message.ack", "session.status"],
+            },
+          ],
+        },
+      }),
+      signal: AbortSignal.timeout(5000),
+    }).catch(() => {})
+  } catch (err) {
+    console.warn("Failed to register OpenWA webhook:", err)
   }
 }
 

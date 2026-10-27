@@ -150,8 +150,8 @@ describe("Admin Tools Suite", () => {
       const res = await dispatchAdminCronTask("temp_cleanup", "secret_admin_pass")
       expect(res.success).toBe(true)
       expect(res.task).toBe("temp_cleanup")
-      expect(res.result.deletedSessionsCount).toBe(3)
-      expect(res.result.cacheCleared).toBe(true)
+      expect(res.result?.deletedSessionsCount).toBe(3)
+      expect(res.result?.cacheCleared).toBe(true)
     })
 
     it("should execute auto_freeze task for compliant companies", async () => {
@@ -166,8 +166,8 @@ describe("Admin Tools Suite", () => {
       const res = await dispatchAdminCronTask("auto_freeze", "secret_admin_pass")
       expect(res.success).toBe(true)
       expect(res.task).toBe("auto_freeze")
-      expect(res.result.evaluatedCompanies).toBe(1)
-      expect(res.result.frozenInvoices).toBe(5)
+      expect(res.result?.evaluatedCompanies).toBe(1)
+      expect(res.result?.frozenInvoices).toBe(5)
     })
   })
 
@@ -180,7 +180,7 @@ describe("Admin Tools Suite", () => {
       const res = await getDatabaseTableMetrics()
       expect(res.success).toBe(true)
       expect(res.tables).toBeDefined()
-      expect(res.tables.length).toBeGreaterThan(5)
+      expect(res.tables?.length).toBeGreaterThan(5)
       expect(res.totalRecords).toBeGreaterThan(0)
     })
   })

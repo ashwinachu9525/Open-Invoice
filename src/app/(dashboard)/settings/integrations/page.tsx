@@ -22,6 +22,9 @@ export default async function IntegrationsPage() {
           initialUrl={company.openWaUrl}
           initialToken={company.openWaToken}
           initialProvider={company.whatsappProvider}
+          initialAiAutoReply={company.whatsappAiAutoReply}
+          initialAutoCreateLeads={company.whatsappAutoCreateLeads}
+          initialWebhookSecret={company.whatsappWebhookSecret}
         />
       )}
 

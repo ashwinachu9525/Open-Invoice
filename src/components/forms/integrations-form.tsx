@@ -26,7 +26,12 @@ import {
   PowerOff,
   Phone,
   Loader2,
-  Settings
+  Settings,
+  Bot,
+  Sparkles,
+  Copy,
+  Check,
+  UserPlus
 } from "lucide-react"
 
 interface IntegrationsFormProps {
@@ -35,6 +40,9 @@ interface IntegrationsFormProps {
   initialUrl: string | null
   initialToken: string | null
   initialProvider?: string | null
+  initialAiAutoReply?: boolean
+  initialAutoCreateLeads?: boolean
+  initialWebhookSecret?: string | null
 }
 
 type ConnectionState = "DISABLED" | "DOWN" | "STARTING" | "QR_READY" | "CONNECTED" | "FAILED"
@@ -45,6 +53,9 @@ export function IntegrationsForm({
   initialUrl,
   initialToken,
   initialProvider,
+  initialAiAutoReply,
+  initialAutoCreateLeads,
+  initialWebhookSecret,
 }: IntegrationsFormProps) {
   const [enabled, setEnabled] = useState(initialEnabled)
   const [url, setUrl] = useState(initialUrl || "")
@@ -52,6 +63,10 @@ export function IntegrationsForm({
   const [provider, setProvider] = useState(initialProvider || "openwa")
   const [showConfig, setShowConfig] = useState(!initialUrl)
   const [loading, setLoading] = useState(false)
+  const [aiAutoReply, setAiAutoReply] = useState(initialAiAutoReply ?? false)
+  const [autoCreateLeads, setAutoCreateLeads] = useState(initialAutoCreateLeads ?? true)
+  const [webhookSecret, setWebhookSecret] = useState(initialWebhookSecret || "")
+  const [copiedWebhook, setCopiedWebhook] = useState(false)
 
   // WAHA session status states
   const [status, setStatus] = useState<ConnectionState>("DISABLED")
@@ -349,6 +364,9 @@ export function IntegrationsForm({
         enabled,
         url,
         token,
+        aiAutoReply,
+        autoCreateLeads,
+        webhookSecret: webhookSecret.trim() || undefined,
       })
 
       if (res.error) {
@@ -491,6 +509,98 @@ export function IntegrationsForm({
                   onChange={(e) => setToken(e.target.value)}
                   className="bg-white/2 border-white/10 text-slate-100 placeholder-slate-600 focus:border-indigo-500/50"
                 />
+              </div>
+
+              {/* CRM & AI Orchestration Settings */}
+              <div className="pt-3 border-t border-white/5 space-y-3">
+                <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> CRM & AI Automation
+                </div>
+
+                {/* AI Auto-Reply Switch */}
+                <div className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/2">
+                  <div className="space-y-0.5 pr-4">
+                    <Label htmlFor="openwa-ai-reply" className="text-xs font-semibold text-slate-200 flex items-center gap-1.5 cursor-pointer">
+                      <Bot className="w-3.5 h-3.5 text-indigo-400" /> AI-Assisted WhatsApp Auto-Reply
+                    </Label>
+                    <p className="text-[11px] text-slate-400">
+                      Uses the existing multi-provider AI orchestrator to answer customer questions about balances, invoices, and quotations. Honors human handover suppression tags.
+                    </p>
+                  </div>
+                  <Switch
+                    id="openwa-ai-reply"
+                    checked={aiAutoReply}
+                    onCheckedChange={setAiAutoReply}
+                    className="data-[state=checked]:bg-indigo-600"
+                  />
+                </div>
+
+                {/* Auto-Create Leads Switch */}
+                <div className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/2">
+                  <div className="space-y-0.5 pr-4">
+                    <Label htmlFor="openwa-auto-leads" className="text-xs font-semibold text-slate-200 flex items-center gap-1.5 cursor-pointer">
+                      <UserPlus className="w-3.5 h-3.5 text-emerald-400" /> Auto-Create CRM Leads
+                    </Label>
+                    <p className="text-[11px] text-slate-400">
+                      Automatically registers unrecognized incoming WhatsApp senders as new CRM leads and initiates workflow triggers.
+                    </p>
+                  </div>
+                  <Switch
+                    id="openwa-auto-leads"
+                    checked={autoCreateLeads}
+                    onCheckedChange={setAutoCreateLeads}
+                    className="data-[state=checked]:bg-emerald-600"
+                  />
+                </div>
+
+                {/* Webhook Secret */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="openwa-webhook-secret" className="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                    <Key className="w-3.5 h-3.5 text-indigo-400" /> Webhook Secret (Optional)
+                  </Label>
+                  <Input
+                    id="openwa-webhook-secret"
+                    type="password"
+                    placeholder="Shared secret for X-Webhook-Secret signature verification"
+                    value={webhookSecret}
+                    onChange={(e) => setWebhookSecret(e.target.value)}
+                    className="bg-white/2 border-white/10 text-slate-100 placeholder-slate-600 focus:border-indigo-500/50"
+                  />
+                </div>
+
+                {/* Inbound Webhook URL Display */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                    <Globe className="w-3.5 h-3.5 text-indigo-400" /> Inbound Webhook URL (For OpenWA / WAHA)
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={typeof window !== "undefined" ? `${window.location.origin}/api/webhooks/whatsapp?session=${companyId}` : `/api/webhooks/whatsapp?session=${companyId}`}
+                      className="bg-black/30 border-white/10 text-slate-300 font-mono text-[11px] select-all cursor-text"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (typeof window !== "undefined") {
+                          navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/whatsapp?session=${companyId}`)
+                          setCopiedWebhook(true)
+                          toast.success("Webhook URL copied to clipboard")
+                          setTimeout(() => setCopiedWebhook(false), 2000)
+                        }
+                      }}
+                      className="border-white/10 hover:bg-white/8 text-slate-200 h-9 shrink-0 gap-1"
+                    >
+                      {copiedWebhook ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                      <span className="text-xs">{copiedWebhook ? "Copied" : "Copy"}</span>
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    OpenWA receives inbound messages and status events at this URL automatically when connected.
+                  </p>
+                </div>
               </div>
             </div>
             <div className="pt-2 flex justify-end">
@@ -704,6 +814,27 @@ export function IntegrationsForm({
                     )}
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {!statusLoading && status === "CONNECTED" && (
+              <div className="p-4 rounded-xl border border-white/5 bg-white/1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-400">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-slate-300">CRM Lifecycle:</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${aiAutoReply ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400" : "bg-white/5 border-white/10 text-slate-400"}`}>
+                    AI Auto-Reply: {aiAutoReply ? "Enabled" : "Disabled"}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${autoCreateLeads ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-white/5 border-white/10 text-slate-400"}`}>
+                    Auto-Capture Leads: {autoCreateLeads ? "Active" : "Disabled"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowConfig(true)}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 underline font-medium self-start sm:self-auto"
+                >
+                  Configure CRM settings
+                </button>
               </div>
             )}
           </div>

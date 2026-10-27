@@ -224,6 +224,9 @@ model Company {
   whatsappPhoneId        String?  // Meta Phone Number ID
   whatsappMetaToken      String?  // Encrypted token
   whatsappSentCount      Int      @default(0)    // usage tracking
+  whatsappAiAutoReply    Boolean  @default(false)
+  whatsappAutoCreateLeads Boolean @default(true)
+  whatsappWebhookSecret  String?
 
   @@index([gstNumber])
 }
