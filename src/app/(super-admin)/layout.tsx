@@ -1,27 +1,22 @@
 import { ReactNode } from "react"
 import Link from "next/link"
-import { Home, Users, Settings, Menu, Zap, Wrench, Database, Upload, Activity } from "lucide-react"
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"
+import { Menu, Zap, LayoutGrid } from "lucide-react"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { SignOutButton } from "@/components/dashboard/sign-out-button"
 import { ThemeToggle } from "@/components/dashboard/theme-toggle"
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
-
-const superAdminNavItems = [
-  { href: "/admin", label: "Dashboard", icon: Home },
-  { href: "/admin/health", label: "Health Check", icon: Activity },
-  { href: "/admin/users", label: "Manage Users", icon: Users },
-  { href: "/admin/tools", label: "Admin Tools", icon: Wrench },
-  { href: "/admin/import", label: "Backup & Restore", icon: Database },
-  { href: "/admin/sql", label: "SQL Console", icon: Database },
-  { href: "/admin/feature-requests", label: "Feature Requests", icon: Zap },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
-]
+import { prisma } from "@/lib/prisma"
+import { AdminDesktopNav, AdminMobileNav } from "@/components/admin/admin-sidebar-nav"
 
 export default async function SuperAdminLayout({ children }: { children: ReactNode }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
   if (session.user.role !== "SUPER_ADMIN") redirect("/dashboard")
+
+  const pendingProCount = await prisma.company.count({
+    where: { proRequestStatus: "PENDING" },
+  }).catch(() => 0)
 
   const initials = session.user.name
     ? session.user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -43,19 +38,8 @@ export default async function SuperAdminLayout({ children }: { children: ReactNo
           </Link>
         </div>
 
-        <nav className="flex-1 overflow-auto py-4 px-3 space-y-1">
-          {superAdminNavItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-white/8 hover:text-foreground hover:translate-x-0.5"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 group-hover:bg-amber-500/20 group-hover:text-amber-500 transition-all duration-200">
-                <item.icon className="h-4 w-4" />
-              </span>
-              {item.label}
-            </Link>
-          ))}
+        <nav className="flex-1 overflow-y-auto py-5 px-3">
+          <AdminDesktopNav pendingProCount={pendingProCount} />
         </nav>
 
         <div className="border-t border-white/8 p-4 space-y-3">
@@ -89,21 +73,8 @@ export default async function SuperAdminLayout({ children }: { children: ReactNo
                   <span className="font-bold gradient-text">Central Admin</span>
                 </Link>
               </div>
-              <nav className="flex-1 overflow-auto grid gap-1 p-3 mt-2">
-                {superAdminNavItems.map((item) => (
-                  <SheetClose
-                    key={item.href}
-                    render={
-                      <Link
-                        href={item.href}
-                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-white/8 hover:text-foreground transition-all"
-                      />
-                    }
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </SheetClose>
-                ))}
+              <nav className="flex-1 overflow-y-auto">
+                <AdminMobileNav pendingProCount={pendingProCount} />
               </nav>
               <div className="border-t border-white/8 p-4 shrink-0">
                 <SignOutButton />
@@ -111,14 +82,30 @@ export default async function SuperAdminLayout({ children }: { children: ReactNo
             </SheetContent>
           </Sheet>
 
-          <div className="flex w-full items-center justify-end gap-3">
-            <ThemeToggle />
-            <div className="h-8 w-px bg-white/10" />
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-white text-xs font-bold">
-                {initials}
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="hidden md:flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                Live Control Center
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 ml-auto">
+              <Link
+                href="/dashboard"
+                className="hidden sm:inline-flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 transition-all"
+              >
+                <LayoutGrid className="w-3.5 h-3.5 text-indigo-400" />
+                Tenant Dashboard
+              </Link>
+              <ThemeToggle />
+              <div className="h-8 w-px bg-white/10" />
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-white text-xs font-bold">
+                  {initials}
+                </div>
+                <span className="hidden sm:block text-sm font-medium text-amber-500">Super Admin</span>
               </div>
-              <span className="hidden sm:block text-sm font-medium text-amber-500">Super Admin</span>
             </div>
           </div>
         </header>

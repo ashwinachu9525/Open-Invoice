@@ -4,6 +4,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath, revalidateTag } from "next/cache"
 import { getSystemConfig as getDbSystemConfig } from "@/lib/system-config"
+import { getNextRunDate } from "@/lib/date-utils"
 import fs from "fs"
 import path from "path"
 import os from "os"
@@ -915,6 +916,525 @@ export async function getSystemHealthCheck() {
     throw new Error(error.message || "Failed to fetch health metrics.")
   }
 }
+
+export async function testSmtpDiagnostic(params: {
+  host?: string
+  port?: number
+  user?: string
+  pass?: string
+  secure?: boolean
+  toEmail?: string
+}) {
+  const session = await auth()
+  if (session?.user?.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const host = params.host || process.env.APP_SMTP_HOST
+  const port = params.port || Number(process.env.APP_SMTP_PORT) || 587
+  const user = params.user || process.env.APP_SMTP_USER
+  const pass = params.pass || process.env.APP_SMTP_PASS
+  const secure = params.secure !== undefined ? params.secure : port === 465
+
+  if (!host || !user || !pass) {
+    return {
+      success: false,
+      error: "Missing SMTP configuration. Provide host, user, and password or configure APP_SMTP_* environment variables."
+    }
+  }
+
+  const startTime = Date.now()
+  try {
+    const nodemailer = (await import("nodemailer")).default
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 8000,
+    })
+
+    // 1. Verify connection & credentials
+    await transporter.verify()
+    const verifyDuration = Date.now() - startTime
+
+    let mailSent = false
+    let mailDuration = 0
+    let messageId: string | null = null
+
+    // 2. Optional test email send
+    if (params.toEmail && params.toEmail.trim()) {
+      const sendStart = Date.now()
+      const appName = process.env.NEXT_PUBLIC_APP_NAME || "Open-Invoice"
+      const info = await transporter.sendMail({
+        from: `"${appName} Diagnostic" <${user}>`,
+        to: params.toEmail.trim(),
+        subject: `[Diagnostic Test] SMTP Connection Verified - ${appName}`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <div style="display: inline-block; padding: 6px 12px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 9999px; font-size: 12px; font-weight: 700; color: #059669; margin-bottom: 16px;">
+              SMTP HANDSHAKE VERIFIED
+            </div>
+            <h2 style="margin: 0 0 12px 0; color: #0f172a; font-size: 20px;">Open-Invoice SMTP Diagnostic Test</h2>
+            <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
+              This diagnostic email confirms that your outgoing mail server is properly connected, authenticated, and capable of delivering outbound invoices and campaign emails.
+            </p>
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 16px;">
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 8px 0; color: #64748b;">SMTP Host:</td>
+                <td style="padding: 8px 0; font-weight: 600; color: #0f172a; text-align: right;">${host}:${port}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 8px 0; color: #64748b;">Security:</td>
+                <td style="padding: 8px 0; font-weight: 600; color: #0f172a; text-align: right;">${secure ? "SSL/TLS (Port 465)" : "STARTTLS"}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 8px 0; color: #64748b;">Handshake Latency:</td>
+                <td style="padding: 8px 0; font-weight: 600; color: #059669; text-align: right;">${verifyDuration} ms</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #64748b;">Dispatched At:</td>
+                <td style="padding: 8px 0; font-weight: 600; color: #0f172a; text-align: right;">${new Date().toLocaleString()}</td>
+              </tr>
+            </table>
+          </div>
+        `
+      })
+      mailSent = true
+      mailDuration = Date.now() - sendStart
+      messageId = info.messageId
+    }
+
+    return {
+      success: true,
+      host,
+      port,
+      secure,
+      user,
+      handshakeDurationMs: verifyDuration,
+      mailSent,
+      mailDurationMs: mailDuration,
+      messageId,
+      message: mailSent
+        ? `SMTP handshake successful (${verifyDuration}ms). Diagnostic test email delivered to ${params.toEmail} (${mailDuration}ms).`
+        : `SMTP server connected and authenticated successfully in ${verifyDuration}ms.`
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      host,
+      port,
+      user,
+      error: err.message || "Failed to establish SMTP connection.",
+      code: err.code || "UNKNOWN_ERROR",
+      command: err.command || null,
+      response: err.response || null
+    }
+  }
+}
+
+export async function dispatchAdminCronTask(
+  task: "recurring_invoices" | "auto_freeze" | "trial_check" | "temp_cleanup",
+  passwordSecret: string,
+  options?: { force?: boolean }
+) {
+  const session = await auth()
+  if (session?.user?.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const adminPassword = process.env.ADMIN_SQL_PASSWORD
+  if (!adminPassword || passwordSecret !== adminPassword) {
+    return { success: false, error: "Incorrect Admin Secret Password" }
+  }
+
+  const startTime = Date.now()
+
+  try {
+    if (task === "recurring_invoices") {
+      const isForce = Boolean(options?.force)
+      const schedules = await prisma.recurringSchedule.findMany({
+        where: { status: "ACTIVE" },
+        include: {
+          invoice: {
+            include: {
+              items: true,
+              customer: true,
+              company: { include: { users: true } },
+            },
+          },
+        },
+      })
+
+      let generated = 0
+      let skipped = 0
+      const now = new Date()
+
+      for (const schedule of schedules) {
+        if (!isForce && schedule.nextRunAt > now) {
+          skipped++
+          continue
+        }
+
+        const source = schedule.invoice
+        if (!source || !source.company) continue
+
+        const count = await prisma.invoice.count({ where: { companyId: source.companyId } })
+        const prefix = source.company.invoicePrefix || "INV"
+        const invoiceNumber = `${prefix}-${now.getFullYear()}-${String(count + 1).padStart(4, "0")}`
+
+        const dueDate = new Date(now)
+        dueDate.setDate(dueDate.getDate() + 30)
+
+        await prisma.invoice.create({
+          data: {
+            companyId: source.companyId,
+            customerId: source.customerId,
+            invoiceNumber,
+            date: now,
+            dueDate,
+            currency: source.currency,
+            notes: source.notes,
+            terms: source.terms,
+            status: "DRAFT",
+            subTotal: source.subTotal,
+            totalDiscount: source.totalDiscount,
+            totalTax: source.totalTax,
+            finalAmount: source.finalAmount,
+            balanceDue: source.finalAmount,
+            items: {
+              create: source.items.map((i: any) => ({
+                description: i.description,
+                hsnSac: i.hsnSac,
+                quantity: i.quantity,
+                unitPrice: i.unitPrice,
+                discount: i.discount,
+                taxPercentage: i.taxPercentage,
+                taxableAmount: i.taxableAmount,
+                taxAmount: i.taxAmount,
+                total: i.total,
+              })),
+            },
+          },
+        })
+
+        // Advance nextRunAt
+        const nextRun = getNextRunDate(schedule.frequency, now)
+
+        await prisma.recurringSchedule.update({
+          where: { id: schedule.id },
+          data: { nextRunAt: nextRun },
+        })
+
+        generated++
+      }
+
+      const durationMs = Date.now() - startTime
+      return {
+        success: true,
+        task,
+        durationMs,
+        result: {
+          totalActiveSchedules: schedules.length,
+          generated,
+          skipped,
+        },
+        message: `Processed ${schedules.length} active recurring schedules. Generated ${generated} invoices (${skipped} skipped until scheduled date). Completed in ${durationMs}ms.`
+      }
+    } else if (task === "auto_freeze") {
+      const companies = await prisma.company.findMany({
+        where: {
+          autoFreezeMonths: { not: null },
+          deletedAt: null,
+        },
+        select: { id: true, name: true, autoFreezeMonths: true },
+      })
+
+      let totalFrozen = 0
+      for (const comp of companies) {
+        if (!comp.autoFreezeMonths) continue
+        const cutoff = new Date()
+        cutoff.setMonth(cutoff.getMonth() - comp.autoFreezeMonths)
+
+        const res = await prisma.invoice.updateMany({
+          where: {
+            companyId: comp.id,
+            date: { lt: cutoff },
+            isFrozen: false,
+            deletedAt: null,
+          },
+          data: { isFrozen: true },
+        })
+        totalFrozen += res.count
+      }
+
+      const durationMs = Date.now() - startTime
+      return {
+        success: true,
+        task,
+        durationMs,
+        result: {
+          evaluatedCompanies: companies.length,
+          frozenInvoices: totalFrozen,
+        },
+        message: `Evaluated ${companies.length} compliance companies. Successfully froze ${totalFrozen} invoices older than threshold. Completed in ${durationMs}ms.`
+      }
+    } else if (task === "trial_check") {
+      const now = new Date()
+      const expiredCompanies = await prisma.company.findMany({
+        where: {
+          trialEndsAt: { lt: now },
+          subscriptionTier: "PRO",
+        },
+        include: { users: true },
+      })
+
+      for (const comp of expiredCompanies) {
+        await prisma.company.update({
+          where: { id: comp.id },
+          data: { subscriptionTier: "FREE" },
+        })
+        await prisma.user.updateMany({
+          where: { companyId: comp.id },
+          data: { isPro: false },
+        })
+      }
+
+      const durationMs = Date.now() - startTime
+      return {
+        success: true,
+        task,
+        durationMs,
+        result: {
+          expiredCount: expiredCompanies.length,
+          companies: expiredCompanies.map(c => ({ id: c.id, name: c.name, expiredAt: c.trialEndsAt })),
+        },
+        message: `Identified ${expiredCompanies.length} expired trial companies and downgraded accounts to FREE tier. Completed in ${durationMs}ms.`
+      }
+    } else if (task === "temp_cleanup") {
+      const now = new Date()
+      const deletedSessions = await prisma.session.deleteMany({
+        where: { expires: { lt: now } },
+      })
+
+      let cacheCleared = false
+      try {
+        const { flushValkeyCache } = await import("@/lib/redis")
+        await flushValkeyCache("*")
+        cacheCleared = true
+      } catch {}
+
+      const durationMs = Date.now() - startTime
+      return {
+        success: true,
+        task,
+        durationMs,
+        result: {
+          deletedSessionsCount: deletedSessions.count,
+          cacheCleared,
+        },
+        message: `Purged ${deletedSessions.count} expired sessions and cleared memory cache. Completed in ${durationMs}ms.`
+      }
+    }
+
+    return { success: false, error: "Invalid task type specified." }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to execute cron task." }
+  }
+}
+
+export async function getDatabaseTableMetrics() {
+  const session = await auth()
+  if (session?.user?.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized" }
+  }
+  try {
+    const [
+      users,
+      companies,
+      invoices,
+      invoiceItems,
+      quotations,
+      payments,
+      customers,
+      auditLogs,
+      emailLogs,
+      appErrors,
+      webhooks,
+      sessions,
+      userFeedback,
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.company.count(),
+      prisma.invoice.count(),
+      prisma.invoiceItem.count(),
+      prisma.quotation.count(),
+      prisma.payment.count(),
+      prisma.customer.count(),
+      prisma.auditLog.count(),
+      prisma.emailLog.count(),
+      prisma.appError.count(),
+      prisma.webhook.count(),
+      prisma.session.count(),
+      prisma.userFeedback.count(),
+    ])
+
+    return {
+      success: true,
+      tables: [
+        { name: "Invoices", count: invoices, category: "Core Business" },
+        { name: "Invoice Line Items", count: invoiceItems, category: "Core Business" },
+        { name: "Quotations", count: quotations, category: "Core Business" },
+        { name: "Payments", count: payments, category: "Core Business" },
+        { name: "Customers", count: customers, category: "CRM & Entities" },
+        { name: "Companies (Tenants)", count: companies, category: "Tenants" },
+        { name: "Users", count: users, category: "Access & Auth" },
+        { name: "Active Sessions", count: sessions, category: "Access & Auth" },
+        { name: "Audit Logs", count: auditLogs, category: "Logs & Telemetry" },
+        { name: "Email Delivery Logs", count: emailLogs, category: "Logs & Telemetry" },
+        { name: "Application Errors", count: appErrors, category: "Logs & Telemetry" },
+        { name: "User Feedback", count: userFeedback, category: "Support" },
+        { name: "Webhooks", count: webhooks, category: "Integrations" },
+      ],
+      totalRecords: users + companies + invoices + invoiceItems + quotations + payments + customers + auditLogs + emailLogs + appErrors + webhooks + sessions + userFeedback
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to fetch table metrics" }
+  }
+}
+
+export async function purgeOldSystemLogs(
+  logType: "app_errors" | "audit_logs" | "all",
+  daysOld: number,
+  dryRun: boolean,
+  passwordSecret: string
+) {
+  const session = await auth()
+  if (session?.user?.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized" }
+  }
+  const adminPassword = process.env.ADMIN_SQL_PASSWORD
+  if (!adminPassword || passwordSecret !== adminPassword) {
+    return { success: false, error: "Incorrect Admin Secret Password" }
+  }
+  if (daysOld < 7) {
+    return { success: false, error: "Retention threshold must be at least 7 days." }
+  }
+
+  const cutoff = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000)
+
+  try {
+    let appErrorsCount = 0
+    let auditLogsCount = 0
+
+    if (logType === "app_errors" || logType === "all") {
+      if (dryRun) {
+        appErrorsCount = await prisma.appError.count({
+          where: { createdAt: { lt: cutoff } }
+        })
+      } else {
+        const res = await prisma.appError.deleteMany({
+          where: { createdAt: { lt: cutoff } }
+        })
+        appErrorsCount = res.count
+      }
+    }
+
+    if (logType === "audit_logs" || logType === "all") {
+      if (dryRun) {
+        auditLogsCount = await prisma.auditLog.count({
+          where: { createdAt: { lt: cutoff } }
+        })
+      } else {
+        const res = await prisma.auditLog.deleteMany({
+          where: { createdAt: { lt: cutoff } }
+        })
+        auditLogsCount = res.count
+      }
+    }
+
+    return {
+      success: true,
+      dryRun,
+      daysOld,
+      cutoff: cutoff.toISOString(),
+      purged: {
+        appErrors: appErrorsCount,
+        auditLogs: auditLogsCount,
+        total: appErrorsCount + auditLogsCount
+      },
+      message: dryRun
+        ? `Found ${appErrorsCount + auditLogsCount} records older than ${daysOld} days (${appErrorsCount} errors, ${auditLogsCount} audit logs) eligible for purge.`
+        : `Successfully purged ${appErrorsCount + auditLogsCount} records older than ${daysOld} days.`
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to purge logs." }
+  }
+}
+
+export async function checkDomainDnsHealth(domain: string) {
+  const session = await auth()
+  if (session?.user?.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "").trim()
+  if (!cleanDomain) {
+    return { success: false, error: "Domain name is required." }
+  }
+
+  try {
+    const dns = await import("dns/promises")
+    let ipv4: string[] = []
+    let cnames: string[] = []
+    let mx: any[] = []
+
+    try {
+      ipv4 = await dns.resolve4(cleanDomain)
+    } catch {}
+
+    try {
+      cnames = await dns.resolveCname(cleanDomain)
+    } catch {}
+
+    try {
+      mx = await dns.resolveMx(cleanDomain)
+    } catch {}
+
+    let httpStatus = "Unknown"
+    let latencyMs = -1
+    const testStart = Date.now()
+    try {
+      const res = await fetch(`https://${cleanDomain}`, {
+        method: "HEAD",
+        redirect: "follow",
+        signal: AbortSignal.timeout(5000)
+      })
+      latencyMs = Date.now() - testStart
+      httpStatus = `${res.status} ${res.statusText}`
+    } catch (fetchErr: any) {
+      httpStatus = `Failed: ${fetchErr.message}`
+    }
+
+    return {
+      success: true,
+      domain: cleanDomain,
+      records: {
+        a: ipv4,
+        cname: cnames,
+        mx: mx.map(m => `${m.exchange} (priority ${m.priority})`)
+      },
+      httpStatus,
+      latencyMs,
+      hasRecords: ipv4.length > 0 || cnames.length > 0
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || "DNS lookup failed." }
+  }
+}
+
 
 
 
